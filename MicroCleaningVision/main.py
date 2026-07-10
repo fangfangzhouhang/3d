@@ -105,7 +105,7 @@ class MainController:
         try:
             # 初始化相机模块
             from camera.camera import CameraManager
-            self.camera_manager = CameraManager(self.config)
+            self.camera_manager = CameraManager(self.config, self.globallogger)
             self.camera_manager.connect()
             self.globallogger.info("相机模块初始化成功", module="Main", function="initialize_modules")
             

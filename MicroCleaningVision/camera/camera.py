@@ -33,19 +33,22 @@ class CameraManager:
     
     Attributes:
         config: 配置对象
+        logger: 日志对象
         top_camera: 顶部相机实例
         angle_camera: 45度相机实例
         is_connected: 是否连接成功
     """
     
-    def __init__(self, config):
+    def __init__(self, config, logger=None):
         """
         初始化相机管理器
         
         参数:
             config: 配置对象
+            logger: 日志对象（可选，不传入时使用全局日志实例）
         """
         self.config = config
+        self.logger = logger
         
         # 相机实例（延迟初始化）
         self.top_camera = None
@@ -54,7 +57,10 @@ class CameraManager:
         # 连接状态
         self.is_connected = False
         
-        logger.info("相机管理器初始化完成")
+        if self.logger:
+            self.logger.info("相机管理器初始化完成", module="Camera", function="__init__")
+        else:
+            logger.info("相机管理器初始化完成")
     
     def connect(self):
         """

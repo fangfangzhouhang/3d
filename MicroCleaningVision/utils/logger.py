@@ -100,7 +100,7 @@ class ExperimentManager:
         """
         从日志目录读取最后一个实验编号
         """
-        log_dir = "logs/"
+        log_dir = "output/logs/"
         if os.path.exists(log_dir):
             max_counter = 0
             for date_folder in os.listdir(log_dir):
@@ -216,12 +216,34 @@ class Logger:
         else:
             # 默认配置
             self.log_level = "INFO"
-            self.log_dir = "logs/"
+            self.log_dir = "output/logs/"
             self.max_size = 10
-            self.backup_count = 30
+            self.backup_count = 7
             self.use_color = True
             self.console_output = True
             self.file_output = True
+    
+    def _clean_old_logs(self):
+        """
+        清理过期日志文件
+        
+        根据backup_count配置，删除超过指定天数的日志目录
+        """
+        if not os.path.exists(self.log_dir):
+            return
+        
+        today = datetime.now()
+        for date_folder in os.listdir(self.log_dir):
+            if os.path.isdir(os.path.join(self.log_dir, date_folder)):
+                try:
+                    folder_date = datetime.strptime(date_folder, "%Y-%m-%d")
+                    days_diff = (today - folder_date).days
+                    if days_diff > self.backup_count:
+                        folder_path = os.path.join(self.log_dir, date_folder)
+                        import shutil
+                        shutil.rmtree(folder_path)
+                except ValueError:
+                    pass
     
     def init(self):
         """
@@ -238,6 +260,9 @@ class Logger:
             
             # 确保日志根目录存在
             os.makedirs(self.log_dir, exist_ok=True)
+            
+            # 清理过期日志
+            self._clean_old_logs()
             
             # 获取当前日期目录
             today = datetime.now().strftime("%Y-%m-%d")

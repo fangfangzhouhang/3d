@@ -49,8 +49,8 @@ class DepthMapGenerator:
         
         # 深度图数据
         self.depth_map = None
-        self.min_depth = config.reconstruction.depth_min
-        self.max_depth = config.reconstruction.depth_max
+        self.min_depth = config.reconstruction.min_depth
+        self.max_depth = config.reconstruction.max_depth
         
         self.logger.info("深度图生成模块初始化完成")
     

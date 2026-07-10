@@ -104,6 +104,9 @@ class DetectionConfig:
         input_size: 模型输入尺寸
         num_classes: 类别数量
         class_names: 类别名称列表
+        min_stain_area: 最小污渍面积（像素）
+        max_stain_area: 最大污渍面积（像素）
+        enable_preprocessing: 是否启用图像预处理
     """
     
     def __init__(self):
@@ -120,6 +123,13 @@ class DetectionConfig:
         # 类别配置
         self.num_classes = 1
         self.class_names = ["contamination"]
+        
+        # 污渍面积过滤参数
+        self.min_stain_area = 10
+        self.max_stain_area = 10000
+        
+        # 预处理配置
+        self.enable_preprocessing = True
 
 
 class ModelConfig:
@@ -140,8 +150,8 @@ class ModelConfig:
     
     def __init__(self):
         # 模型路径
-        self.yolo_model_path = "models/yolov8n.pt"
-        self.custom_model_path = "models/custom.pt"
+        self.yolo_model_path = "output/models/yolov8n.pt"
+        self.custom_model_path = "output/models/custom.pt"
         
         # 模型类型
         self.custom_model_type = "pytorch"
@@ -202,6 +212,7 @@ class PlanningConfig:
         deceleration: 减速度（毫米/秒²）
         spray_duration: 默认喷射时间（毫秒）
         spray_pressure: 默认喷射压力（0.0-1.0）
+        spray_radius: 喷射半径（毫米）
         min_spray_duration: 最小喷射时间（毫秒）
         max_spray_duration: 最大喷射时间（毫秒）
         path_optimization: 是否启用路径优化
@@ -209,6 +220,9 @@ class PlanningConfig:
         safety_margin: 安全边距（毫米）
         approach_distance: 接近距离（毫米）
         retract_distance: 撤回距离（毫米）
+        cleaning_threshold: 清洗效果阈值（0.0-1.0）
+        max_cleaning_iterations: 最大清洗迭代次数
+        enable_auto_cleaning: 是否启用自动清洗
     """
     
     def __init__(self):
@@ -220,6 +234,7 @@ class PlanningConfig:
         # 喷射参数
         self.spray_duration = 1000
         self.spray_pressure = 0.5
+        self.spray_radius = 2.0
         self.min_spray_duration = 100
         self.max_spray_duration = 5000
         
@@ -231,6 +246,11 @@ class PlanningConfig:
         self.safety_margin = 1.0
         self.approach_distance = 5.0
         self.retract_distance = 5.0
+        
+        # 清洗决策参数
+        self.cleaning_threshold = 0.95
+        self.max_cleaning_iterations = 5
+        self.enable_auto_cleaning = True
 
 
 class ReconstructionConfig:
@@ -293,11 +313,11 @@ class DatasetConfig:
     
     def __init__(self):
         # 数据集路径
-        self.dataset_path = "dataset/"
-        self.train_path = "dataset/train/"
-        self.val_path = "dataset/val/"
-        self.test_path = "dataset/test/"
-        self.annotations_path = "dataset/annotations/"
+        self.dataset_path = "output/datasets/"
+        self.train_path = "output/datasets/train/"
+        self.val_path = "output/datasets/val/"
+        self.test_path = "output/datasets/test/"
+        self.annotations_path = "output/datasets/annotations/"
         
         # 数据加载参数
         self.batch_size = 8
@@ -330,11 +350,11 @@ class SaveConfig:
     
     def __init__(self):
         # 保存路径
-        self.save_path = "data/"
-        self.capture_path = "data/captures/"
-        self.detection_path = "data/detections/"
-        self.reconstruction_path = "data/reconstructions/"
-        self.log_path = "logs/"
+        self.save_path = "output/data/"
+        self.capture_path = "output/data/captures/"
+        self.detection_path = "output/data/detections/"
+        self.reconstruction_path = "output/data/reconstructions/"
+        self.log_path = "output/logs/"
         
         # 保存格式
         self.save_format = "jpg"
@@ -376,12 +396,12 @@ class LoggingConfig:
         self.level = "INFO"
         
         # 日志路径
-        self.file_path = "logs/"
+        self.file_path = "output/logs/"
         self.log_file_name = "app.log"
         
         # 文件管理
         self.max_size = 10
-        self.backup_count = 5
+        self.backup_count = 7
         
         # 格式配置
         self.format = "{time} | {level} | {message}"
