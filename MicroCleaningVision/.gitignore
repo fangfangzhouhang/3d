@@ -1,0 +1,93 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.env/
+.tox/
+.eggs/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Logs
+logs/
+*.log
+*.log.*
+app.log_*
+
+# Data
+data/
+dataset/
+*.db
+*.sqlite
+*.sqlite3
+
+# Models
+models/*.pt
+models/*.pth
+models/*.onnx
+models/*.engine
+!models/__init__.py
+
+# Visual Studio Code
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS
+*.bak
+*.tmp
+*.old
+
+# Configuration
+config_local.py
+config.yaml
+config.json
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+coverage.json
+nosetests.xml
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Documentation
+docs/_build/
+docs/.doctrees/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+*.spec
+*.exe
+*.dll
+*.so
+
+# Temporary files
+*.tmp
+*.temp
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/

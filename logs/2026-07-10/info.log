@@ -1,0 +1,20 @@
+2026-07-10 15:57:01.135 | INFO     | Logger       | init                 | N/A        | 日志系统初始化完成
+2026-07-10 15:57:01.135 | INFO     | Logger       | init                 | N/A        | 日志级别: INFO
+2026-07-10 15:57:01.135 | INFO     | Logger       | init                 | N/A        | 日志目录: D:\大创\opencv\logs
+2026-07-10 15:57:01.135 | INFO     | Experiment   | start                | EXP_001    | 实验开始: EXP_001
+2026-07-10 15:57:01.135 | INFO     | Main         | __init__             | N/A        | 主控制器初始化完成
+2026-07-10 15:57:01.140 | INFO     | Main         | start                | N/A        | 启动MicroCleaningVision系统...
+2026-07-10 15:57:01.140 | INFO     | Main         | initialize_modules   | N/A        | 开始初始化各个模块...
+2026-07-10 15:57:01.140 | INFO     | Unknown      | Unknown              | N/A        | 相机管理器初始化完成
+2026-07-10 15:57:01.140 | INFO     | Main         | initialize_modules   | N/A        | 相机模块初始化成功
+2026-07-10 15:57:01.140 | INFO     | Unknown      | Unknown              | N/A        | 检测器初始化完成
+2026-07-10 15:57:01.140 | INFO     | Main         | initialize_modules   | N/A        | 检测模块初始化成功
+2026-07-10 15:57:01.140 | INFO     | Unknown      | Unknown              | N/A        | 规划器初始化完成
+2026-07-10 15:57:01.140 | INFO     | Main         | initialize_modules   | N/A        | 规划模块初始化成功
+2026-07-10 15:57:01.144 | INFO     | Unknown      | Unknown              | N/A        | STM32通信模块初始化完成
+2026-07-10 15:57:01.144 | INFO     | Main         | initialize_modules   | N/A        | 通信模块初始化成功
+2026-07-10 15:57:01.144 | INFO     | Main         | initialize_modules   | N/A        | 所有模块初始化完成
+2026-07-10 15:57:01.144 | INFO     | Main         | run_cleaning_cycle   | N/A        | 开始执行清洗循环...
+2026-07-10 15:57:01.144 | INFO     | Main         | run_cleaning_cycle   | N/A        | 步骤1: 采集图像
+2026-07-10 15:57:01.144 | INFO     | Main         | run_cleaning_cycle   | N/A        | 步骤2: AI污染检测
+2026-07-10 15:57:01.144 | INFO     | Main         | run_cleaning_cycle   | N/A        | 未检测到污染物，清洗循环结束
