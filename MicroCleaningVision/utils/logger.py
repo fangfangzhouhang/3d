@@ -283,40 +283,15 @@ class Logger:
                     filter=lambda record: record["level"].no >= self._get_level_number(self.log_level)
                 )
             
-            # 添加INFO级别日志文件
-            info_file = os.path.join(today_dir, "info.log")
+            # 根据配置的日志级别，只记录WARNING及以上级别
+            log_file = os.path.join(today_dir, "app.log")
             self.logger.add(
-                sink=info_file,
+                sink=log_file,
                 format=log_format,
-                level="INFO",
+                level=self.log_level,
                 rotation=self.max_size * 1024 * 1024,
                 retention=self.backup_count,
-                compression="zip",
-                filter=lambda record: record["level"].no == 20
-            )
-            
-            # 添加WARNING级别日志文件
-            warning_file = os.path.join(today_dir, "warning.log")
-            self.logger.add(
-                sink=warning_file,
-                format=log_format,
-                level="WARNING",
-                rotation=self.max_size * 1024 * 1024,
-                retention=self.backup_count,
-                compression="zip",
-                filter=lambda record: record["level"].no == 30
-            )
-            
-            # 添加ERROR级别日志文件（包含CRITICAL）
-            error_file = os.path.join(today_dir, "error.log")
-            self.logger.add(
-                sink=error_file,
-                format=log_format,
-                level="ERROR",
-                rotation=self.max_size * 1024 * 1024,
-                retention=self.backup_count,
-                compression="zip",
-                filter=lambda record: record["level"].no >= 40
+                compression="zip"
             )
             
             self.is_initialized = True

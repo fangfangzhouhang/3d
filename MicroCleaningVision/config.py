@@ -393,15 +393,15 @@ class LoggingConfig:
     
     def __init__(self):
         # 日志级别
-        self.level = "INFO"
+        self.level = "WARNING"
         
         # 日志路径
         self.file_path = "output/logs/"
         self.log_file_name = "app.log"
         
         # 文件管理
-        self.max_size = 10
-        self.backup_count = 7
+        self.max_size = 5
+        self.backup_count = 3
         
         # 格式配置
         self.format = "{time} | {level} | {message}"
@@ -409,7 +409,7 @@ class LoggingConfig:
         
         # 输出配置
         self.use_color = True
-        self.console_output = True
+        self.console_output = False
         self.file_output = True
         
         # 轮转配置
