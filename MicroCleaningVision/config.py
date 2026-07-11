@@ -121,8 +121,8 @@ class DetectionConfig:
         self.input_size = 640
         
         # 类别配置
-        self.num_classes = 1
-        self.class_names = ["contamination"]
+        self.num_classes = 5
+        self.class_names = ["dust", "oil", "scratch", "residue", "fiber"]
         
         # 污渍面积过滤参数
         self.min_stain_area = 10

@@ -1,151 +1,107 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-=========================================================
-MicroCleaningVision - YOLO模型封装模块
-=========================================================
 
-功能描述:
-    封装YOLO模型的加载和推理接口。
-    
-设计原则:
-    1. 提供统一的模型接口
-    2. 支持不同版本的YOLO模型
-    3. 提供推理结果后处理
-    
-TODO:
-    - 实现YOLO模型加载
-    - 添加推理接口
-    - 实现结果后处理
-    - 支持模型配置
-    - 添加推理速度优化
-"""
+from ultralytics import YOLO
+import torch
+import cv2
+import numpy as np
 
 
 class YOLOModel:
-    """
-    YOLO模型类
-    
-    封装YOLO模型的加载和推理。
-    
-    Attributes:
-        config: 配置对象
-        logger: 日志对象
-        model: YOLO模型实例
-        model_path: 模型路径
-        confidence_threshold: 置信度阈值
-        iou_threshold: IoU阈值
-    """
-    
     def __init__(self, config, logger):
-        """
-        初始化YOLO模型
-        
-        参数:
-            config: 配置对象
-            logger: 日志对象
-        """
         self.config = config
         self.logger = logger
-        
-        # 模型实例（延迟初始化）
         self.model = None
-        
-        # 模型路径
         self.model_path = config.models.yolo_model_path
-        
-        # 推理参数
         self.confidence_threshold = config.detection.confidence_threshold
         self.iou_threshold = config.detection.iou_threshold
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
-        self.logger.info("YOLO模型模块初始化完成")
-    
+        self.logger.info(f"YOLO模型模块初始化完成, 设备: {self.device}")
+
     def load(self):
-        """
-        加载YOLO模型
-        
-        返回:
-            bool: 加载是否成功
-        """
-        pass
-    
+        try:
+            self.model = YOLO(self.model_path)
+            self.model.to(self.device)
+            self.logger.info(f"YOLO模型加载成功: {self.model_path}")
+            return True
+        except Exception as e:
+            self.logger.error(f"YOLO模型加载失败: {str(e)}")
+            return False
+
     def unload(self):
-        """
-        卸载模型
-        """
-        pass
-    
+        if self.model is not None:
+            self.model = None
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            self.logger.info("YOLO模型已卸载")
+
     def predict(self, image):
-        """
-        执行推理
+        if self.model is None:
+            self.logger.error("模型未加载")
+            return []
         
-        参数:
-            image: 输入图像
+        try:
+            results = self.model(
+                image,
+                conf=self.confidence_threshold,
+                iou=self.iou_threshold,
+                device=self.device,
+                verbose=False
+            )
             
-        返回:
-            list: 检测结果列表
-        """
-        pass
-    
+            detections = []
+            for result in results:
+                for box in result.boxes:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    conf = float(box.conf[0])
+                    cls = int(box.cls[0])
+                    
+                    area = (x2 - x1) * (y2 - y1)
+                    
+                    detections.append({
+                        'bbox': [x1, y1, x2, y2],
+                        'confidence': conf,
+                        'class': cls,
+                        'class_name': self.config.detection.class_names[cls] if cls < len(self.config.detection.class_names) else 'unknown',
+                        'area': area
+                    })
+            
+            return detections
+        except Exception as e:
+            self.logger.error(f"推理失败: {str(e)}")
+            return []
+
     def predict_batch(self, images):
-        """
-        批量推理
-        
-        参数:
-            images: 输入图像列表
-            
-        返回:
-            list: 检测结果列表
-        """
-        pass
-    
+        results = []
+        for image in images:
+            results.append(self.predict(image))
+        return results
+
     def set_confidence_threshold(self, threshold):
-        """
-        设置置信度阈值
-        
-        参数:
-            threshold: 置信度阈值
-        """
-        pass
-    
+        self.confidence_threshold = threshold
+
     def set_iou_threshold(self, threshold):
-        """
-        设置IoU阈值
-        
-        参数:
-            threshold: IoU阈值
-        """
-        pass
-    
+        self.iou_threshold = threshold
+
     def get_classes(self):
-        """
-        获取类别列表
-        
-        返回:
-            list: 类别名称列表
-        """
-        pass
-    
+        return self.config.detection.class_names
+
     def get_model_info(self):
-        """
-        获取模型信息
-        
-        返回:
-            dict: 模型信息
-        """
-        pass
-    
+        if self.model is None:
+            return {'loaded': False}
+        return {
+            'loaded': True,
+            'path': self.model_path,
+            'device': self.device,
+            'classes': self.get_classes()
+        }
+
     def is_loaded(self):
-        """
-        检查模型是否已加载
-        
-        返回:
-            bool: 是否已加载
-        """
-        pass
-    
+        return self.model is not None
+
     def warmup(self):
-        """
-        模型预热（加速首次推理）
-        """
-        pass
+        if self.model is not None:
+            dummy_image = np.zeros((640, 640, 3), dtype=np.uint8)
+            self.predict(dummy_image)
+            self.logger.info("模型预热完成")

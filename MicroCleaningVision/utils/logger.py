@@ -543,9 +543,21 @@ class Logger:
         self.logger.complete()
 
 
+class _DefaultConfig:
+    class LoggingConfig:
+        level = "WARNING"
+        file_path = "output/logs/"
+        max_size = 5
+        backup_count = 3
+        use_color = True
+        console_output = False
+        file_output = True
+
+    logging = LoggingConfig()
+
 # 创建全局日志实例，供所有模块共享使用
-# 注意：需要在main.py中调用init()方法初始化
-logger = Logger()
+# 默认配置：仅记录WARNING及以上级别，关闭控制台输出
+logger = Logger(_DefaultConfig())
 
 # 创建全局实验管理器实例
 experiment_manager = ExperimentManager()
