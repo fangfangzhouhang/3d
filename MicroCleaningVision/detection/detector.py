@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from models.yolo_model import YOLOModel
-from detection.preprocessing import ImagePreprocessor as Preprocessor
-from detection.postprocessing import DetectionPostprocessor as Postprocessor
-from utils.logger import logger
+from ..models.yolo_model import YOLOModel
+from .preprocessing import ImagePreprocessor as Preprocessor
+from .postprocessing import DetectionPostprocessor as Postprocessor
+from ..utils.logger import logger
 
 
 class Detector:
@@ -19,7 +19,7 @@ class Detector:
 
     def load_model(self, model_path=None):
         if model_path is None:
-            model_path = self.config.models.yolo_model_path
+            model_path = self.config.model.yolo_model_path
         
         try:
             self.model = YOLOModel(self.config, logger)

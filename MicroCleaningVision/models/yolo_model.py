@@ -12,7 +12,7 @@ class YOLOModel:
         self.config = config
         self.logger = logger
         self.model = None
-        self.model_path = config.models.yolo_model_path
+        self.model_path = config.model.yolo_model_path
         self.confidence_threshold = config.detection.confidence_threshold
         self.iou_threshold = config.detection.iou_threshold
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'

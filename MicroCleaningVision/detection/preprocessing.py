@@ -175,3 +175,15 @@ class ImagePreprocessor:
             numpy.ndarray: 缩放后的图像
         """
         pass
+    
+    def process(self, image):
+        """
+        执行完整预处理流程（与preprocess方法相同，提供统一接口）
+        
+        参数:
+            image: 原始图像
+            
+        返回:
+            numpy.ndarray: 预处理后的图像
+        """
+        return self.preprocess(image)

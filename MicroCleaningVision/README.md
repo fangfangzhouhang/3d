@@ -82,10 +82,10 @@ MicroCleaningVision/
 ├── utils/               # 工具模块
 │   ├── __init__.py
 │   ├── logger.py        # 日志管理
-│   ├── config_parser.py # 配置解析
-│   ├── image_utils.py   # 图像工具
-│   ├── common_utils.py  # 通用工具
-│   └── types.py         # 统一数据类型定义
+│   ├── image_utils.py   # 图像工具（预留）
+│   ├── common_utils.py  # 通用工具（预留）
+│   ├── types.py         # 统一数据类型定义
+│   └── exceptions.py    # 自定义异常
 ├── docs/                # 文档目录
 │   └── api_reference.md # API参考文档
 └── test/                # 测试目录
@@ -160,10 +160,10 @@ MicroCleaningVision/
 提供通用工具函数和数据类型定义。
 
 - **logger.py**: 日志记录和管理
-- **config_parser.py**: 配置文件解析
-- **image_utils.py**: 图像处理工具
-- **common_utils.py**: 通用工具函数
+- **image_utils.py**: 图像处理工具（预留）
+- **common_utils.py**: 通用工具函数（预留）
 - **types.py**: 统一数据类型定义（dataclass）
+- **exceptions.py**: 自定义异常类
 
 ## 软件架构图
 

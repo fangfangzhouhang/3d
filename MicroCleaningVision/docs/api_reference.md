@@ -7,14 +7,16 @@
 ```
 MicroCleaningVision/
 ├── camera/          # 相机模块
-├── detection/       # 检测模块
-├── reconstruction/  # 三维重建模块
-├── planning/        # 规划模块
 ├── communication/   # 通信模块
 ├── dataset/         # 数据集模块
+├── detection/       # 检测模块
+├── docs/            # 文档目录
 ├── models/          # 模型模块
+├── planning/        # 规划模块
+├── reconstruction/  # 三维重建模块
+├── training/        # 模型训练模块
 ├── utils/           # 工具模块
-└── docs/            # 文档目录
+└── test/            # 测试模块
 ```
 
 ## 模块说明
@@ -48,12 +50,12 @@ MicroCleaningVision/
 
 负责路径规划、坐标计算和决策。
 
-#### PathPlanner类
+#### Planner类
 
-- `plan_path(targets)` - 规划路径
+- `plan_paths(targets)` - 规划路径
+- `calculate_coordinates(detections)` - 计算目标坐标
+- `decide_continue_cleaning(results)` - 判断是否继续清洗
 - `optimize_path(path)` - 优化路径
-- `get_path_length(path)` - 计算路径长度
-- `smooth_path(path)` - 平滑路径
 
 #### CoordinateCalculator类
 
