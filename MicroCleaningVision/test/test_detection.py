@@ -42,7 +42,7 @@ class TestDetection(unittest.TestCase):
         
         self.config = Config()
         self.logger = Logger(self.config)
-        self.detector = Detector(self.config, self.logger)
+        self.detector = Detector(self.config)
     
     def test_detector_initialization(self):
         """
@@ -55,9 +55,10 @@ class TestDetection(unittest.TestCase):
         测试检测功能
         """
         import numpy as np
-        test_image = np.zeros((480, 640, 3), dtype=np.uint8)
-        results = self.detector.detect(test_image)
-        self.assertIsInstance(results, list)
+        test_top_image = np.zeros((480, 640, 3), dtype=np.uint8)
+        test_angle_image = np.zeros((480, 640, 3), dtype=np.uint8)
+        results = self.detector.detect(test_top_image, test_angle_image)
+        self.assertIsNone(results)
     
     def test_set_threshold(self):
         """

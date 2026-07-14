@@ -1,5 +1,4 @@
 from .logger import Logger, logger, ExperimentManager
-from .config_parser import ConfigParser
 from .image_utils import ImageUtils
 from .common_utils import CommonUtils
 from .types import (
@@ -35,7 +34,6 @@ __all__ = [
     'Logger', 
     'logger',
     'ExperimentManager',
-    'ConfigParser', 
     'ImageUtils', 
     'CommonUtils',
     'CameraInfo',

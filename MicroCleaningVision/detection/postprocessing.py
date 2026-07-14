@@ -163,3 +163,28 @@ class DetectionPostprocessor:
             dict: 标准化输出格式
         """
         pass
+    
+    def process(self, raw_results):
+        """
+        执行完整后处理流程（与postprocess方法相同，提供统一接口）
+        
+        参数:
+            raw_results: 原始检测结果
+            
+        返回:
+            list: 后处理后的检测结果
+        """
+        return self.postprocess(raw_results)
+    
+    def merge_results(self, results1, results2):
+        """
+        合并两组检测结果
+        
+        参数:
+            results1: 第一组检测结果
+            results2: 第二组检测结果
+            
+        返回:
+            list: 合并后的检测结果
+        """
+        pass
