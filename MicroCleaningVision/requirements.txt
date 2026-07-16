@@ -1,7 +1,20 @@
-opencv-python
-numpy
-ultralytics
-pyserial
-matplotlib
-loguru
-PyYAML
+# 核心依赖
+opencv-python==5.0.0.93
+numpy==2.0.0
+ultralytics==8.4.92
+pyserial==3.5
+matplotlib==3.11.0
+loguru==0.7.3
+PyYAML==6.0.3
+
+# PyTorch（CUDA版本需手动安装，见文档说明）
+# CPU版本: pip install torch torchvision torchaudio
+# CUDA 12.4版本: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+torch>=2.4.0
+torchvision>=0.19.0
+torchaudio>=2.4.0
+
+# 辅助依赖
+pillow>=12.0.0
+requests>=2.34.0
+psutil>=7.0.0
