@@ -1,4 +1,4 @@
-# MicroCleaningVision
+﻿# MicroCleaningVision
 
 基于双显微镜（顶部+45°）的智能微污染检测与清洗系统。
 
@@ -498,9 +498,6 @@ python main.py
 
 ## 配置说明
 
-所有配置参数统一在[config.py](file:///d:/大创/opencv/MicroCleaningVision/config.py)中定义，**不在任何其他文件中出现魔法数字**。
-
-### 配置类结构
 
 ```python
 from config import Config
