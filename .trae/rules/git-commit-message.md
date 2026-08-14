@@ -1,4 +1,4 @@
----
+尽量简短 20字以内 必须凸显较上部分最大改动---
 alwaysApply: true
 scene: git_message
 ---

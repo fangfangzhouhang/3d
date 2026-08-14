@@ -1,0 +1,32 @@
+# Python 虚拟环境必须由每台电脑按 requirements 重建，不进入 Git。
+.venv/
+venv/
+env/
+
+# Python/测试缓存。
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# IDE 与本机配置。
+.idea/
+.trae/
+.vscode/*.local.json
+
+# 密钥和本地环境。
+.env
+.env.*
+!.env.example
+
+# 运行输出和原始实验数据不直接进入 Git；只提交清单、协议和小型示例。
+output/
+MicroCleaningVision/output/
+MicroCleaningVision/data/raw/
+MicroCleaningVision/data/episodes/
+
+# 模型权重需要单独的数据/模型版本管理。
+*.pt
+*.pth
+*.onnx
+
