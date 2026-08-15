@@ -1,64 +1,91 @@
 # MicroCleaningVision
 
-MicroCleaningVision 是一个显微表面智能处理科研项目。当前三人团队专注视觉成像软件，先让“前图—测量—模拟动作—后图复检—记录”形成完整、可测试的软件闭环；机械和 STM32 固件由未来接口接入。
+MicroCleaningVision 是一个显微表面智能处理科研项目。当前三人团队先建设视觉和上位机软件：让真实图片变成污染测量，让测量变成目标与控制仿真，并为未来STM32保留清晰接口。
 
-## 新手先看这里
+## 当前真实状态
 
-按顺序阅读：
+- 软件组件：E1；当前回归测试可重复。
+- 真实相机/USB显微镜数据：尚未进入仓库证据链。
+- HSV真实污染识别：尚未验证。
+- 像素到毫米标定：尚未验证。
+- STM32、运动和喷洗：E0，无真实执行证据。
 
-1. [共同上下文](AGENTS.md)：项目边界和 AI 工作规则。
-2. [当前事实](project_state.yaml)：哪些通过测试，哪些仍是假设。
-3. [文档导航](docs/README.md)：架构、接口、分工和每周任务。
+目录和文档完整不等于系统已经实现。动态事实见 [project_state.yaml](project_state.yaml)。
 
-## 当前软件链
+## 三人怎样合作
 
 ```text
-成员 A                     成员 B                     成员 C
-图像 + 质量 ──Observation──> 污染测量 + State ──────> 动作申请
-    ^                         │                         │
-    │                         └── 前后复检 <── 后图      v
-ReplayCamera                                      Safety + FakeSerial
-    │                                                   │
-    └──────────────────── Episode <─────────────────────┘
+A 数据与模型              B 视觉识别与测量            C 目标规划与控制仿真
+真实图片/清单/标注 ─────> mask/面积/中心/状态 ─────> 目标点/路线/动作/FakeSerial
+       ↑                                                        │
+       └──────────── 失败样本与Episode反馈 ─────────────────────┘
 ```
 
-- ReplayCamera（回放相机）：读取预先登记的图片，不打开真实相机。
-- FakeSerial（假串口）：模拟 STM32 确认、超时和错误，不打开 COM 口。
-- Episode（回合记录）：保存一次任务的输入、状态、申请、审批、回执和复检。
+- A独占 `microcleaning/data_learning/`；
+- B独占 `microcleaning/vision/`；
+- C独占 `microcleaning/control_system/`；
+- `contracts.py` 和 `ports.py` 是共享接口，不能单人随意改。
 
-## 当前目录
+## 目录
 
 ```text
 MicroCleaningVision/
-├── AGENTS.md / project_state.yaml       # 共享上下文与当前事实
 ├── microcleaning/
-│   ├── contracts.py                     # 共享接口，三人评审后才改
-│   ├── perception/                      # A：质量；B：污染测量
-│   ├── state/                           # B：状态估计
-│   ├── verification/                    # B：前后复检
-│   ├── decision/                        # C：动作申请
-│   ├── safety/                          # C：独立安全规则
-│   ├── execution/                       # C：FakeSerial
-│   ├── data/                            # C：Episode 保存
-│   ├── adapters/                        # 软硬件接口与回放适配器
-│   └── app/                             # Mock 和软件回放编排
-├── test/visual_loop/                    # A/B/C 各自拥有的测试文件
-├── docs/                                # architecture/team/research/future_hardware/archive
-├── .codex/skills/                       # 项目 AI Skill
-├── legacy/                              # 旧代码与旧测试，仅作迁移参考
-└── docs/archive/legacy_docs/            # 旧版详细说明，仅作历史参考
+│   ├── contracts.py
+│   ├── ports.py
+│   ├── data_learning/
+│   ├── vision/
+│   └── control_system/
+├── test/
+│   ├── data_learning/
+│   ├── vision/
+│   └── control_system/
+├── docs/                    # 总导航、长期规划、个人手册、Git、术语
+├── legacy/                  # 旧原型，只读参考
+├── AGENTS.md
+└── project_state.yaml
 ```
 
-`legacy/` 中的相机、检测、规划、通信等是早期原型，含大量空实现；当前主线不导入它们。可借鉴其中思路，但迁移前必须有新接口和测试。
+## 新手从这里开始
 
-## 运行与测试
+1. [共同上下文](AGENTS.md)
+2. [当前事实](project_state.yaml)
+3. [文档总导航](docs/README.md)
+4. [团队入门指南](docs/team/团队入门指南.md)
+5. [本轮任务看板](docs/team/团队任务看板.md)
 
-在本目录打开 PowerShell：
+## 环境和测试
+
+虚拟环境不进入Git；每台电脑按依赖清单重建。
 
 ```powershell
-python main.py
-python -m unittest discover -s test\visual_loop -v
-python -m unittest discover -s test\mcl -v
+cd D:\大创\3d\MicroCleaningVision
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe scripts\check_environment.py --profile mock
+.\.venv\Scripts\python.exe -m unittest discover -s test -p "test*.py" -v
+.\.venv\Scripts\python.exe main.py
 ```
 
-当前通过测试表示软件框架连通，不表示真实相机、STM32 或清洗已经完成。虚拟环境不进 Git；每台电脑按照 `docs/12_开发环境与依赖说明.md` 重建。
+需要OpenCV真实图片任务时再安装：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements\perception-opencv.txt
+```
+
+测试通过表示软件接口和回归正常，不表示真实相机、标定、STM32或清洗有效。
+
+## 长期路线
+
+```text
+P0目录/接口统一
+→ P1真实USB数据和HSV
+→ P2真实图片软件回放
+→ P3定位与控制仿真
+→ P4真实硬件最小闭环
+→ P5证据驱动模型升级
+→ P6结果预测与适应
+→ P7平台化
+```
+
+详细入口、出口、三人任务和停止条件见 [长期分阶段研发规划](docs/architecture/长期分阶段研发规划.md)。

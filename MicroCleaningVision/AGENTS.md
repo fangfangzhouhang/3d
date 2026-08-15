@@ -1,56 +1,72 @@
 # MicroCleaningVision 共同上下文
 
-> 人和 AI 每次开始任务时，依次阅读：本文件 → `project_state.yaml` → `docs/README.md` → 自己的任务手册。
+> 人和 AI 开始任务时依次阅读：本文件 → `project_state.yaml` → `docs/README.md` → 团队任务看板 → 自己的长期手册。
 
 ## 这个项目现在到底在做什么
 
-MicroCleaningVision 的长期目标是研究机器如何感知、处理并复检微观表面。当前三人团队只负责**视觉成像与软件闭环**，不负责机械结构、STM32 固件或真实喷洗控制。
+长期目标是研究机器怎样感知、处理并复检微观表面。当前三人团队只负责视觉成像和上位机软件，最多为未来STM32保留受限串口接口；不负责机械设计、STM32固件或真实喷洗控制。
 
-当前要做的是软件回放闭环（`Software Replay Loop`，用动作前后图像和假串口完整演练数据流）：
+当前软件主线：
 
 ```text
-前图 → 图像质量 → 污染测量 → 状态判断 → 动作申请
-    → 安全审批 → FakeSerial 回执 → 后图复检 → Episode
+A真实图片/数据
+→ B污染mask、面积和中心
+→ C目标点、路线、动作申请和控制仿真
+→ 动作后视觉复检
+→ Episode
 ```
 
-这里的 FakeSerial（假串口）只模拟 STM32 的确认、超时和错误，不打开 COM 口。软件回放闭环不是硬件闭环，更不证明真实清洗有效。
+FakeSerial只模拟确认、超时和错误，不打开COM口。软件回放不是硬件闭环，更不证明真实清洗有效。
 
-## 三个人的责任
+## 三个人的责任和目录
 
-- 成员 A：图像输入和质量，输出 `Observation`（观测记录）。
-- 成员 B：污染测量、状态估计和前后复检，输出 `StateEstimate` 与 `VerificationResult`。
-- 成员 C：动作申请、安全规则、FakeSerial、流程编排与 Episode。
+- A 数据与模型：`microcleaning/data_learning/`、`test/data_learning/`。
+- B 视觉识别与测量：`microcleaning/vision/`、`test/vision/`。
+- C 目标规划与控制仿真：`microcleaning/control_system/`、`test/control_system/`。
 
-成员需要理解整条链，但只修改自己拥有的业务文件。文件所有权见 `docs/team/三人分工与文件所有权.md`。
+所有人理解整条链，但只直接修改自己的业务目录。上游未到位时使用合成fixture继续，不把fixture写成真实证据。
 
 ## 共享接口
 
-`microcleaning/contracts.py` 是三人共同的数据合同；`microcleaning/adapters/ports.py` 是未来硬件必须遵守的端口合同：
+`microcleaning/contracts.py` 是数据合同，`microcleaning/ports.py` 是未来设备端口合同。
 
 | 对象 | 通俗解释 |
 |---|---|
-| `Observation` | 一张图从哪里来、质量如何 |
-| `StateEstimate` | 系统根据图像认为污染在哪里、有多大、有多不确定 |
+| `Observation` | 一张图从哪里来、质量怎样 |
+| `StateEstimate` | 系统认为污染在哪里、有多大、有多不确定 |
 | `ActionRequest` | 软件建议做什么；它不是硬件命令 |
-| `SafetyDecision` | 独立输出 ALLOW / DENY / HUMAN |
-| `ExecutionReceipt` | 控制端实际返回了什么；当前只能是假串口回执 |
+| `SafetyDecision` | ALLOW / DENY / HUMAN |
+| `ExecutionReceipt` | 控制端实际返回了什么 |
 | `VerificationResult` | 前后图是否可比、污染是否减少 |
 | `Episode` | 一次任务从输入到结果的完整记录 |
-| `FailureRecord` | 失败发生在哪一层、如何复现和恢复 |
+| `FailureRecord` | 失败发生在哪一层、怎样复现和恢复 |
 
-任何人不得单独修改 `contracts.py` 或 `adapters/ports.py`。确需修改时，先在 PR 中写清消费者、迁移方法和测试，由另外两人评审。
+共享文件不能夹在个人功能PR中随意修改。确需变更时，先写消费者、迁移方法、单位、失败测试和接口版本，由至少两人评审。
 
-## AI 开工规则
+## 任务和AI开工规则
 
-1. 只解决当前任务卡，不顺手加入 YOLO、3D、Agent 或真实串口。
-2. 先检查文件所有权；默认不得修改他人的业务文件。
-3. 写代码必须同时写负责人自己的测试。
-4. 复杂词首次出现时使用“中文（英文词，一句话解释）”。
-5. AI 可以生成代码、测试、失败假设和文档；AI 不得把 Mock 当实验结果，不得直接控制硬件。
-6. 完成后报告：改了什么、测试证据、仍未验证什么、下一位成员需要什么输入。
+1. 每个代码修改先解释方案和文件清单，经用户/负责人批准后实施。
+2. 一次只做一张任务卡；默认只修改负责人目录和测试。
+3. 每人都有核心、扩展、备用和集成任务，不因上游未到位停工。
+4. 写代码同时写测试；完成后运行个人测试和全部回归。
+5. 复杂词首次出现时使用“中文（英文词，一句话解释）”。
+6. AI可以生成代码、测试、样例和文档；不能制造人工真值、批准硬件或把Mock当实验。
+7. 交付必须区分：代码框架、合成测试、真实像素、真实硬件和研究结论。
 
-项目 Skill：`.codex/skills/visual-closed-loop-task/SKILL.md`。
+项目Skill：`.codex/skills/visual-closed-loop-task/SKILL.md`。
 
-## 技术升级门槛
+## 证据和复杂度规则
 
-传统方法先行。只有固定条件下出现稳定失败，并完成最小 A/B 对照后，才讨论 CNN、YOLO、双视角或 3D。Agent 当前服务于研发协作、审查和文档，不进入物理控制链。
+- E0：设计或框架；E1：单组件可重复；E2：多个真实模块交接；E3：真实闭环；E4：重复对照与误差/局限分析。
+- HSV简单基线先行。只有固定条件下出现稳定失败，并有人工标注与独立测试集，才讨论学习模型。
+- 第二视角、3D、Transformer、PINN、强化学习或World Model必须对应已记录失败和最小A/B。
+- 模型、Agent或LLM不能通过自然语言直接控制泵、电机、阀、平台或喷头。
+
+## 当前最低硬件边界
+
+1. 默认不打开真实串口；
+2. 没有有效标定不产生毫米动作；
+3. 自然语言不能成为硬件命令；
+4. 第一次真实动作必须经过Human Gate并有人在场。
+
+完整任务、术语、Git和长期阶段见 `docs/README.md`。

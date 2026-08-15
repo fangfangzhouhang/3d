@@ -1,66 +1,108 @@
 # 全团队唯一的当前事实。计划、愿景和代码文件不能自动成为事实。
-current_phase: P0 - 视觉软件回放闭环框架
+updated_at: 2026-08-15
+current_phase: "P0 - 三模块责任与入门体系已迁移；P1真实USB数据尚未开始"
+
 current_evidence_level:
   overall_hardware: E0
   software_components: E1
+  software_integration: E1
+
 team_scope:
   in_scope:
-    - 显微图像输入与质量评估
-    - 污染分割、测量、状态估计与前后图复检
-    - 软件回放闭环、FakeSerial、STM32 接口合同与 Episode
+    - 真实图片输入、图像质量和数据清单
+    - 污染分割、面积/中心测量、状态和前后复检
+    - 目标点、路线、坐标变换和控制仿真
+    - 软件回放、FakeSerial、Episode和未来STM32上位机接口
   out_of_scope:
     - 机械结构设计与加工
-    - STM32 固件实现
-    - 真实泵、电机、喷头和 XY 平台控制
+    - STM32固件实现
+    - 未经人工关卡的真实泵、电机、喷头和平台控制
 
 validated_capabilities:
-  - "旧 Mock MCL 的 16 项标准库测试通过；只证明合成流程与失败路由。"
-  - "视觉软件框架的 12 项测试通过：图像质量、像素/毫米坐标隔离、状态估计、面积复检、安全拒绝、FakeSerial 和 Episode。"
-  - "main.py 只运行 Mock，不再提供旧真实控制入口。"
+  - "目录迁移后30项软件测试通过：A数据输入5项、B视觉测量3项、C控制/Mock 22项。"
+  - "真实文件入口测试会由OpenCV解码程序生成PNG、计算SHA-256和基础质量指标；图片仍不是团队相机采集证据。"
+  - "Mock和软件回放不会打开真实COM口；main.py只运行纯合成Mock。"
+  - "无标定状态不会产生毫米目标；模拟审批令牌绑定、超时和失败路由有回归测试。"
 
 unvalidated_claims:
-  - 真实显微图像采集和质量阈值
-  - PLA 彩色水溶性标记物的 OpenCV 分割效果
-  - 前后图真实配准和复检准确性
+  - 团队手机或USB显微镜真实图像采集和质量阈值
+  - PLA彩色水溶性标记物的适用性
+  - HSV在真实项目图片上的分割效果
+  - 像素不确定度到毫米不确定度的接口迁移
+  - 人工mask、前后图配准和真实复检准确性
+  - mask到目标点和路线的当前实现
   - 像素到工作台毫米坐标的标定
   - STM32、XY、泵或喷头通信与执行
   - 真实清洗效果、损伤和硬件闭环
 
 current_interfaces:
   version: mcl-v0
-  path: microcleaning/contracts.py
-  change_rule: "三人评审后才能修改；日常任务只消费接口。"
+  contracts: microcleaning/contracts.py
+  ports: microcleaning/ports.py
+  change_rule: "共享接口单独提案；至少两人评审；必须给出消费者、迁移和失败测试。"
+
+module_ownership:
+  member_a:
+    role: 数据与模型
+    source: microcleaning/data_learning/
+    tests: test/data_learning/
+  member_b:
+    role: 视觉识别与测量
+    source: microcleaning/vision/
+    tests: test/vision/
+  member_c:
+    role: 目标规划与控制仿真
+    source: microcleaning/control_system/
+    tests: test/control_system/
 
 software_loop:
-  status: framework_tested
-  entry: microcleaning/app/replay_mcl.py
-  controller: microcleaning/execution/fake_serial.py
-  note: "框架可以用结构化前后数据回放，但尚无真实图像数据集和 OpenCV 算法证据。"
+  status: synthetic_and_file_ingestion_regression_tested
+  mock_entry: microcleaning/control_system/mock_mcl.py
+  replay_entry: microcleaning/control_system/replay_mcl.py
+  controller: microcleaning/control_system/fake_serial.py
+  note: "当前只有合成回放和程序生成图片测试；不能声明真实像素已穿过A/B/C。"
 
 current_dataset:
   status: absent
-  planned_baseline: "PLA 平面测试片 + 水溶性彩色标记物 + 固定俯视成像"
+  planned_primary_source: USB显微镜
+  auxiliary_source: 手机链路图片
+  planned_baseline: "PLA平面试片 + 经过可行性检查的水溶性彩色标记物 + 固定俯视成像"
 
 hardware_boundary:
-  camera_port: microcleaning/adapters/ports.py
-  controller_port: microcleaning/adapters/ports.py
+  camera_port: microcleaning/ports.py
+  controller_port: microcleaning/ports.py
   real_hardware_armed: false
   stm32_firmware_status: unavailable
+  serial_protocol_status: unavailable
 
 development_environment:
-  recommended_python: "CPython 3.12 + project-local .venv"
-  base_profile: "Python 标准库，可运行 Mock/框架测试"
-  perception_profile: "requirements/perception-opencv.txt，成员 A/B 开始真实图像任务时安装"
-  serial_profile: "requirements/control-serial.txt，仅在已获协议后做受限串口适配"
+  recommended_python: "CPython 3.12 + 项目本地.venv"
+  locally_verified: "CPython 3.13.14 .venv + numpy 2.5.2 + opencv-python 4.14.0.94"
+  base_profile: "requirements.txt；标准库Mock/回放框架"
+  perception_profile: "requirements/perception-opencv.txt；A/B真实图像任务"
+  serial_profile: "requirements/control-serial.txt；仅获得真实协议并批准后使用"
 
-file_ownership:
-  member_a: "成像质量、回放图像入口和 A 测试"
-  member_b: "污染测量、状态估计、复检和 B 测试"
-  member_c: "动作申请、安全、FakeSerial、闭环编排、Episode 和 C 测试"
-  shared: "contracts.py、AGENTS.md、project_state.yaml；需要评审"
+major_risks:
+  - "三人尚无稳定投入时间，采用核心/扩展/备用任务和实际专注时段回填。"
+  - "用户持有相机和GPU经验，A阶段负担可能在标注/训练期上升，需要按两轮真实记录再平衡。"
+  - "旧legacy代码和旧文档容易被误当当前入口；当前主线禁止导入legacy。"
+  - "模型训练可能被过早启动；必须先有HSV失败、人工标注和独立测试集。"
+  - "ContaminationMeasurement仍使用uncertainty_mm字段；真实分割接入前必须先完成像素/毫米接口提案。"
+
+blockers:
+  - "A尚未提供结构化USB显微镜原图、采集批次和人工标注。"
+  - "真实标记物、样本状态和固定成像条件尚未形成证据。"
+  - "STM32协议、标定和硬件安全事实缺失。"
 
 next_actions:
-  - "A：建立 30～50 张链路验证图像清单并实现真实图像质量评分。"
-  - "B：实现 HSV 基线分割和前后图配准，报告失败样本。"
-  - "C：补回放数据清单读取、FakeSerial 协议测试和 Episode 保存。"
-  - "全体：每周用 5 组前后图跑一次完整回放并复盘失败。"
+  - "A-P1-01：采集至少12张、两个批次的USB显微镜图片，建立清单并标注5张。"
+  - "B-P0-01/P1-01：先提像素/毫米不确定度迁移方案；同时用合成色块实现HSV、mask、面积、中心和测试。"
+  - "C-P1-01：不等待B，使用合成mask实现目标点、简单路线和像素级Dry Run。"
+  - "TEAM-P1-INT-01：A/B/C最小成果到位后，用一张真实图片完成第一次接口集成。"
+
+documentation:
+  navigation: docs/README.md
+  roadmap: docs/architecture/长期分阶段研发规划.md
+  task_board: docs/team/团队任务看板.md
+  glossary: docs/team/项目术语与概念词典.md
+  git_tutorial: docs/team/Git与GitHub协作教程.md

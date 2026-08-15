@@ -1,33 +1,40 @@
 ---
 name: visual-closed-loop-task
-description: 在 MicroCleaningVision 中实现或评审视觉软件闭环的小任务。用于修改成像质量、污染测量、状态估计、复检、软件回放、FakeSerial、Episode 或对应测试时，强制先同步共享上下文、遵守单人文件所有权，并以测试和证据结束任务。
+description: 在MicroCleaningVision中实现或评审A数据模型、B视觉测量、C目标控制的软件任务；强制先同步共同上下文、遵守顶层目录所有权，并以测试和证据结束。
 ---
 
 # 视觉软件闭环任务
 
 ## 开工前
 
-1. 依次阅读项目根目录的 `AGENTS.md`、`project_state.yaml`、`docs/team/团队入门指南.md`。
-2. 阅读 `microcleaning/contracts.py`，确认本任务消费和产出的契约对象。
-3. 阅读 `docs/team/团队任务看板.md`，只修改任务负责人拥有的文件。
-4. 若必须改变共享契约，先写接口变更提案；没有三人评审记录不得修改 `contracts.py`。
+1. 依次阅读 `AGENTS.md`、`project_state.yaml`、`docs/README.md`。
+2. 阅读 `docs/team/团队任务看板.md` 和负责人的长期任务手册。
+3. 阅读 `microcleaning/contracts.py` 与 `microcleaning/ports.py`，确认输入、输出、单位和失败语义。
+4. 代码变更前先解释方案、文件清单和测试，经用户/负责人批准后实施。
 
-## 实施
+## 目录所有权
 
-- 一次只解决一张任务卡，不顺手增加 YOLO、3D、Agent 或硬件控制。
-- 成员 A 的代码只产生 `Observation` 和图像质量证据。
-- 成员 B 的代码只产生污染测量、`StateEstimate` 或 `VerificationResult`。
-- 成员 C 的代码只编排结构化动作、安全规则、FakeSerial 和 Episode。
-- 所有真实硬件默认不可用；不得打开 COM 口，不得把模拟 ACK 写成真实执行。
-- 复杂术语首次出现时，写成“中文（`EnglishTerm`，一句话解释）”。
+- A只直接修改 `microcleaning/data_learning/`、`test/data_learning/`。
+- B只直接修改 `microcleaning/vision/`、`test/vision/`。
+- C只直接修改 `microcleaning/control_system/`、`test/control_system/`。
+- 共享契约变化先写提案；没有评审不得夹在个人功能任务中。
+
+## 实施规则
+
+- 一次只解决一张任务卡，不顺手加入YOLO、3D、Agent或真实串口。
+- 上游未到位时使用明确标记的合成fixture，不停工，也不把fixture当真实证据。
+- A生产数据、标注和未来模型；B生产视觉测量与复检；C生产目标、路线和控制仿真。
+- 默认不打开真实硬件；无有效标定不产生毫米动作；自然语言不成为硬件命令。
+- 复杂术语首次出现时写成“中文（EnglishTerm，一句话解释）”。
 
 ## 验证
 
-1. 运行本人的测试文件，再运行全部 `test/visual_loop` 测试。
-2. 运行 `test/mcl` 回归测试，确认没有破坏已有 Mock 基线。
-3. 检查输出能否追溯到输入图像、接口版本和失败原因。
-4. 在交付中区分：框架、模拟验证、真实数据验证、真实硬件验证。
+1. 运行负责人测试目录。
+2. 运行 `python -m unittest discover -s test -p "test*.py" -v`。
+3. 检查输出能否追溯到输入、接口版本和失败原因。
+4. 区分合成测试、真实像素、真实硬件和研究结论。
+5. 更新 `project_state.yaml` 时只写实际发生的事实。
 
-## AI 交付格式
+## AI交付格式
 
-报告解决的问题、负责人文件、未改的共享接口、测试结果、新增证据、未验证假设，以及下一位成员需要的输入。
+报告任务编号、解决的问题、修改文件、未改的共享接口、测试结果、新增证据、未验证假设、下一位成员需要的输入和实际专注时段。

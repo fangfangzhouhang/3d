@@ -12,7 +12,7 @@ from pathlib import Path
 
 def main() -> int:
     """运行现有 Mock 回归演示；保留无参数形式以兼容测试与新手使用。"""
-    from microcleaning.app.mock_mcl import MockMCLRunner, write_episode
+    from microcleaning.control_system.mock_mcl import MockMCLRunner, write_episode
 
     episode = MockMCLRunner().run(task_id="mock-demo")
     output = write_episode(episode, Path("output") / "mock_episodes")
