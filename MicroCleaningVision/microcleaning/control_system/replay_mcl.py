@@ -28,6 +28,7 @@ class ReplayMCLRunner:
         state: StateEstimate,
         post: Observation | None,
         post_area_px: float | None,
+        action_target_mm: tuple[float, float] | None = None,
     ) -> Episode:
         if state.task_id != pre.task_id or state.observation_id != pre.observation_id:
             raise ValueError("StateEstimate 必须来自本次动作前 Observation")
@@ -52,7 +53,7 @@ class ReplayMCLRunner:
                 "replace or recapture the input image",
             )
             return Episode(_uid("episode"), pre.task_id, "software_replay", "replay-v0", pre, state, None, None, None, None, verification, [failure])
-        request = propose_action(state)
+        request = propose_action(state, target_centroid_mm=action_target_mm)
         if request is None:
             verification = VerificationResult(pre.task_id, pre.observation_id, getattr(post, "observation_id", None), post_area_px, None, False, NextRoute.STOP, ("NO_TARGET",))
             return Episode(_uid("episode"), pre.task_id, "software_replay", "replay-v0", pre, state, None, None, None, post, verification)

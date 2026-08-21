@@ -54,7 +54,7 @@ Baseline（基线）是最简单、可复现、以后用来比较升级方案的
 
 ### 4.0 先处理一个当前接口债务
 
-现有 `ContaminationMeasurement` 的字段名仍是 `uncertainty_mm`，但没有标定的图像分割只能产生像素误差。这不是已经解决的事实。开始真实HSV集成前，B先提交接口提案，明确 `uncertainty_px → 标定传播 → uncertainty_mm` 的责任和测试；三人批准后再改共享接口。
+这个接口债务已在 `mcl-v0.1` 解决：`ContaminationMeasurement` 输出 `uncertainty_px`；经过有效标定后，`StateEstimate` 才允许出现 `uncertainty_mm`。B下一步不再写接口提案，而是用真实图片检查HSV分割和像素误差是否合理。
 
 ### 4.1 先用合成图片解除等待
 

@@ -4,7 +4,9 @@ MicroCleaningVision 是一个显微表面智能处理科研项目。当前三人
 
 ## 当前真实状态
 
-- 软件组件：E1；当前回归测试可重复。
+- 软件组件：E1；A/B/C软件集成：E2（仅程序生成图和FakeSerial）。
+- Demo v0.1：已能输出图片、mask、面积、中心、路线、模拟动作与Episode。
+- 当前回归：项目`.venv`中54项测试全部执行并通过，无跳过。
 - 真实相机/USB显微镜数据：尚未进入仓库证据链。
 - HSV真实污染识别：尚未验证。
 - 像素到毫米标定：尚未验证。
@@ -40,6 +42,8 @@ MicroCleaningVision/
 │   ├── data_learning/
 │   ├── vision/
 │   └── control_system/
+├── demo/                    # 明确的软件演示入口
+├── data/datasets/           # 数据集清单；raw原图默认不进Git
 ├── docs/                    # 总导航、长期规划、个人手册、Git、术语
 ├── legacy/                  # 旧原型，只读参考
 ├── AGENTS.md
@@ -74,6 +78,63 @@ python -m venv .venv
 ```
 
 测试通过表示软件接口和回归正常，不表示真实相机、标定、STM32或清洗有效。
+
+## Demo v0.1：现在最明确的程序入口
+
+### 1. 不依赖外部图片的完整软件模拟
+
+```powershell
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --generate-sample --mode simulate
+```
+
+明确输入：程序生成、可重复的红色模拟污染图。
+
+明确输出：
+
+```text
+output/demo/<run_id>/
+├── input.png
+├── mask.png
+├── contamination_overlay.png
+├── path_overlay.png
+├── post_mask.png
+├── summary.json
+├── episode_<id>.json
+└── episode_<id>.sha256
+```
+
+这个模式会产生 `ActionRequest → SafetyDecision → FakeSerial → ExecutionReceipt → VerificationResult`，但使用的是虚拟归一化标定和模拟动作后mask，不能写成真实清洗。
+
+### 2. 分析一张手机或USB显微镜图片
+
+```powershell
+.\.venv\Scripts\python.exe -m demo.demo_pipeline `
+  --input data\datasets\microcleaning_v0_1\raw\你的图片.png `
+  --mode analyze
+```
+
+这个模式输出真实像素的mask、面积、中心和像素路线。因为目前没有真实像素到毫米标定，所以 `ActionRequest` 必须为空；这不是程序缺陷，而是在证据不足时拒绝伪造物理坐标。
+
+## 数据集入口
+
+```powershell
+# 建立数据集骨架
+.\.venv\Scripts\python.exe -m microcleaning.data_learning.dataset_manifest `
+  init data\datasets\microcleaning_v0_1
+
+# 导入图片；不会修改原文件，相同内容不会重复复制
+.\.venv\Scripts\python.exe -m microcleaning.data_learning.dataset_manifest `
+  import data\datasets\microcleaning_v0_1 你的图片1.png 你的图片2.png `
+  --source usb-microscope --sample-id pla-001 --session session-01 `
+  --contamination-type red-water-soluble-marker `
+  --illumination ring-light-fixed --magnification unknown
+
+# 检查图片缺失、重复编号和哈希变化
+.\.venv\Scripts\python.exe -m microcleaning.data_learning.dataset_manifest `
+  check data\datasets\microcleaning_v0_1
+```
+
+第一条真实数据关卡不是“先凑够50张才运行”，而是：先导入1张跑通Demo，再扩展到两个采集批次、50张图片和至少10张人工标注。
 
 ## 长期路线
 

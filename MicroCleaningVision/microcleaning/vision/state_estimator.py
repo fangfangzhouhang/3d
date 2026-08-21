@@ -20,13 +20,19 @@ def estimate_state(
     calibration_version: str = "unavailable",
     calibration_valid: bool = False,
     target_centroid_mm: tuple[float, float] | None = None,
+    uncertainty_mm: float | None = None,
     device_state: Mapping[str, object] | None = None,
     prior_actions: Sequence[str] = (),
 ) -> StateEstimate:
     """生成状态；默认标定无效、控制器不可用，遵循失效安全原则。"""
     measurement.validate()
-    if target_centroid_mm is not None and not calibration_valid:
-        raise ValueError("没有有效标定时不得提供毫米坐标")
+    if not calibration_valid and (target_centroid_mm is not None or uncertainty_mm is not None):
+        raise ValueError("没有有效标定时不得提供毫米坐标或毫米误差")
+    if calibration_valid and measurement.centroid_px is not None:
+        if target_centroid_mm is None or uncertainty_mm is None:
+            raise ValueError("有效标定状态必须同时提供毫米目标和毫米误差")
+    if uncertainty_mm is not None and (uncertainty_mm < 0 or uncertainty_mm != uncertainty_mm):
+        raise ValueError("uncertainty_mm 必须是非负有限数值")
     devices = {
         "controller_connected": False,
         "interlock_ok": False,
@@ -42,10 +48,12 @@ def estimate_state(
         observation_id=observation.observation_id,
         target_centroid_mm=target_centroid_mm,
         target_area_px=measurement.area_px,
-        coordinate_frame="work_mm",
-        uncertainty_mm=measurement.uncertainty_mm,
+        coordinate_frame="work_mm" if target_centroid_mm is not None else "image_px",
+        uncertainty_mm=uncertainty_mm,
         device_state=devices,
         calibration_version=calibration_version,
         calibration_valid=calibration_valid,
         prior_actions=tuple(prior_actions),
+        target_centroid_px=measurement.centroid_px,
+        uncertainty_px=measurement.uncertainty_px,
     )

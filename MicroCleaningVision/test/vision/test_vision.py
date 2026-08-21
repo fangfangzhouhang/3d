@@ -1,5 +1,6 @@
 """成员 B：视觉识别、状态测量和最小复检测试。"""
 
+import importlib.util
 import unittest
 
 from microcleaning.contracts import ExecutionReceipt, NextRoute
@@ -7,6 +8,9 @@ from microcleaning.data_learning.image_quality import ImageQuality, build_observ
 from microcleaning.vision.contamination import ContaminationMeasurement
 from microcleaning.vision.state_estimator import estimate_state
 from microcleaning.vision.verification import verify_area_change
+
+
+HAS_PERCEPTION_DEPS = importlib.util.find_spec("cv2") is not None and importlib.util.find_spec("numpy") is not None
 
 
 class MeasurementAndVerificationTests(unittest.TestCase):
@@ -18,7 +22,11 @@ class MeasurementAndVerificationTests(unittest.TestCase):
     def test_measurement_becomes_state_without_hardware_authority(self):
         state = estimate_state(self.pre, ContaminationMeasurement(100.0, (10.0, 20.0), 0.2, 0.95))
         self.assertEqual(100.0, state.target_area_px)
+        self.assertEqual((10.0, 20.0), state.target_centroid_px)
         self.assertIsNone(state.target_centroid_mm)
+        self.assertEqual("image_px", state.coordinate_frame)
+        self.assertIsNone(state.uncertainty_mm)
+        self.assertEqual(0.2, state.uncertainty_px)
         self.assertFalse(state.calibration_valid)
         self.assertFalse(state.device_state["controller_connected"])
 
@@ -39,6 +47,46 @@ class MeasurementAndVerificationTests(unittest.TestCase):
         measurement = ContaminationMeasurement(100.0, (10.0, 20.0), 0.2, 0.95)
         with self.assertRaises(ValueError):
             estimate_state(self.pre, measurement, target_centroid_mm=(1.0, 2.0))
+
+    def test_calibrated_state_requires_millimetre_uncertainty(self):
+        measurement = ContaminationMeasurement(100.0, (10.0, 20.0), 0.2, 0.95)
+        with self.assertRaises(ValueError):
+            estimate_state(
+                self.pre,
+                measurement,
+                calibration_version="cal-v0",
+                calibration_valid=True,
+                target_centroid_mm=(1.0, 2.0),
+            )
+
+
+@unittest.skipUnless(HAS_PERCEPTION_DEPS, "需要 requirements/perception-opencv.txt")
+class HSVBaselineTests(unittest.TestCase):
+    def test_red_regions_become_mask_area_and_centroid(self):
+        import cv2
+        import numpy as np
+
+        from microcleaning.vision.hsv_baseline import segment_contamination
+
+        image = np.full((120, 160, 3), 210, dtype=np.uint8)
+        cv2.circle(image, (80, 60), 20, (0, 0, 230), -1)
+        result = segment_contamination(image)
+        self.assertGreater(result.measurement.area_px, 1000)
+        self.assertAlmostEqual(80.0, result.measurement.centroid_px[0], delta=1.0)
+        self.assertAlmostEqual(60.0, result.measurement.centroid_px[1], delta=1.0)
+        self.assertEqual(1, result.measurement.component_count)
+
+    def test_small_red_noise_is_removed(self):
+        import cv2
+        import numpy as np
+
+        from microcleaning.vision.hsv_baseline import segment_contamination
+
+        image = np.full((80, 80, 3), 210, dtype=np.uint8)
+        cv2.circle(image, (10, 10), 1, (0, 0, 255), -1)
+        result = segment_contamination(image)
+        self.assertEqual(0.0, result.measurement.area_px)
+        self.assertIsNone(result.measurement.centroid_px)
 
 
 if __name__ == "__main__":

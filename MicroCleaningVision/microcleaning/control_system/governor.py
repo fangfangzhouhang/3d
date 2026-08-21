@@ -85,7 +85,9 @@ def evaluate_action(
         denied.append("PRESSURE_OUT_OF_BOUNDS")
     if not state.device_state.get("observation_quality_ok"):
         human.append("OBSERVATION_LOW_QUALITY")
-    if state.uncertainty_mm > limits.max_uncertainty_mm:
+    if state.uncertainty_mm is None:
+        denied.append("MILLIMETRE_UNCERTAINTY_MISSING")
+    elif state.uncertainty_mm > limits.max_uncertainty_mm:
         human.append("LOCALIZATION_UNCERTAIN")
 
     if denied:

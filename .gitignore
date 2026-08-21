@@ -24,9 +24,9 @@ output/
 MicroCleaningVision/output/
 MicroCleaningVision/data/raw/
 MicroCleaningVision/data/episodes/
+MicroCleaningVision/data/datasets/*/raw/
 
 # 模型权重需要单独的数据/模型版本管理。
 *.pt
 *.pth
 *.onnx
-

@@ -1,0 +1,18 @@
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}\\MicroCleaningVision\\.venv\\Scripts\\python.exe",
+
+    "terminal.integrated.cwd": "${workspaceFolder}\\MicroCleaningVision",
+
+    "terminal.integrated.profiles.windows": {
+        "MicroCleaningVision PowerShell": {
+            "source": "PowerShell",
+            "args": [
+                "-NoExit",
+                "-Command",
+                "& '${workspaceFolder}\\MicroCleaningVision\\.venv\\Scripts\\Activate.ps1'"
+            ]
+        }
+    },
+
+    "terminal.integrated.defaultProfile.windows": "MicroCleaningVision PowerShell"
+}

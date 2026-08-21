@@ -1,11 +1,11 @@
 # 全团队唯一的当前事实。计划、愿景和代码文件不能自动成为事实。
-updated_at: 2026-08-15
-current_phase: "P0 - 三模块责任与入门体系已迁移；P1真实USB数据尚未开始"
+updated_at: 2026-08-20
+current_phase: "P1 - Demo v0.1软件链已形成；等待第一张团队真实图片进入A/B/C"
 
 current_evidence_level:
   overall_hardware: E0
   software_components: E1
-  software_integration: E1
+  software_integration: E2
 
 team_scope:
   in_scope:
@@ -19,24 +19,25 @@ team_scope:
     - 未经人工关卡的真实泵、电机、喷头和平台控制
 
 validated_capabilities:
-  - "目录迁移后30项软件测试通过：A数据输入5项、B视觉测量3项、C控制/Mock 22项。"
+  - "项目.venv中54项测试全部执行并通过，无跳过：包含数据集、HSV、分段路径和Demo端到端。"
   - "真实文件入口测试会由OpenCV解码程序生成PNG、计算SHA-256和基础质量指标；图片仍不是团队相机采集证据。"
   - "Mock和软件回放不会打开真实COM口；main.py只运行纯合成Mock。"
   - "无标定状态不会产生毫米目标；模拟审批令牌绑定、超时和失败路由有回归测试。"
+  - "Demo v0.1的程序生成图片可输出input/mask/污染叠加/分段路径/summary/Episode；simulate模式产生FakeSerial回执和模拟复查。"
+  - "MicroCleaning Dataset v0.1具备init/import/check入口、SHA-256去重和文件篡改检查；当前真实记录数仍为0。"
 
 unvalidated_claims:
   - 团队手机或USB显微镜真实图像采集和质量阈值
   - PLA彩色水溶性标记物的适用性
   - HSV在真实项目图片上的分割效果
-  - 像素不确定度到毫米不确定度的接口迁移
   - 人工mask、前后图配准和真实复检准确性
-  - mask到目标点和路线的当前实现
+  - mask路线在真实污染形状、真实喷头覆盖范围和运动约束下的有效性
   - 像素到工作台毫米坐标的标定
   - STM32、XY、泵或喷头通信与执行
   - 真实清洗效果、损伤和硬件闭环
 
 current_interfaces:
-  version: mcl-v0
+  version: mcl-v0.1
   contracts: microcleaning/contracts.py
   ports: microcleaning/ports.py
   change_rule: "共享接口单独提案；至少两人评审；必须给出消费者、迁移和失败测试。"
@@ -56,14 +57,17 @@ module_ownership:
     tests: test/control_system/
 
 software_loop:
-  status: synthetic_and_file_ingestion_regression_tested
+  status: synthetic_demo_v0_1_integrated
+  demo_entry: demo/demo_pipeline.py
   mock_entry: microcleaning/control_system/mock_mcl.py
   replay_entry: microcleaning/control_system/replay_mcl.py
   controller: microcleaning/control_system/fake_serial.py
-  note: "当前只有合成回放和程序生成图片测试；不能声明真实像素已穿过A/B/C。"
+  note: "程序生成像素已穿过A/B/C；团队手机或USB显微镜图片尚未进入。"
 
 current_dataset:
-  status: absent
+  status: structure_initialized_empty
+  root: data/datasets/microcleaning_v0_1
+  record_count: 0
   planned_primary_source: USB显微镜
   auxiliary_source: 手机链路图片
   planned_baseline: "PLA平面试片 + 经过可行性检查的水溶性彩色标记物 + 固定俯视成像"
@@ -87,7 +91,8 @@ major_risks:
   - "用户持有相机和GPU经验，A阶段负担可能在标注/训练期上升，需要按两轮真实记录再平衡。"
   - "旧legacy代码和旧文档容易被误当当前入口；当前主线禁止导入legacy。"
   - "模型训练可能被过早启动；必须先有HSV失败、人工标注和独立测试集。"
-  - "ContaminationMeasurement仍使用uncertainty_mm字段；真实分割接入前必须先完成像素/毫米接口提案。"
+  - "HSV默认参数只针对高饱和红色标记物；真实相机、材料和光照变化可能使其立即失效。"
+  - "Demo路线只考虑mask几何，不包含喷头直径、速度、平台动力学和真实障碍物。"
 
 blockers:
   - "A尚未提供结构化USB显微镜原图、采集批次和人工标注。"
@@ -96,9 +101,10 @@ blockers:
 
 next_actions:
   - "A-P1-01：采集至少12张、两个批次的USB显微镜图片，建立清单并标注5张。"
-  - "B-P0-01/P1-01：先提像素/毫米不确定度迁移方案；同时用合成色块实现HSV、mask、面积、中心和测试。"
-  - "C-P1-01：不等待B，使用合成mask实现目标点、简单路线和像素级Dry Run。"
-  - "TEAM-P1-INT-01：A/B/C最小成果到位后，用一张真实图片完成第一次接口集成。"
+  - "A-P1-01：先导入1张真实图片运行analyze；再完成至少12张、两个批次，最终扩展到50张和10张标注。"
+  - "B-P1-REAL-01：检查真实图片的mask/面积/中心；记录漏检、误检和反光失败，不凭合成结果调结论。"
+  - "C-P1-REAL-01：读取B的真实mask并检查分段路线；暂不增加复杂规划。"
+  - "TEAM-P1-INT-01：保存第一次真实图片Demo输出，并由三人共同检查路径图。"
 
 documentation:
   navigation: docs/README.md

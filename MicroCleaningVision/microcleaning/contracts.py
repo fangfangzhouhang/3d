@@ -16,7 +16,7 @@ from enum import Enum
 from typing import Any
 
 
-INTERFACE_VERSION = "mcl-v0"
+INTERFACE_VERSION = "mcl-v0.1"
 
 
 class SafetyOutcome(str, Enum):
@@ -53,11 +53,13 @@ class StateEstimate:
     target_centroid_mm: tuple[float, float] | None
     target_area_px: float
     coordinate_frame: str
-    uncertainty_mm: float
+    uncertainty_mm: float | None
     device_state: dict[str, Any]
     calibration_version: str
     calibration_valid: bool
     prior_actions: tuple[str, ...] = ()
+    target_centroid_px: tuple[float, float] | None = None
+    uncertainty_px: float | None = None
 
 
 @dataclass(frozen=True)
