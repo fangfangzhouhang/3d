@@ -1,5 +1,0 @@
-interface:
-  display_name: "视觉闭环任务"
-  short_description: "让三名成员按共享契约独立完成视觉闭环模块任务"
-  default_prompt: "Use $visual-closed-loop-task to implement one owned MicroCleaningVision visual-loop task with tests and evidence."
-

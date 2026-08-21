@@ -65,9 +65,10 @@ software_loop:
   note: "程序生成像素已穿过A/B/C；团队手机或USB显微镜图片尚未进入。"
 
 current_dataset:
-  status: structure_initialized_empty
-  root: data/datasets/microcleaning_v0_1
-  record_count: 0
+  status: raw_images_staged_11_public_unclassified
+  root: data
+  raw_images_count: 11
+  classified_record_count: 0
   planned_primary_source: USB显微镜
   auxiliary_source: 手机链路图片
   planned_baseline: "PLA平面试片 + 经过可行性检查的水溶性彩色标记物 + 固定俯视成像"

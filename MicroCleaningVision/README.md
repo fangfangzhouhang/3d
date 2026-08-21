@@ -43,7 +43,7 @@ MicroCleaningVision/
 │   ├── vision/
 │   └── control_system/
 ├── demo/                    # 明确的软件演示入口
-├── data/datasets/           # 数据集清单；raw原图默认不进Git
+├── data/                    # 数据集：raw_images暂存+六类分类+标注预留
 ├── docs/                    # 总导航、长期规划、个人手册、Git、术语
 ├── legacy/                  # 旧原型，只读参考
 ├── AGENTS.md
@@ -109,7 +109,7 @@ output/demo/<run_id>/
 
 ```powershell
 .\.venv\Scripts\python.exe -m demo.demo_pipeline `
-  --input data\datasets\microcleaning_v0_1\raw\你的图片.png `
+  --input data\raw_images\你的图片.png `
   --mode analyze
 ```
 
@@ -117,24 +117,21 @@ output/demo/<run_id>/
 
 ## 数据集入口
 
+Dataset v0.1 由 `data/` 目录管理，规范见 [docs/dataset_management.md](docs/dataset_management.md)：新图先放 `data/raw_images/`，人工分类后改名移入 `data/dataset/<类别>/`，并在 `data/metadata.csv` 登记。
+
 ```powershell
-# 建立数据集骨架
-.\.venv\Scripts\python.exe -m microcleaning.data_learning.dataset_manifest `
-  init data\datasets\microcleaning_v0_1
+# 对某个类别目录做批量质量检查
+.\.venv\Scripts\python.exe -m microcleaning.data_learning.inspect_images data\dataset\particle
 
-# 导入图片；不会修改原文件，相同内容不会重复复制
-.\.venv\Scripts\python.exe -m microcleaning.data_learning.dataset_manifest `
-  import data\datasets\microcleaning_v0_1 你的图片1.png 你的图片2.png `
-  --source usb-microscope --sample-id pla-001 --session session-01 `
-  --contamination-type red-water-soluble-marker `
-  --illumination ring-light-fixed --magnification unknown
-
-# 检查图片缺失、重复编号和哈希变化
-.\.venv\Scripts\python.exe -m microcleaning.data_learning.dataset_manifest `
-  check data\datasets\microcleaning_v0_1
+# 用已分类图片跑视觉分析Demo
+.\.venv\Scripts\python.exe -m demo.demo_pipeline `
+  --input data\dataset\particle\MC_particle_001.jpg `
+  --mode analyze
 ```
 
-第一条真实数据关卡不是“先凑够50张才运行”，而是：先导入1张跑通Demo，再扩展到两个采集批次、50张图片和至少10张人工标注。
+`data/raw_images/` 现有 11 张公共样例图（`public_001.jpg` ~ `public_011.jpg`），等待人工分类。
+
+第一条真实数据关卡不是“先凑够50张才运行”，而是：先分类1张跑通Demo，再扩展到两个采集批次、50张图片和至少10张人工标注。
 
 ## 长期路线
 
