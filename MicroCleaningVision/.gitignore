@@ -6,5 +6,4 @@ __pycache__/
 # 运行产物
 output/
 
-# 原始未分类图片（约定不进 Git，见 docs/dataset_management.md）
-data/raw_images/
+
