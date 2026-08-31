@@ -1,6 +1,6 @@
 # 全团队唯一的当前事实。计划、愿景和代码文件不能自动成为事实。
-updated_at: 2026-08-28
-current_phase: "P1 - 第一张来源待核实的真实像素图片已完成A/B软件评价；进入HSV失败分析"
+updated_at: 2026-08-31
+current_phase: "P1 - U500通用USB相机适配器已完成无硬件测试，等待实机probe；并行推进HSV失败分析"
 
 current_evidence_level:
   overall_hardware: E0
@@ -19,7 +19,7 @@ team_scope:
     - 未经人工关卡的真实泵、电机、喷头和平台控制
 
 validated_capabilities:
-  - "项目.venv中74项测试全部执行并通过，无跳过：包含metadata半自动生成、数据审计、Labelme imagePath批量定位、Polygon/Circle标注转换、Mask评价、HSV、分段路径和Demo端到端。"
+  - "项目.venv中81项测试全部执行并通过，无跳过：包含metadata、数据审计、标注转换、Mask评价、USBCamera无硬件测试、HSV、分段路径和Demo端到端。"
   - "真实文件入口测试会由OpenCV解码程序生成PNG、计算SHA-256和基础质量指标；图片仍不是团队相机采集证据。"
   - "Mock和软件回放不会打开真实COM口；main.py只运行纯合成Mock。"
   - "无标定状态不会产生毫米目标；模拟审批令牌绑定、超时和失败路由有回归测试。"
@@ -30,9 +30,10 @@ validated_capabilities:
   - "Labelme批量转换可从JSON的imagePath自动定位data/raw_images内原图，支持Polygon/Circle；当前13份JSON已全部转换，报告为13成功、0失败。"
   - "public_001.jpg已完成质量检查、人工Polygon、人工Mask、HSV预测Mask和定量评价：IoU=0.0739，算法面积比人工多911px，中心误差86.87px。该证据证明链路可运行，同时证明当前HSV基线在此图上失败。"
   - "metadata_builder默认dry-run，可自动填写文件名和分辨率并保留人工行；已执行apply生成13条记录，public_001标记为labeled。"
+  - "USBCamera实现CameraPort，使用OpenCV VideoCapture、预热帧、无损PNG、现有质量检查和build_observation；7项FakeVideoCapture测试覆盖正常抓帧、驱动异常及四类失败并确认release。"
 
 unvalidated_claims:
-  - 团队手机或USB显微镜真实图像采集和质量阈值
+  - U500实机能否被本机OpenCV VideoCapture打开、真实分辨率/FPS和质量阈值
   - PLA彩色水溶性标记物的适用性
   - HSV在真实项目图片上的分割效果
   - 人工mask、前后图配准和真实复检准确性
@@ -78,21 +79,32 @@ current_dataset:
   corrupt_count: 0
   duplicate_sha256_group_count: 0
   metadata_record_count: 13
-    labelme_json_file_count: 13
-    converted_manual_mask_count: 13
-    metadata_labeled_count: 1
-    evaluated_prediction_count: 1
+  labelme_json_file_count: 13
+  converted_manual_mask_count: 13
+  metadata_labeled_count: 1
+  evaluated_prediction_count: 1
   gate1_flagged_count: 12
   evidence_note: "文件夹名public不等于来源证据；Gate 1 flag来自暂定阈值，不能写成科学质量结论。"
-  planned_primary_source: USB显微镜
+  planned_primary_source: U500_USB显微镜
   auxiliary_source: 手机链路图片
   planned_baseline: "PLA平面试片 + 经过可行性检查的水溶性彩色标记物 + 固定俯视成像"
 
 hardware_boundary:
   camera_port: microcleaning/ports.py
+  camera_model: U500
+  camera_connection: USB
+  camera_adapter: microcleaning/data_learning/usb_camera.py
+  camera_adapter_status: implemented_and_fake_capture_tested
+  camera_probe_entry: scripts/probe_usb_camera.py
+  camera_integration_status: integration_not_verified
+  physical_capture_verified: false
   controller_port: microcleaning/ports.py
   real_hardware_armed: false
-  stm32_firmware_status: unavailable
+  stm32_board: NUCLEO-F401RE
+  stm32_pump_pin_plan: "PB5 / D4 -> MOSFET / 泵控制；未验证"
+  stm32_estop_pin_plan: "PB12 -> E-stop状态检测；未验证有效电平和固件行为"
+  stm32_pc_connection_plan: "USB / ST-LINK VCP；未冻结串口参数"
+  stm32_firmware_status: protocol_not_frozen
   serial_protocol_status: unavailable
 
 development_environment:
@@ -111,13 +123,15 @@ major_risks:
   - "Demo路线只考虑mask几何，不包含喷头直径、速度、平台动力学和真实障碍物。"
 
 blockers:
-    - "A尚未提供结构化USB显微镜原图和采集批次；现有13份Labelme JSON已自动转换为13张Mask，但仍需逐份人工复核，其中只有1份在metadata中标记为labeled并完成算法对照。"
+  - "U500尚未在本机执行probe和capture-test；适配器通过FakeVideoCapture测试不能写成实机接入完成。"
+  - "A尚未提供结构化USB显微镜原图和采集批次；现有13份Labelme JSON已自动转换为13张Mask，但仍需逐份人工复核，其中只有1份在metadata中标记为labeled并完成算法对照。"
   - "真实标记物、样本状态和固定成像条件尚未形成证据。"
   - "STM32协议、标定和硬件安全事实缺失。"
 
 next_actions:
+  - "A-P1-U500-01：插入U500后运行scripts/probe_usb_camera.py，再运行--capture-test；保存index、分辨率、FPS、PNG、SHA256和质量结果。"
   - "A-P1-DATA-01：13张已登记；继续核实来源、设备、倍率和日期，无法核实的字段保持unknown。"
-    - "A-P1-LABEL-01：逐份复核自动生成的13张Mask并同步metadata。至少冻结3张开发图和2张留出图，包含1张无目标或困难负样本。"
+  - "A-P1-LABEL-01：逐份复核自动生成的13张Mask并同步metadata。至少冻结3张开发图和2张留出图，包含1张无目标或困难负样本。"
   - "B-P1-HSV-02：保持v0.1结果不变，针对细长铜色横线误检建立连通域形状诊断和场景限定的v0.2候选；用至少5张人工Mask做A/B，不在单图上宣布提升。"
   - "A-P1-CAPTURE-01：补采至少12张、两个批次的USB显微镜图片；先导入1张运行analyze，再扩展到50张。"
   - "B-P1-REAL-01：检查真实图片的mask/面积/中心；记录漏检、误检和反光失败，不凭合成结果调结论。"
@@ -131,3 +145,5 @@ documentation:
   task_board: docs/team/团队公共/团队任务看板.md
   glossary: docs/team/团队公共/项目术语与概念词典.md
   git_tutorial: docs/team/团队公共/Git与GitHub协作教程.md
+  u500_guide: docs/team/成员A/U500_USB相机接入指南.md
+  stm32_pending_contract: docs/future_hardware/NUCLEO-F401RE串口接口待确认清单.md

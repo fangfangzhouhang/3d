@@ -28,14 +28,16 @@ microcleaning/data_learning/
 ├── annotation_tools.py    # 根据Labelme imagePath批量定位原图，Polygon/Circle转二值Mask
 ├── mask_evaluation.py     # 人工Mask与算法Mask定量比较
 ├── dataset_manifest.py    # SHA-256、稳定ID和文件变化检查
-└── replay_camera.py       # 把登记图片转换成Observation
+├── replay_camera.py       # 把登记图片转换成Observation
+└── usb_camera.py          # 通用USB视频设备抓帧、保存、质量检查和Observation
 
 test/data_learning/
 ├── test_data_learning.py
 ├── test_data_audit.py
 ├── test_metadata_builder.py
 ├── test_annotation_evaluation.py
-└── test_dataset_manifest.py
+├── test_dataset_manifest.py
+└── test_usb_camera.py
 ```
 
 当前没有训练入口。只有人工Mask、批次隔离和简单基线失败证据到位后，才增加数据划分和训练文件；没有任务和证据时不创建空目录。
@@ -63,7 +65,7 @@ test/data_learning/
 
 ## 4. 当前核心任务：USB显微镜数据 v0
 
-完整任务卡见 [团队任务看板](../团队公共/团队任务看板.md#3-a数据与模型任务包)。这里解释为什么和怎样做。
+完整任务卡见 [团队任务看板](../总流程说明/团队任务看板.md#3-a数据与模型任务包)。这里解释为什么和怎样做。
 
 ### 4.1 先准备实验对象
 

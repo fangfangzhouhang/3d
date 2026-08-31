@@ -1,7 +1,9 @@
 """全项目共享的软硬件端口契约（ports）。
 
 这些接口为当前回放适配器和未来真实相机/控制器提供同一契约入口。
-目前只有 ReplayCamera 和 FakeSerial 实现；它们不构成真实硬件证据。
+目前 ReplayCamera 用于文件回放，USBCamera 用于通用 USB 视频设备采集，
+FakeSerial 用于控制仿真。USBCamera 的无硬件单元测试不等于 U500 实机已验证；
+FakeSerial 也不构成真实控制器证据。
 
 设计原则（来自 AGENTS.md 第四节"核心责任边界"）：
 - 感知层不直接控制硬件。
@@ -13,11 +15,13 @@
 - CameraPort 只产出 Observation，不产出动作。
 - ControllerPort 只接受已批准的 ActionRequest + SafetyDecision，不自行决策。
 
-何时实现这些接口：
-1. 人工关卡完成（样品、安全清单、操作员签署）。
-2. 真实相机已标定并保留证据。
-3. 真实控制器协议已确认。
-在此之前，只允许 MockMCLRunner 与 ReplayMCLRunner 运行。
+真实相机和真实控制器的启用条件必须分开：
+
+1. CameraPort 可以先用于人工发起的真实图片采集、保存和软件分析；这不需要授予
+   泵、电机或平台权限，也不代表像素到毫米标定已经完成。
+2. ControllerPort 的真实实现必须等待 STM32 协议、坐标标定、设备状态、安全边界
+   和 Human Gate 全部确认。在此之前只允许 FakeSerial / Mock / Replay。
+3. “能够拍照”绝不自动推导出“允许启动泵或运动平台”。
 """
 
 from __future__ import annotations

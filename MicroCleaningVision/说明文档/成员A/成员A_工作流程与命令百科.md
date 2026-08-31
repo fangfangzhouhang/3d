@@ -178,6 +178,20 @@ Get-ChildItem -File -Recurse "data\raw_images" |
 输入：手机、显微镜或公共图片。  
 输出：`data/raw_images/<批次>/<图片>`。
 
+### 4.4 U500 USB 相机探测与抓帧
+
+U500 的专用流程、错误码和实机验收见 [U500 USB 数码显微镜接入指南](U500_USB数码显微镜接入指南.md)。第一次先运行探测，不要手写设备编号：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\probe_usb_camera.py
+```
+
+确认存在可读 index 后再保存测试帧：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\probe_usb_camera.py --capture-test
+```
+
 ## 5. 质量检查
 
 ### 5.1 运行全部原图检查
