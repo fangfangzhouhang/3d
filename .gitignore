@@ -22,7 +22,6 @@ env/
 # 运行输出和原始实验数据不直接进入 Git；只提交清单、协议和小型示例。
 output/
 MicroCleaningVision/output/
-MicroCleaningVision/data/raw/
 MicroCleaningVision/data/episodes/
 MicroCleaningVision/data/datasets/*/raw/
 

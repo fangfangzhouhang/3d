@@ -1,6 +1,6 @@
 # 全团队唯一的当前事实。计划、愿景和代码文件不能自动成为事实。
-updated_at: 2026-08-20
-current_phase: "P1 - Demo v0.1软件链已形成；等待第一张团队真实图片进入A/B/C"
+updated_at: 2026-08-28
+current_phase: "P1 - 第一张来源待核实的真实像素图片已完成A/B软件评价；进入HSV失败分析"
 
 current_evidence_level:
   overall_hardware: E0
@@ -19,12 +19,17 @@ team_scope:
     - 未经人工关卡的真实泵、电机、喷头和平台控制
 
 validated_capabilities:
-  - "项目.venv中54项测试全部执行并通过，无跳过：包含数据集、HSV、分段路径和Demo端到端。"
+  - "项目.venv中74项测试全部执行并通过，无跳过：包含metadata半自动生成、数据审计、Labelme imagePath批量定位、Polygon/Circle标注转换、Mask评价、HSV、分段路径和Demo端到端。"
   - "真实文件入口测试会由OpenCV解码程序生成PNG、计算SHA-256和基础质量指标；图片仍不是团队相机采集证据。"
   - "Mock和软件回放不会打开真实COM口；main.py只运行纯合成Mock。"
   - "无标定状态不会产生毫米目标；模拟审批令牌绑定、超时和失败路由有回归测试。"
   - "Demo v0.1的程序生成图片可输出input/mask/污染叠加/分段路径/summary/Episode；simulate模式产生FakeSerial回执和模拟复查。"
-  - "MicroCleaning Dataset v0.1具备init/import/check入口、SHA-256去重和文件篡改检查；当前真实记录数仍为0。"
+  - "MicroCleaning Dataset清单入口具备init/import/check、SHA-256去重和文件篡改检查；data/metadata.csv当前有13条来源待核实的记录。"
+  - "A数据工具已实际检查data/raw_images中的13张JPG：13张可解码、0损坏、0个相同SHA-256重复组；13张已登记。"
+  - "Labelme contamination Polygon/Circle可被严格校验并转换为同尺寸二值Mask；人工Mask与算法Mask可计算IoU、面积误差和中心像素误差。"
+  - "Labelme批量转换可从JSON的imagePath自动定位data/raw_images内原图，支持Polygon/Circle；当前13份JSON已全部转换，报告为13成功、0失败。"
+  - "public_001.jpg已完成质量检查、人工Polygon、人工Mask、HSV预测Mask和定量评价：IoU=0.0739，算法面积比人工多911px，中心误差86.87px。该证据证明链路可运行，同时证明当前HSV基线在此图上失败。"
+  - "metadata_builder默认dry-run，可自动填写文件名和分辨率并保留人工行；已执行apply生成13条记录，public_001标记为labeled。"
 
 unvalidated_claims:
   - 团队手机或USB显微镜真实图像采集和质量阈值
@@ -57,18 +62,28 @@ module_ownership:
     tests: test/control_system/
 
 software_loop:
-  status: synthetic_demo_v0_1_integrated
+  status: first_source_unverified_real_pixel_evaluation_complete
   demo_entry: demo/demo_pipeline.py
   mock_entry: microcleaning/control_system/mock_mcl.py
   replay_entry: microcleaning/control_system/replay_mcl.py
   controller: microcleaning/control_system/fake_serial.py
-  note: "程序生成像素已穿过A/B/C；团队手机或USB显微镜图片尚未进入。"
+  note: "public_001真实像素已穿过A质量、人工Mask、B分割、状态和C路线，但来源尚未核实；无真实标定、执行和动作后复检。"
 
 current_dataset:
-  status: raw_images_staged_11_public_unclassified
+  status: raw_images_staged_13_source_unverified_registered
   root: data
-  raw_images_count: 11
+  raw_images_count: 13
   classified_record_count: 0
+  decodable_count: 13
+  corrupt_count: 0
+  duplicate_sha256_group_count: 0
+  metadata_record_count: 13
+    labelme_json_file_count: 13
+    converted_manual_mask_count: 13
+    metadata_labeled_count: 1
+    evaluated_prediction_count: 1
+  gate1_flagged_count: 12
+  evidence_note: "文件夹名public不等于来源证据；Gate 1 flag来自暂定阈值，不能写成科学质量结论。"
   planned_primary_source: USB显微镜
   auxiliary_source: 手机链路图片
   planned_baseline: "PLA平面试片 + 经过可行性检查的水溶性彩色标记物 + 固定俯视成像"
@@ -96,13 +111,15 @@ major_risks:
   - "Demo路线只考虑mask几何，不包含喷头直径、速度、平台动力学和真实障碍物。"
 
 blockers:
-  - "A尚未提供结构化USB显微镜原图、采集批次和人工标注。"
+    - "A尚未提供结构化USB显微镜原图和采集批次；现有13份Labelme JSON已自动转换为13张Mask，但仍需逐份人工复核，其中只有1份在metadata中标记为labeled并完成算法对照。"
   - "真实标记物、样本状态和固定成像条件尚未形成证据。"
   - "STM32协议、标定和硬件安全事实缺失。"
 
 next_actions:
-  - "A-P1-01：采集至少12张、两个批次的USB显微镜图片，建立清单并标注5张。"
-  - "A-P1-01：先导入1张真实图片运行analyze；再完成至少12张、两个批次，最终扩展到50张和10张标注。"
+  - "A-P1-DATA-01：13张已登记；继续核实来源、设备、倍率和日期，无法核实的字段保持unknown。"
+    - "A-P1-LABEL-01：逐份复核自动生成的13张Mask并同步metadata。至少冻结3张开发图和2张留出图，包含1张无目标或困难负样本。"
+  - "B-P1-HSV-02：保持v0.1结果不变，针对细长铜色横线误检建立连通域形状诊断和场景限定的v0.2候选；用至少5张人工Mask做A/B，不在单图上宣布提升。"
+  - "A-P1-CAPTURE-01：补采至少12张、两个批次的USB显微镜图片；先导入1张运行analyze，再扩展到50张。"
   - "B-P1-REAL-01：检查真实图片的mask/面积/中心；记录漏检、误检和反光失败，不凭合成结果调结论。"
   - "C-P1-REAL-01：读取B的真实mask并检查分段路线；暂不增加复杂规划。"
   - "TEAM-P1-INT-01：保存第一次真实图片Demo输出，并由三人共同检查路径图。"
@@ -110,6 +127,7 @@ next_actions:
 documentation:
   navigation: docs/README.md
   roadmap: docs/architecture/长期分阶段研发规划.md
-  task_board: docs/team/团队任务看板.md
-  glossary: docs/team/项目术语与概念词典.md
-  git_tutorial: docs/team/Git与GitHub协作教程.md
+  team_index: docs/team/README.md
+  task_board: docs/team/团队公共/团队任务看板.md
+  glossary: docs/team/团队公共/项目术语与概念词典.md
+  git_tutorial: docs/team/团队公共/Git与GitHub协作教程.md

@@ -1,0 +1,40 @@
+{
+  "version": "7.2.0",
+  "flags": {},
+  "shapes": [
+    {
+      "label": "contamination",
+      "points": [
+        [
+          115.79905715969359,
+          88.83323512080142
+        ],
+        [
+          99.74130819092518,
+          105.18562168532706
+        ],
+        [
+          105.63406010606955,
+          128.31467295226872
+        ],
+        [
+          117.7142015321155,
+          123.45315262227462
+        ],
+        [
+          117.7142015321155,
+          103.12315851502653
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "polygon",
+      "flags": {},
+      "mask": null
+    }
+  ],
+  "imagePath": "..\\..\\raw_images\\public\\public_004.jpg",
+  "imageData": null,
+  "imageHeight": 226,
+  "imageWidth": 226
+}

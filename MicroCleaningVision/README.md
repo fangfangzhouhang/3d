@@ -4,11 +4,11 @@ MicroCleaningVision 是一个显微表面智能处理科研项目。当前三人
 
 ## 当前真实状态
 
-- 软件组件：E1；A/B/C软件集成：E2（仅程序生成图和FakeSerial）。
+- 软件组件：E1；A/B/C软件集成：E2。程序生成图和FakeSerial已回归，第一张来源待核实的真实像素图已完成A/B评价。
 - Demo v0.1：已能输出图片、mask、面积、中心、路线、模拟动作与Episode。
-- 当前回归：项目`.venv`中54项测试全部执行并通过，无跳过。
-- 真实相机/USB显微镜数据：尚未进入仓库证据链。
-- HSV真实污染识别：尚未验证。
+- 当前回归：项目`.venv`中74项测试全部执行并通过，无跳过。
+- `public_001.jpg` 已完成人工Mask与HSV预测比较：IoU为0.0739，证明链路可运行，也证明当前HSV基线在此图上失败。
+- USB显微镜团队采集数据：尚未进入证据链；现有图片来源仍需metadata核实。
 - 像素到毫米标定：尚未验证。
 - STM32、运动和喷洗：E0，无真实执行证据。
 
@@ -55,8 +55,10 @@ MicroCleaningVision/
 1. [共同上下文](AGENTS.md)
 2. [当前事实](project_state.yaml)
 3. [文档总导航](docs/README.md)
-4. [团队入门指南](docs/team/团队入门指南.md)
-5. [本轮任务看板](docs/team/团队任务看板.md)
+4. [团队文档分类导航](docs/team/README.md)
+5. [团队入门指南](docs/team/团队公共/团队入门指南.md)
+6. [本轮任务看板](docs/team/团队公共/团队任务看板.md)
+7. [成员A工作流程与命令百科](docs/team/成员A/成员A_工作流程与命令百科.md)
 
 ## 环境和测试
 
@@ -117,7 +119,7 @@ output/demo/<run_id>/
 
 ## 数据集入口
 
-Dataset v0.1 由 `data/` 目录管理，规范见 [docs/dataset_management.md](docs/dataset_management.md)：新图先放 `data/raw_images/`，人工分类后改名移入 `data/dataset/<类别>/`，并在 `data/metadata.csv` 登记。
+Dataset v0.2 由 `data/` 目录管理，规范见 [data/dataset_management.md](data/dataset_management.md)：新图先进入 `data/raw_images/`，经过质量检查、metadata登记和必要的人工Mask后再交给视觉算法。
 
 ```powershell
 # 对某个类别目录做批量质量检查

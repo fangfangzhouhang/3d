@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from microcleaning.data_learning.image_quality import ImageQuality, build_observation
-from microcleaning.data_learning.inspect_images import inspect_directory
+from microcleaning.data_learning.inspect_images import inspect_directory, write_quality_summary_csv
 from microcleaning.data_learning.replay_camera import ReplayCamera, ReplayFrame
 
 
@@ -66,6 +66,23 @@ class ImagingQualityTests(unittest.TestCase):
             self.assertEqual(inspection.sha256, report[0]["sha256"])
             self.assertEqual("quality-gate1-v0", report[0]["algorithm_version"])
             self.assertEqual(100.0, report[0]["policy"]["focus_reference"])
+            csv_path = write_quality_summary_csv(report, Path(folder) / "quality_summary.csv")
+            csv_text = csv_path.read_text(encoding="utf-8-sig")
+            self.assertIn("filename,status,width,height", csv_text)
+            self.assertIn("phone-smoke.png,OK,64,64", csv_text)
+
+    @unittest.skipUnless(HAS_PERCEPTION_DEPS, "需要 requirements/perception-opencv.txt")
+    def test_recursive_inspection_keeps_relative_path(self):
+        import cv2
+        import numpy as np
+
+        with tempfile.TemporaryDirectory() as folder:
+            nested = Path(folder) / "public"
+            nested.mkdir()
+            image_path = nested / "nested.jpg"
+            self.assertTrue(cv2.imwrite(str(image_path), np.full((16, 20, 3), 128, dtype=np.uint8)))
+            report = inspect_directory(Path(folder), recursive=True)
+            self.assertEqual("public/nested.jpg", report[0]["file"])
 
     @unittest.skipUnless(HAS_PERCEPTION_DEPS, "需要 requirements/perception-opencv.txt")
     def test_real_pixel_mode_rejects_missing_and_undecodable_files(self):

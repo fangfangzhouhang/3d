@@ -1,0 +1,130 @@
+{
+  "version": "7.2.0",
+  "flags": {},
+  "shapes": [
+    {
+      "label": "contamination",
+      "points": [
+        [
+          680.3338898163606,
+          459.6994991652755
+        ],
+        [
+          665.3088480801334,
+          500.6010016694491
+        ],
+        [
+          693.6894824707847,
+          513.1218697829717
+        ],
+        [
+          704.5409015025041,
+          483.90651085141906
+        ],
+        [
+          697.0283806343907,
+          456.36060100166947
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "polygon",
+      "flags": {},
+      "mask": null
+    },
+    {
+      "label": "contamination",
+      "points": [
+        [
+          358.9649415692822,
+          533.1552587646077
+        ],
+        [
+          346.44407345575956,
+          526.4774624373957
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "circle",
+      "flags": {},
+      "mask": null
+    },
+    {
+      "label": "contamination",
+      "points": [
+        [
+          224.57429048414025,
+          818.6310517529216
+        ],
+        [
+          231.25208681135229,
+          835.3255425709516
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "circle",
+      "flags": {},
+      "mask": null
+    },
+    {
+      "label": "contamination",
+      "points": [
+        [
+          549.2821368948248,
+          460.534223706177
+        ],
+        [
+          551.7863105175293,
+          476.3939899833055
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "circle",
+      "flags": {},
+      "mask": null
+    },
+    {
+      "label": "contamination",
+      "points": [
+        [
+          313.88981636060095,
+          448.0133555926544
+        ],
+        [
+          320.567612687813,
+          464.7078464106845
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "circle",
+      "flags": {},
+      "mask": null
+    },
+    {
+      "label": "contamination",
+      "points": [
+        [
+          101.86978297161937,
+          436.3272120200334
+        ],
+        [
+          106.04340567612684,
+          453.02170283806345
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "circle",
+      "flags": {},
+      "mask": null
+    }
+  ],
+  "imagePath": "..\\..\\raw_images\\public\\M9.jpg",
+  "imageData": null,
+  "imageHeight": 1280,
+  "imageWidth": 960
+}
