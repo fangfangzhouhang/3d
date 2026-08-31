@@ -1,0 +1,3 @@
+config load "D:\codex\worktrees\f401re-stage1-firmware\阶段一_基础喷液控制\firmware\f401re-stage1\f401re-stage1.ioc"
+project generate
+exit
