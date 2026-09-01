@@ -5,6 +5,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <string.h>
+
 #include "line_receiver.h"
 #include "mcv1_protocol.h"
 #include "stm32f401re_hal.h"

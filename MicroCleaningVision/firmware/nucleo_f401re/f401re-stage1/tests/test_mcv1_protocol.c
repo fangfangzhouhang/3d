@@ -37,10 +37,10 @@ static void test_ping_and_status_use_the_shared_wire_format(void) {
   const fw_inputs_t inputs = {0u, false, false};
 
   mcv1_process_line(&controller, inputs, "MCV1|PING");
-  expect_response(&controller, "MCV1|PONG\\r\\n");
+  expect_response(&controller, "MCV1|PONG\r\n");
 
   mcv1_process_line(&controller, inputs, "MCV1|STATUS");
-  expect_response(&controller, "MCV1|STATUS|ESTOP=0|PUMP=0\\r\\n");
+  expect_response(&controller, "MCV1|STATUS|ESTOP=0|PUMP=0\r\n");
 }
 
 static void test_pump_acknowledges_then_reports_done_after_the_local_deadline(void) {
@@ -48,7 +48,7 @@ static void test_pump_acknowledges_then_reports_done_after_the_local_deadline(vo
   fw_inputs_t inputs = {0u, false, false};
 
   mcv1_process_line(&controller, inputs, "MCV1|PUMP|A001|300");
-  expect_response(&controller, "MCV1|ACK|A001\\r\\n");
+  expect_response(&controller, "MCV1|ACK|A001\r\n");
   EXPECT_TRUE(fw_core_outputs(&controller.core, inputs.now_ms).pump_on);
 
   inputs.now_ms = 299u;
@@ -58,7 +58,7 @@ static void test_pump_acknowledges_then_reports_done_after_the_local_deadline(vo
 
   inputs.now_ms = 300u;
   mcv1_step(&controller, inputs);
-  expect_response(&controller, "MCV1|DONE|A001\\r\\n");
+  expect_response(&controller, "MCV1|DONE|A001\r\n");
   EXPECT_TRUE(!fw_core_outputs(&controller.core, inputs.now_ms).pump_on);
 }
 
@@ -67,7 +67,7 @@ static void test_pump_deadline_uses_the_current_board_clock(void) {
   fw_inputs_t inputs = {1000u, false, false};
 
   mcv1_process_line(&controller, inputs, "MCV1|PUMP|LATE|300");
-  expect_response(&controller, "MCV1|ACK|LATE\\r\\n");
+  expect_response(&controller, "MCV1|ACK|LATE\r\n");
 
   inputs.now_ms = 1299u;
   mcv1_step(&controller, inputs);
@@ -76,7 +76,7 @@ static void test_pump_deadline_uses_the_current_board_clock(void) {
 
   inputs.now_ms = 1300u;
   mcv1_step(&controller, inputs);
-  expect_response(&controller, "MCV1|DONE|LATE\\r\\n");
+  expect_response(&controller, "MCV1|DONE|LATE\r\n");
 }
 
 static void test_pump_is_rejected_when_estop_is_active(void) {
@@ -84,7 +84,7 @@ static void test_pump_is_rejected_when_estop_is_active(void) {
   const fw_inputs_t inputs = {0u, true, false};
 
   mcv1_process_line(&controller, inputs, "MCV1|PUMP|A002|300");
-  expect_response(&controller, "MCV1|ERR|A002|ESTOP\\r\\n");
+  expect_response(&controller, "MCV1|ERR|A002|ESTOP\r\n");
   EXPECT_TRUE(!fw_core_outputs(&controller.core, inputs.now_ms).pump_on);
 }
 
@@ -93,16 +93,16 @@ static void test_duplicate_action_id_never_starts_a_second_pulse(void) {
   fw_inputs_t inputs = {0u, false, false};
 
   mcv1_process_line(&controller, inputs, "MCV1|PUMP|A003|100");
-  expect_response(&controller, "MCV1|ACK|A003\\r\\n");
+  expect_response(&controller, "MCV1|ACK|A003\r\n");
   mcv1_process_line(&controller, inputs, "MCV1|PUMP|A003|100");
-  expect_response(&controller, "MCV1|ACK|A003\\r\\n");
+  expect_response(&controller, "MCV1|ACK|A003\r\n");
 
   inputs.now_ms = 100u;
   mcv1_step(&controller, inputs);
-  expect_response(&controller, "MCV1|DONE|A003\\r\\n");
+  expect_response(&controller, "MCV1|DONE|A003\r\n");
 
   mcv1_process_line(&controller, inputs, "MCV1|PUMP|A003|100");
-  expect_response(&controller, "MCV1|DONE|A003\\r\\n");
+  expect_response(&controller, "MCV1|DONE|A003\r\n");
   EXPECT_TRUE(!fw_core_outputs(&controller.core, inputs.now_ms).pump_on);
 }
 
@@ -111,15 +111,15 @@ static void test_invalid_duration_and_a_busy_controller_are_safe(void) {
   const fw_inputs_t inputs = {0u, false, false};
 
   mcv1_process_line(&controller, inputs, "MCV1|PUMP|A004|99");
-  expect_response(&controller, "MCV1|ERR|A004|BAD_DURATION\\r\\n");
+  expect_response(&controller, "MCV1|ERR|A004|BAD_DURATION\r\n");
 
   mcv1_process_line(&controller, inputs, "MCV1|PUMP|A004|2001");
-  expect_response(&controller, "MCV1|ERR|A004|BAD_DURATION\\r\\n");
+  expect_response(&controller, "MCV1|ERR|A004|BAD_DURATION\r\n");
 
   mcv1_process_line(&controller, inputs, "MCV1|PUMP|A004|100");
-  expect_response(&controller, "MCV1|ACK|A004\\r\\n");
+  expect_response(&controller, "MCV1|ACK|A004\r\n");
   mcv1_process_line(&controller, inputs, "MCV1|PUMP|A005|100");
-  expect_response(&controller, "MCV1|ERR|A005|BUSY\\r\\n");
+  expect_response(&controller, "MCV1|ERR|A005|BUSY\r\n");
 }
 
 int main(void) {

@@ -69,7 +69,7 @@ static void queue_pump_response(
   }
   (void)snprintf(controller->responses[slot],
                  MCV1_RESPONSE_CAPACITY,
-                 "MCV1|ERR|%s|%s\\r\\n",
+                 "MCV1|ERR|%s|%s\r\n",
                  action_id,
                  code);
   ++controller->response_count;
@@ -105,7 +105,7 @@ static void remember_completed(mcv1_controller_t *controller, const char *action
 
 static void complete_active(mcv1_controller_t *controller) {
   remember_completed(controller, controller->active_action_id);
-  queue_response(controller, "MCV1|DONE|%s\\r\\n", controller->active_action_id);
+  queue_response(controller, "MCV1|DONE|%s\r\n", controller->active_action_id);
   controller->action_active = false;
   controller->active_action_id[0] = '\0';
 }
@@ -182,7 +182,7 @@ void mcv1_process_line(
     return;
   }
   if (strcmp(fields[1], "PING") == 0 && field_count == 2u) {
-    queue_response(controller, "MCV1|PONG\\r\\n", "");
+    queue_response(controller, "MCV1|PONG\r\n", "");
     return;
   }
   if (strcmp(fields[1], "STATUS") == 0 && field_count == 2u) {
@@ -192,7 +192,7 @@ void mcv1_process_line(
     if (controller->response_count < MCV1_RESPONSE_QUEUE_CAPACITY) {
       (void)snprintf(controller->responses[slot],
                      MCV1_RESPONSE_CAPACITY,
-                     "MCV1|STATUS|ESTOP=%u|PUMP=%u\\r\\n",
+                     "MCV1|STATUS|ESTOP=%u|PUMP=%u\r\n",
                      status.estop_latched ? 1u : 0u,
                      status.state == FW_STATE_PUMPING ? 1u : 0u);
       ++controller->response_count;
@@ -208,8 +208,8 @@ void mcv1_process_line(
       controller->active_action_id[0] = '\0';
     }
     (void)fw_core_command(&controller->core, inputs, &stop);
-    queue_response(controller, "MCV1|ACK|%s\\r\\n", "STOP");
-    queue_response(controller, "MCV1|DONE|%s\\r\\n", "STOP");
+    queue_response(controller, "MCV1|ACK|%s\r\n", "STOP");
+    queue_response(controller, "MCV1|DONE|%s\r\n", "STOP");
     return;
   }
   if (strcmp(fields[1], "PUMP") != 0 || field_count != 4u || !action_id_is_valid(fields[2])) {
@@ -229,12 +229,12 @@ void mcv1_process_line(
       queue_pump_response(controller, fields[2], "ESTOP");
     } else if (controller->action_active) {
       if (strcmp(controller->active_action_id, fields[2]) == 0) {
-        queue_response(controller, "MCV1|ACK|%s\\r\\n", fields[2]);
+        queue_response(controller, "MCV1|ACK|%s\r\n", fields[2]);
       } else {
         queue_pump_response(controller, fields[2], "BUSY");
       }
     } else if (is_completed(controller, fields[2])) {
-      queue_response(controller, "MCV1|DONE|%s\\r\\n", fields[2]);
+      queue_response(controller, "MCV1|DONE|%s\r\n", fields[2]);
     } else if (fw_core_command(&controller->core, inputs, &arm) != FW_RESULT_OK ||
                fw_core_command(&controller->core, inputs, &pump) != FW_RESULT_OK) {
       queue_pump_response(controller, fields[2], "INTERNAL");
@@ -244,7 +244,7 @@ void mcv1_process_line(
                      "%s",
                      fields[2]);
       controller->action_active = true;
-      queue_response(controller, "MCV1|ACK|%s\\r\\n", fields[2]);
+      queue_response(controller, "MCV1|ACK|%s\r\n", fields[2]);
     }
   }
 }
