@@ -29,3 +29,11 @@ MicroCleaningVision/data/datasets/*/raw/
 *.pt
 *.pth
 *.onnx
+
+# STM32CubeIDE 编译产物：保留工程配置与源码，不提交板端二进制。
+MicroCleaningVision/firmware/nucleo_f401re/**/Debug/
+MicroCleaningVision/firmware/nucleo_f401re/**/Release/
+MicroCleaningVision/firmware/nucleo_f401re/**/*.elf
+MicroCleaningVision/firmware/nucleo_f401re/**/*.hex
+MicroCleaningVision/firmware/nucleo_f401re/**/*.bin
+MicroCleaningVision/firmware/nucleo_f401re/.tools/

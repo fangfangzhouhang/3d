@@ -25,6 +25,7 @@ class STM32ProtocolTests(unittest.TestCase):
             ("", 100),
             ("含中文", 100),
             ("A001", 0),
+            ("A001", 99),
             ("A001", 501),
             ("A001", 10.5),
             ("A001", True),

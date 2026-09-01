@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 
 PROTOCOL_VERSION = "MCV1"
+MIN_PUMP_DURATION_MS = 100
 DEFAULT_MAX_PUMP_DURATION_MS = 500
 MAX_LINE_BYTES = 128
 
@@ -76,10 +77,10 @@ def encode_pump(
         raise STM32ProtocolError("INVALID_DURATION", "duration_ms 必须是整数毫秒")
     if isinstance(max_duration_ms, bool) or not isinstance(max_duration_ms, int) or max_duration_ms < 1:
         raise STM32ProtocolError("INVALID_LIMIT", "max_duration_ms 必须是正整数")
-    if not 1 <= duration_ms <= max_duration_ms:
+    if not MIN_PUMP_DURATION_MS <= duration_ms <= max_duration_ms:
         raise STM32ProtocolError(
             "DURATION_OUT_OF_BOUNDS",
-            f"duration_ms 必须在 1 到 {max_duration_ms} 之间",
+            f"duration_ms 必须在 {MIN_PUMP_DURATION_MS} 到 {max_duration_ms} 之间",
         )
     return _encode_parts(PROTOCOL_VERSION, "PUMP", action_id, str(duration_ms))
 

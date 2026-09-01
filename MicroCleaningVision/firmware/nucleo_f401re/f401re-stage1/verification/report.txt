@@ -1,0 +1,65 @@
+Stage 1 NUCLEO-F401RE Firmware Verification Report
+===================================================
+
+Scope
+-----
+Host-only verification for the formal NUCLEO-F401RE Stage 1 firmware. No board was flashed.
+No board was energized from 12 V, and no pump or liquid path was connected. This report
+is not a 12 V authorization. 全部签字前禁止连接 12 V.
+
+Verification baseline
+---------------------
+Git commit before Task 7 documentation changes: f9796bc7b6388d9ba16860049fbf160433ca1c40
+Zig required version: 0.16.0
+Official Zig archive SHA-256: 68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e
+Observed Zig executable SHA-256: 086ce9d47ba42f33a514e1a6e04eb1d4a8fa1d75e0868e0213caad447c91e864
+Observed bootstrap-zig.ps1 SHA-256: 4a879e99c51fbd5f60e4b84f253d38fa55883d5397368684e696973ca4dbe6c1
+Observed Node.js version: v24.19.0
+Target build: unavailable on this machine because STM32CubeIDE and arm-none-eabi-gcc are not installed.
+
+Fresh command evidence
+----------------------
+Host C suite command:
+  powershell -ExecutionPolicy Bypass -File .\阶段一_基础喷液控制\firmware\f401re-stage1\scripts\run-host-tests.ps1
+
+Fresh host C result:
+  arm and output: 61 passed, 0 failed
+  control core: 178 passed, 0 failed
+  parser: 187 passed, 0 failed
+  protocol flow: 38 passed, 0 failed
+  smoke: 1 passed, 0 failed
+  UART RX guard: 17 passed, 0 failed
+  total: 482 passed, 0 failed
+
+Root Stage 1 suite command:
+  powershell -ExecutionPolicy Bypass -File .\阶段一_基础喷液控制\scripts\run-tests.ps1
+
+Fresh root Stage 1 result: 91 tests total; 90 passed, 1 failed. The only
+failure is the unrelated source-model hash mismatch documented below.
+
+Known unrelated root-suite failure
+---------------------------------
+The source artifact `schematics/src/shared-pump-power.svg` is not changed by
+Task 7. The render contract computes the model hash
+cc996ed5f9d8ecdeb208296fcf1f999a0d4bce48840ec936b432dc3e834e6c07 from
+`models/shared-pump-power.net.json`, but the SVG metadata embeds
+c9f882fbeca975fab0137c3f4c99820bb2016e148b41581057ca2f146f3dc0ff.
+The source SVG file SHA-256 observed before this task is
+2fae75d7ee0ea4bd4502dececff94133e365f16fb279e695ec2c2a877ef69ac2.
+This discrepancy predates Task 7 and is intentionally not papered over by
+regenerating or editing unrelated schematic exports.
+
+Deterministic Zig-cache test
+----------------------------
+`tests/firmware.test.mjs` now makes a temporary local archive containing a
+version probe, injects its archive path, SHA-256 and tools directory into
+`bootstrap-zig.ps1`, and starts from an invalid cached version. The bootstrap
+script must replace that cache and confirm version 0.16.0. Routine tests no
+longer perform a real network redownload. Production bootstrap defaults remain
+the official Zig URL and official archive SHA-256 above.
+
+Limitations
+-----------
+The checked-in `.ioc` and C sources were inspected and host-tested only. Target
+compilation is unavailable on this machine; therefore there is no target
+binary, no flashing result, and no hardware or 12 V evidence in this report.
