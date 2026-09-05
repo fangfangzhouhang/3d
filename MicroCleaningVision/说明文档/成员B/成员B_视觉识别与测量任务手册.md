@@ -17,7 +17,9 @@
 ```text
 microcleaning/vision/
 ├── contamination.py       # 污染测量结果
-├── hsv_baseline.py         # HSV候选区域、Mask、面积和中心基线
+├── hsv_baseline.py         # 官方HSV基线
+├── otsu_baseline.py        # Otsu/自适应阈值候选
+├── run_baseline.py         # B自己产出算法Mask
 ├── state_estimator.py      # 观测与测量变成状态
 └── verification.py        # 最小前后面积比较
 
@@ -25,7 +27,7 @@ test/vision/
 └── test_vision.py
 ```
 
-当前 `hsv_baseline.py` 是 v0.1，已经在 `public_001` 上形成失败证据。新形状过滤、批量可视化或配准只有在任务卡和多张人工Mask到位后再增加，不提前建立空文件。
+当前 `hsv_baseline.py` 是官方 v0.1，已经在 `public_001` 上形成失败证据。`otsu_baseline.py` 是迁入后的对照候选，输出同样的 Mask 合同，但还不是 Demo 默认算法。调参、A/B 和命令见 [成员 B 工作流程与命令百科](成员B_工作流程与命令百科.md)。
 
 ## 3. 你的输入和输出
 

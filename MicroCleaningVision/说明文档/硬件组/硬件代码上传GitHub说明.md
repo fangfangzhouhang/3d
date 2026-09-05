@@ -34,7 +34,7 @@ MicroCleaningVision/
 ├── hardware/
 │   ├── wiring/                     # 接线图和器件表
 │   └── mechanical/                 # 有真实资料时再创建
-└── docs/
+└── 说明文档/
     └── 硬件组/                     # 双方共同阅读的接口说明
 ```
 
@@ -102,7 +102,7 @@ git diff --check
 确认没有 `Debug/Release` 后再提交：
 
 ```powershell
-git add firmware hardware docs/硬件组
+git add firmware hardware 说明文档/硬件组
 git commit -m "feat(firmware): add nucleo f401re ping and status"
 git push -u origin feat/firmware-f401re-v0
 ```
@@ -126,7 +126,7 @@ git push -u origin feat/firmware-f401re-v0
 
 - 硬件组主要修改 `firmware/` 和 `hardware/`；
 - 软件组主要修改 `microcleaning/` 和 `test/`；
-- `docs/硬件组/STM32最小串口协议_v0.1.md` 是共同接口，修改时双方都要看；
+- `说明文档/硬件组/STM32最小串口协议_v0.1.md` 是共同接口，修改时双方都要看；
 - 协议变化必须同时更新 Python 编码测试和固件解析；
 - 接线变化必须更新接线图版本，不能只在群里说一句；
 - 合并前至少由另一组一人运行或审阅。
