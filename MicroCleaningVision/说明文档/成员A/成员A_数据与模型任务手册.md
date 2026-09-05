@@ -40,7 +40,7 @@ test/data_learning/
 └── test_usb_camera.py
 ```
 
-当前没有训练入口。只有人工Mask、批次隔离和简单基线失败证据到位后，才增加数据划分和训练文件；没有任务和证据时不创建空目录。
+当前没有训练入口。批量 Mask 评价脚本在 `scripts/evaluate_vision_baselines.py`。只有人工Mask、批次隔离和简单基线失败证据到位后，才增加数据划分和训练文件。
 
 ## 3. 你的输入和输出
 

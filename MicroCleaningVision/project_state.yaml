@@ -1,6 +1,6 @@
 # 全团队唯一的当前事实。计划、愿景和代码文件不能自动成为事实。
 updated_at: 2026-08-31
-current_phase: "P1 - U500通用USB相机适配器已完成无硬件测试，等待实机probe；并行推进HSV失败分析"
+current_phase: "P1 - 硬件组交接模块完成：U500电脑端接口、MCV1串口协议和PING/STATUS探测已准备；等待U500实机与NUCLEO固件"
 
 current_evidence_level:
   overall_hardware: E0
@@ -19,7 +19,7 @@ team_scope:
     - 未经人工关卡的真实泵、电机、喷头和平台控制
 
 validated_capabilities:
-  - "项目.venv中81项测试全部执行并通过，无跳过：包含metadata、数据审计、标注转换、Mask评价、USBCamera无硬件测试、HSV、分段路径和Demo端到端。"
+  - "项目.venv中87项测试全部执行并通过，无跳过：包含metadata、数据审计、标注转换、Mask评价、USBCamera无硬件测试、HSV、分段路径、Demo端到端和STM32文本协议。"
   - "真实文件入口测试会由OpenCV解码程序生成PNG、计算SHA-256和基础质量指标；图片仍不是团队相机采集证据。"
   - "Mock和软件回放不会打开真实COM口；main.py只运行纯合成Mock。"
   - "无标定状态不会产生毫米目标；模拟审批令牌绑定、超时和失败路由有回归测试。"
@@ -31,6 +31,7 @@ validated_capabilities:
   - "public_001.jpg已完成质量检查、人工Polygon、人工Mask、HSV预测Mask和定量评价：IoU=0.0739，算法面积比人工多911px，中心误差86.87px。该证据证明链路可运行，同时证明当前HSV基线在此图上失败。"
   - "metadata_builder默认dry-run，可自动填写文件名和分辨率并保留人工行；已执行apply生成13条记录，public_001标记为labeled。"
   - "USBCamera实现CameraPort，使用OpenCV VideoCapture、预热帧、无损PNG、现有质量检查和build_observation；7项FakeVideoCapture测试覆盖正常抓帧、驱动异常及四类失败并确认release。"
+  - "MCV1电脑端协议可编码PING/STATUS/STOP/受限PUMP并解析PONG/STATUS/ACK/DONE/ERR；6项无硬件合同测试通过，探测脚本默认不打开COM。"
 
 unvalidated_claims:
   - U500实机能否被本机OpenCV VideoCapture打开、真实分辨率/FPS和质量阈值
@@ -40,6 +41,7 @@ unvalidated_claims:
   - mask路线在真实污染形状、真实喷头覆盖范围和运动约束下的有效性
   - 像素到工作台毫米坐标的标定
   - STM32、XY、泵或喷头通信与执行
+  - NUCLEO固件是否按MCV1返回PONG/STATUS，以及PB5/PB12实机状态
   - 真实清洗效果、损伤和硬件闭环
 
 current_interfaces:
@@ -91,7 +93,7 @@ current_dataset:
 
 hardware_boundary:
   camera_port: microcleaning/ports.py
-  camera_model: U500
+  camera_model: U500_USB数码显微镜
   camera_connection: USB
   camera_adapter: microcleaning/data_learning/usb_camera.py
   camera_adapter_status: implemented_and_fake_capture_tested
@@ -103,9 +105,11 @@ hardware_boundary:
   stm32_board: NUCLEO-F401RE
   stm32_pump_pin_plan: "PB5 / D4 -> MOSFET / 泵控制；未验证"
   stm32_estop_pin_plan: "PB12 -> E-stop状态检测；未验证有效电平和固件行为"
-  stm32_pc_connection_plan: "USB / ST-LINK VCP；未冻结串口参数"
-  stm32_firmware_status: protocol_not_frozen
-  serial_protocol_status: unavailable
+  stm32_pc_connection_plan: "USB / ST-LINK VCP；电脑端MCV1暂定115200 8N1，等待固件实机确认"
+  stm32_firmware_status: host_protocol_defined_firmware_missing
+  stm32_host_protocol: microcleaning/control_system/stm32_protocol.py
+  stm32_probe_entry: scripts/probe_stm32_link.py
+  serial_protocol_status: mcv1_host_codec_tested_firmware_unverified
 
 development_environment:
   recommended_python: "CPython 3.12 + 项目本地.venv"
@@ -126,7 +130,8 @@ blockers:
   - "U500尚未在本机执行probe和capture-test；适配器通过FakeVideoCapture测试不能写成实机接入完成。"
   - "A尚未提供结构化USB显微镜原图和采集批次；现有13份Labelme JSON已自动转换为13张Mask，但仍需逐份人工复核，其中只有1份在metadata中标记为labeled并完成算法对照。"
   - "真实标记物、样本状态和固定成像条件尚未形成证据。"
-  - "STM32协议、标定和硬件安全事实缺失。"
+  - "MCV1电脑端协议已经定义，但STM32固件、实机回执、标定和硬件状态事实仍缺失。"
+  - "NUCLEO真实CubeIDE工程尚未上传；当前MCV1只有电脑端测试，没有PONG/STATUS实机回执。"
 
 next_actions:
   - "A-P1-U500-01：插入U500后运行scripts/probe_usb_camera.py，再运行--capture-test；保存index、分辨率、FPS、PNG、SHA256和质量结果。"
@@ -137,13 +142,15 @@ next_actions:
   - "B-P1-REAL-01：检查真实图片的mask/面积/中心；记录漏检、误检和反光失败，不凭合成结果调结论。"
   - "C-P1-REAL-01：读取B的真实mask并检查分段路线；暂不增加复杂规划。"
   - "TEAM-P1-INT-01：保存第一次真实图片Demo输出，并由三人共同检查路径图。"
+  - "HW-P1-01：硬件组上传可编译NUCLEO-F401RE工程，并提供PING/PONG、急停正常/按下两组STATUS记录。"
 
 documentation:
-  navigation: docs/README.md
-  roadmap: docs/architecture/长期分阶段研发规划.md
-  team_index: docs/team/README.md
-  task_board: docs/team/团队公共/团队任务看板.md
-  glossary: docs/team/团队公共/项目术语与概念词典.md
-  git_tutorial: docs/team/团队公共/Git与GitHub协作教程.md
-  u500_guide: docs/team/成员A/U500_USB相机接入指南.md
-  stm32_pending_contract: docs/future_hardware/NUCLEO-F401RE串口接口待确认清单.md
+  navigation: 说明文档/README.md
+  roadmap: 说明文档/未来计划/长期分阶段研发规划.md
+  team_index: 说明文档/README.md
+  task_board: 说明文档/总流程说明/团队任务看板.md
+  glossary: 说明文档/总流程说明/项目术语与概念词典.md
+  git_tutorial: 说明文档/总流程说明/Git与GitHub协作教程.md
+  u500_guide: 说明文档/成员A/U500_USB数码显微镜接入指南.md
+  hardware_group_index: 说明文档/硬件组/README.md
+  stm32_contract: 说明文档/硬件组/STM32最小串口协议_v0.1.md

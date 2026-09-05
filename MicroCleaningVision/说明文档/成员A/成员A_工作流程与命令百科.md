@@ -1,7 +1,32 @@
 # 成员 A 工作流程与命令百科
 
 > 用途：成员 A 不需要每次询问“下一条命令是什么”。从图片进入项目，到交给 B，再到评价 B 的算法，全部按本文件执行。  
-> 当前边界：本文件只记录仓库中已经存在、可以运行的命令；尚未实现的批量评价和模型训练不会伪装成现成功能。
+> 当前边界：本文件只记录仓库中已经存在、可以运行的命令。模型训练仍未实现，不要伪装成现成功能。
+
+## 0. 当前该做什么（2026-09-05）
+
+仓库里已经有 13 张原图、13 份 Labelme JSON、13 张转换 Mask，以及 HSV / Otsu 两套算法的批量对照。`output/` 不进 Git，拉取后若本机没有评价文件，按第 12 节重跑即可。
+
+| 事实 | 含义 |
+|---|---|
+| 只有 `public_001` 的 `annotation_status=labeled` | 这是目前唯一正式判卷图 |
+| 其余 12 张 Mask 是自动转换结果 | 可看图、分类失败；复核前不要改成 `labeled` |
+| B 的官方 Demo 默认仍是 HSV | A 评价两套算法，不要让 C 先切换入口 |
+| 批量评价入口已存在 | `scripts/evaluate_vision_baselines.py` |
+
+A 现在只做三件事，不要改 `microcleaning/vision/`：
+
+1. 肉眼复核自动 Mask，先过 `public_003`、`public_008`、`public_009`、`public_002`、`public_011`。贴合的才改 metadata 为 `labeled`。
+2. 冻结 3 张开发图 + 2 张留出图，书面告诉 B；留出图禁止给 B 调参。
+3. B 改完算法后重跑第 12 节批量评价，只在已 `labeled` 的图上宣布升降。
+
+建议划分（复核完成前只是候选，不是冻结）：
+
+```text
+开发图候选：public_001（已复核）、public_003、public_008
+留出图候选：public_002、public_011
+先不拿来调参：M9、M12（960×1280，两套算法都接近失败）
+```
 
 ## 目录
 
@@ -57,9 +82,13 @@ A评价：IoU + 面积误差 + 中心误差
 data/raw_images/public/public_001.jpg
 data/annotations/labelme/public_001.json
 data/annotations/masks/public_001.png
-output/demo/<本次run_id>/mask.png
-output/data_learning/public_001_evaluation.json
+output/vision/otsu_public_001_<时间>/mask.png
+output/vision/hsv_public_001_<时间>/mask.png
+output/data_learning/evaluations/public_001_otsu_evaluation.json
+output/data_learning/evaluations/public_001_hsv_evaluation.json
 ```
+
+需要把路线也交给 C 时，才另跑 Demo，文件在 `output/demo/<run_id>/`。
 
 ## 2. 命令使用规则
 
@@ -438,51 +467,82 @@ A 不通过聊天重新发送一套图片；A/B 在同一仓库按路径交接�
 
 ## 11. 运行 B 的视觉算法
 
+评价算法时用 B 自己的入口，不要只用 Demo。Demo 默认 HSV，还会生成 C 的路线图。
+
+单张：
+
+```powershell
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm otsu `
+  --input "data\raw_images\public\public_001.jpg"
+
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm hsv `
+  --input "data\raw_images\public\public_001.jpg"
+```
+
+整目录：
+
+```powershell
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm otsu `
+  --input-dir "data\raw_images\public"
+
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm hsv `
+  --input-dir "data\raw_images\public"
+```
+
+输出目录：
+
+```text
+output/vision/<algorithm>_<图片名>_<时间>/
+├── input.png
+├── mask.png                      ← 交给评价的算法 Mask
+├── contamination_overlay.png     ← 叠加图，必须打开看
+└── summary.json                  ← 面积、中心、algorithm_version
+```
+
+需要 C 的路线预览时再跑 Demo（默认仍是 HSV）：
+
 ```powershell
 .\.venv\Scripts\python.exe -m demo.demo_pipeline `
   --input "data\raw_images\public\public_001.jpg" `
   --mode analyze
 ```
 
-输入：原图。  
-输出目录：
-
-```text
-output/demo/<run_id>/
-├── input.png
-├── mask.png
-├── contamination_overlay.png
-├── path_overlay.png
-├── summary.json
-└── episode_<id>.json
-```
-
-其中 `mask.png` 是 B 的算法 Mask，`summary.json` 记录面积、中心、算法版本和证据边界。`analyze` 模式不会执行真实硬件。
-
-找到最新一次目录：
-
-```powershell
-$demoDir = Get-ChildItem "output\demo" -Directory |
-  Sort-Object LastWriteTime -Descending |
-  Select-Object -First 1
-
-$demoDir.FullName
-```
+`analyze` 模式不会执行真实硬件。`path_overlay.png` 属于 C。
 
 ## 12. 评价人工 Mask 与算法 Mask
 
+13 张图一起评（推荐）：
+
 ```powershell
-.\.venv\Scripts\python.exe -m microcleaning.data_learning.mask_evaluation `
-  "data\annotations\masks\public_001.png" `
-  (Join-Path $demoDir.FullName "mask.png") `
-  --output "output\data_learning\public_001_evaluation.json"
+.\.venv\Scripts\python.exe scripts\evaluate_vision_baselines.py
 ```
 
-输入：人工 Mask + B 的算法 Mask。  
-输出：
+它会读取最新的 `output/vision/otsu_*` 和 `hsv_*`，对照 `data/annotations/masks/`，写出：
 
 ```text
-output/data_learning/public_001_evaluation.json
+output/data_learning/evaluations/
+├── comparison_summary.json
+├── public_001_otsu_evaluation.json
+├── public_001_hsv_evaluation.json
+└── ...每张图各两份
+```
+
+单张仍可用 A 的评价模块：
+
+```powershell
+$otsuDir = Get-ChildItem "output\vision" -Directory |
+  Where-Object { $_.Name -like "otsu_public_001_*" } |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object -First 1
+
+.\.venv\Scripts\python.exe -m microcleaning.data_learning.mask_evaluation `
+  "data\annotations\masks\public_001.png" `
+  (Join-Path $otsuDir.FullName "mask.png") `
+  --output "output\data_learning\evaluations\public_001_otsu_evaluation.json"
 ```
 
 主要指标：
@@ -501,10 +561,19 @@ output/data_learning/public_001_evaluation.json
 
 ```powershell
 Get-Content -Raw -Encoding UTF8 `
-  "output\data_learning\public_001_evaluation.json"
+  "output\data_learning\evaluations\comparison_summary.json"
 ```
 
-A 需要同时查看：原图、人工 Mask、算法 Mask、叠加图和评价 JSON。
+A 需要同时查看：原图、人工 Mask、`output/vision/` 里的算法 Mask 和叠加图、以及评价 JSON。叠加图不在评价 JSON 里。
+
+当前 v0.1 对照（自动 Mask 上的观察，只有 `public_001` 正式）：
+
+| 图 | Otsu IoU | HSV IoU | A 该注意什么 |
+|---|---|---|---|
+| public_001 | 0.029 | 0.074 | 已复核。HSV 吃底部横线；Otsu 中心对、区域空心 |
+| public_003 / 008 / 009 / 011 | 0.61–0.73 | ≈0 | 先复核 Mask。HSV 常把整张图涂白 |
+| public_002 / 005 | 0.05 | 0.25–0.32 | 先复核。这几张 HSV 看起来更接近 |
+| M9 / M12 | ≈0 | 0 | 大图，两套都失败；不要当第一批开发图 |
 
 | 失败类型 | 大白话解释 |
 |---|---|
@@ -626,21 +695,14 @@ cd "D:\大创\3d\MicroCleaningVision"
 
   .\.venv\Scripts\python.exe -m microcleaning.data_learning.annotation_tools --batch
 
-.\.venv\Scripts\python.exe -m demo.demo_pipeline `
-  --input "data\raw_images\public\public_001.jpg" `
-  --mode analyze
-
-$demoDir = Get-ChildItem "output\demo" -Directory |
-  Sort-Object LastWriteTime -Descending |
-  Select-Object -First 1
-
-.\.venv\Scripts\python.exe -m microcleaning.data_learning.mask_evaluation `
-  "data\annotations\masks\public_001.png" `
-  (Join-Path $demoDir.FullName "mask.png") `
-  --output "output\data_learning\public_001_evaluation.json"
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm otsu --input-dir "data\raw_images\public"
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm hsv --input-dir "data\raw_images\public"
+.\.venv\Scripts\python.exe scripts\evaluate_vision_baselines.py
 
 Get-Content -Raw -Encoding UTF8 `
-  "output\data_learning\public_001_evaluation.json"
+  "output\data_learning\evaluations\comparison_summary.json"
 ```
 
 注意：这里没有自动执行 metadata `--apply`，因为写入前仍需要 A 确认未知字段和批次范围。

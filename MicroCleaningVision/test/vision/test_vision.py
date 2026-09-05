@@ -89,5 +89,56 @@ class HSVBaselineTests(unittest.TestCase):
         self.assertIsNone(result.measurement.centroid_px)
 
 
+@unittest.skipUnless(HAS_PERCEPTION_DEPS, "需要 requirements/perception-opencv.txt")
+class OtsuBaselineTests(unittest.TestCase):
+    def test_dark_region_becomes_mask_area_and_centroid(self):
+        import cv2
+        import numpy as np
+
+        from microcleaning.vision.otsu_baseline import OTSU_BASELINE_VERSION, segment_contamination
+
+        image = np.full((160, 200, 3), 220, dtype=np.uint8)
+        cv2.circle(image, (100, 80), 12, (20, 20, 20), -1)
+        result = segment_contamination(image)
+        self.assertEqual(image.shape[:2], result.mask.shape)
+        self.assertGreater(result.measurement.area_px, 250)
+        self.assertAlmostEqual(100.0, result.measurement.centroid_px[0], delta=2.0)
+        self.assertAlmostEqual(80.0, result.measurement.centroid_px[1], delta=2.0)
+        self.assertEqual(1, result.measurement.component_count)
+        self.assertEqual(OTSU_BASELINE_VERSION, result.measurement.algorithm_version)
+
+    def test_mask_shape_follows_non_square_image(self):
+        import numpy as np
+
+        from microcleaning.vision.otsu_baseline import segment_contamination
+
+        image = np.full((90, 200, 3), 230, dtype=np.uint8)
+        image[35:50, 90:110] = 15
+        result = segment_contamination(image)
+        self.assertEqual((90, 200), result.mask.shape)
+        self.assertGreater(result.measurement.area_px, 0)
+
+    def test_small_dark_noise_is_removed(self):
+        import cv2
+        import numpy as np
+
+        from microcleaning.vision.otsu_baseline import segment_contamination
+
+        image = np.full((80, 80, 3), 220, dtype=np.uint8)
+        cv2.circle(image, (40, 40), 1, (0, 0, 0), -1)
+        result = segment_contamination(image)
+        self.assertEqual(0.0, result.measurement.area_px)
+        self.assertIsNone(result.measurement.centroid_px)
+
+    def test_invalid_policy_is_rejected(self):
+        import numpy as np
+
+        from microcleaning.vision.otsu_baseline import OtsuSegmentationPolicy, segment_contamination
+
+        image = np.full((40, 40, 3), 200, dtype=np.uint8)
+        with self.assertRaises(ValueError):
+            segment_contamination(image, policy=OtsuSegmentationPolicy(blur_kernel_px=4))
+
+
 if __name__ == "__main__":
     unittest.main()
