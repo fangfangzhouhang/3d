@@ -1,7 +1,8 @@
 """成员 B 的算法 Mask 运行入口。
 
 只产出与工作流程一致的文件：input.png、mask.png、contamination_overlay.png、
-summary.json。默认跑 Otsu 候选；HSV 仍是 Demo 官方入口，这里提供对照。
+summary.json。默认跑邻域差异（local）：看一块地方和周围差多少，不预先规定红色。
+HSV 仍是 Demo 官方入口；Otsu / ExG / ExR 继续作对照。看见污渍不会发泵。
 """
 
 from __future__ import annotations
@@ -13,7 +14,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from microcleaning.vision.exg_baseline import (
+    segment_contamination as segment_exg,
+    segment_excess_red as segment_exr,
+)
 from microcleaning.vision.hsv_baseline import read_bgr_image, segment_contamination as segment_hsv
+from microcleaning.vision.local_contrast_baseline import segment_contamination as segment_local
 from microcleaning.vision.otsu_baseline import segment_contamination as segment_otsu
 
 
@@ -23,7 +29,7 @@ IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 def run_baseline(
     *,
     input_path: str | Path,
-    algorithm: str = "otsu",
+    algorithm: str = "local",
     output_root: str | Path = Path("output") / "vision",
 ) -> Path:
     """对一张图运行指定基线，返回本次不可覆盖的输出目录。"""
@@ -80,7 +86,7 @@ def run_baseline(
 def run_baseline_dir(
     *,
     input_dir: str | Path,
-    algorithm: str = "otsu",
+    algorithm: str = "local",
     output_root: str | Path = Path("output") / "vision",
 ) -> list[Path]:
     """对目录内全部 jpg/png 各跑一次。"""
@@ -104,7 +110,12 @@ def main(argv: list[str] | None = None) -> int:
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--input", type=Path, help="单张原图路径")
     source.add_argument("--input-dir", type=Path, help="批量原图目录")
-    parser.add_argument("--algorithm", choices=("otsu", "hsv"), default="otsu")
+    parser.add_argument(
+        "--algorithm",
+        choices=("local", "otsu", "hsv", "exg", "exr"),
+        default="local",
+        help="默认 local=邻域差异；hsv 仍是 Demo 默认",
+    )
     parser.add_argument("--output-root", type=Path, default=Path("output") / "vision")
     args = parser.parse_args(argv)
     if args.input is not None:
@@ -115,11 +126,17 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _segment(image, algorithm: str):
+    if algorithm == "local":
+        return segment_local(image)
     if algorithm == "otsu":
         return segment_otsu(image)
     if algorithm == "hsv":
         return segment_hsv(image)
-    raise ValueError("algorithm必须是otsu或hsv")
+    if algorithm == "exg":
+        return segment_exg(image)
+    if algorithm == "exr":
+        return segment_exr(image)
+    raise ValueError("algorithm必须是local、otsu、hsv、exg或exr")
 
 
 def _draw_contamination(image, mask, centroid, cv2):

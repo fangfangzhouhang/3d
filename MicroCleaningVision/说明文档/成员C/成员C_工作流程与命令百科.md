@@ -79,16 +79,21 @@ C 不是把路线画漂亮就结束。路线必须能解释来源、坐标系、
 ```text
 microcleaning/control_system/
 ├── cleaning_plan.py    # Mask到策略和像素路线
-├── fixed_rule.py       # 最小动作申请
-├── governor.py         # 最低动作边界
+├── fixed_rule.py       # SPRAY_AT_POINT 与 PUMP_IN_PLACE 申请
+├── governor.py         # 最低动作边界与人工关卡
 ├── fake_serial.py      # 模拟ACK、超时和错误
+├── stm32_protocol.py   # MCV1 编解码
+├── stm32_serial.py     # STM32SerialController；默认只允许 PING/STATUS；stop() 不发泵
 ├── replay_mcl.py       # 软件回放编排
 ├── episode_store.py    # 回合记录
 └── mock_mcl.py         # 合成回归基线
 
 test/control_system/
 ├── test_control_system.py
-└── test_mock_mcl.py
+├── test_mock_mcl.py
+├── test_stm32_protocol.py
+├── test_pump_in_place.py
+└── test_stm32_serial.py
 ```
 
 ## 4. 当前真实能力边界
@@ -170,6 +175,12 @@ Invoke-Item (Join-Path $demoDir.FullName "path_overlay.png")
 .\.venv\Scripts\python.exe -m demo.demo_pipeline `
   --generate-sample `
   --mode simulate
+
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --mode analyze
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --live --camera-index 1
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --generate-sample --mode ping-only
+.\.venv\Scripts\python.exe -m demo.demo_pipeline `
+  --generate-sample --mode arm-pump --confirm-pump --controller fake
 ```
 
 额外输出包括：
@@ -232,6 +243,13 @@ X/Y方向是否相反或旋转
 - 限位和急停事实。
 
 这些信息缺失时，C只使用 FakeSerial，不能猜测字节并发送到真实 COM 口。
+
+没有步进电机时，不要申请 XY。可改用定点短喷：`propose_pump_in_place()` 生成
+`primitive=PUMP_IN_PLACE`、`coordinate_frame=nozzle_fixed`、目标 `(0,0)`，表示喷头
+原地 100～300 ms 脉冲，不是伪造的 `work_mm` 标定。治理器对此返回 HUMAN；Demo
+需要 `--mode arm-pump --confirm-pump`。`STM32SerialController` 还要 `--arm-pump`
+才会把 ALLOW 翻译成 `MCV1|PUMP`。`stop()` 可在未武装时发送 `MCV1|STOP`，不发泵。
+默认 `--from-camera` 只分析，不发泵。
 
 ### 第四道桥：动作后复检
 
@@ -302,6 +320,11 @@ $summary = Get-Content -Raw -Encoding UTF8 `
 $summary.cleaning_plan | Format-List
 Invoke-Item (Join-Path $demoDir.FullName "path_overlay.png")
 
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --mode analyze
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --generate-sample --mode ping-only
+.\.venv\Scripts\python.exe -m demo.demo_pipeline `
+  --generate-sample --mode arm-pump --confirm-pump --controller fake
+
 .\.venv\Scripts\python.exe -m unittest discover `
   -s test\control_system `
   -p "test*.py" `
@@ -319,7 +342,7 @@ Invoke-Item (Join-Path $demoDir.FullName "path_overlay.png")
 [ ] 保存path_overlay和cleaning_plan
 [ ] 坐标单位明确为image_px
 [ ] 没有把虚拟标定写成真实标定
-[ ] 没有打开真实COM口
+[ ] 默认不打开真实COM口；PING/PUMP 必须显式指定端口和武装标志
 [ ] C测试和完整回归通过
 ```
 

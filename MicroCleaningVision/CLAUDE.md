@@ -7,8 +7,9 @@ Before work, read in order:
 1. `project_state.yaml`
 2. `README.md`
 3. `AGENTS.md`
-4. This migration package's `HANDOFF.md` if present in the project
-5. Only the directly relevant files under `说明文档/`
+4. `说明文档/总流程说明/项目作战总表.md` when planning hardware or sprint work
+5. This migration package's `HANDOFF.md` if present in the project
+6. Only the directly relevant files under `说明文档/`
 
 The project goal is a closed-loop microscopic-surface treatment platform:
 
@@ -18,7 +19,7 @@ image/data → contamination measurement → target/path/action request
 → post-action reinspection → Episode evidence
 ```
 
-Current three-person scope is vision and host-computer software plus a limited future STM32 serial interface. Do not silently expand into mechanical design, STM32 firmware, or real spray control.
+Current three-person software scope is vision and host-computer software. MCV1 firmware source lives in-repo; that is not burn/PONG evidence. Do not silently expand into mechanical design, unapproved 12V spray, or XY/MOVE.
 
 Evidence levels are not interchangeable:
 

@@ -1,5 +1,7 @@
 # MicroCleaningVision 交接文档对照审计
 
+> **2026-09-07 头注：** 本文是对交接原文的历史快照（审计提交 `4364d70`，2026-09-05）。其中「没有 `STM32SerialController`」「`docs/` 导航」等条目 **已过时**。当前准则：[项目作战总表](总流程说明/项目作战总表.md)、`project_state.yaml` 与代码。本轮不重写全文。
+
 对照对象：`/cursor/stores/bc-3ca064e4-6927-4391-a491-574b362f73a5/docs/MicroCleaningVision_Project_Handover.md`（交接文档写的路径 `/cursor/stores/self/docs/...` 在本环境中不存在；实际文件在父项目 store）。
 
 仓库：`https://github.com/fangfangzhouhang/3d`  

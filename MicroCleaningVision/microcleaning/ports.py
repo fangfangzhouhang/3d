@@ -19,9 +19,10 @@ FakeSerial 也不构成真实控制器证据。
 
 1. CameraPort 可以先用于人工发起的真实图片采集、保存和软件分析；这不需要授予
    泵、电机或平台权限，也不代表像素到毫米标定已经完成。
-2. ControllerPort 的真实实现必须等待 STM32 协议、坐标标定、设备状态、安全边界
-   和 Human Gate 全部确认。在此之前只允许 FakeSerial / Mock / Replay。
-3. “能够拍照”绝不自动推导出“允许启动泵或运动平台”。
+2. ControllerPort 的真实实现（``STM32SerialController``）默认只允许 PING/STATUS；
+   翻译 PUMP 必须同时具备显式武装（如 ``--arm-pump``）、SafetyDecision=ALLOW，
+   以及 Human Gate。没有这些条件时只允许 FakeSerial / Mock / Replay。
+3. “能够拍照”绝不自动推导出“允许启动泵或运动平台”。不发送 XY/MOVE。
 """
 
 from __future__ import annotations

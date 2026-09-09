@@ -1,6 +1,7 @@
 # 全团队唯一的当前事实。计划、愿景和代码文件不能自动成为事实。
-updated_at: 2026-08-31
-current_phase: "P1 - 硬件组交接模块完成：U500电脑端接口、MCV1串口协议和PING/STATUS探测已准备；等待U500实机与NUCLEO固件"
+# 近场执行与阶段表以 说明文档/总流程说明/项目作战总表.md 为准。
+updated_at: 2026-09-07
+current_phase: "P1/MVP-1 - 软件链与 MCV1 上位机已就绪；固件源码在仓；等待 U500 实机 probe、NUCLEO 烧录与实机 PONG"
 
 current_evidence_level:
   overall_hardware: E0
@@ -12,36 +13,36 @@ team_scope:
     - 真实图片输入、图像质量和数据清单
     - 污染分割、面积/中心测量、状态和前后复检
     - 目标点、路线、坐标变换和控制仿真
-    - 软件回放、FakeSerial、Episode和未来STM32上位机接口
+    - 软件回放、FakeSerial、STM32SerialController（默认不发泵）、Episode
   out_of_scope:
     - 机械结构设计与加工
-    - STM32固件实现
+    - 未经烧录证据的「固件已联调」宣称
     - 未经人工关卡的真实泵、电机、喷头和平台控制
 
 validated_capabilities:
-  - "项目.venv中87项测试全部执行并通过，无跳过：包含metadata、数据审计、标注转换、Mask评价、USBCamera无硬件测试、HSV、分段路径、Demo端到端和STM32文本协议。"
+  - "项目.venv中150项测试全部执行并通过，无跳过：含 metadata、数据审计、标注转换、Mask评价（IoU/P/R/FP/FN、labeled 与 develop/holdout 分表）、USBCamera/live 无硬件测试、HSV/Otsu/ExG/ExR/邻域差异 local、离线 mm/px、分段路径、Demo v0.2、PUMP_IN_PLACE、STM32 协议与 STM32SerialController（含 stop/ESTOP/超时）。"
   - "真实文件入口测试会由OpenCV解码程序生成PNG、计算SHA-256和基础质量指标；图片仍不是团队相机采集证据。"
   - "Mock和软件回放不会打开真实COM口；main.py只运行纯合成Mock。"
   - "无标定状态不会产生毫米目标；模拟审批令牌绑定、超时和失败路由有回归测试。"
-  - "Demo v0.1的程序生成图片可输出input/mask/污染叠加/分段路径/summary/Episode；simulate模式产生FakeSerial回执和模拟复查。"
+  - "Demo v0.2：文件/合成图/USB抓帧可进入同一入口；analyze/camera-analyze/live 默认不发泵；ping-only 只探测 PING/STATUS；arm-pump 须 Human Gate，STM32 还须 --arm-pump。"
   - "MicroCleaning Dataset清单入口具备init/import/check、SHA-256去重和文件篡改检查；data/metadata.csv当前有13条来源待核实的记录。"
   - "A数据工具已实际检查data/raw_images中的13张JPG：13张可解码、0损坏、0个相同SHA-256重复组；13张已登记。"
-  - "Labelme contamination Polygon/Circle可被严格校验并转换为同尺寸二值Mask；人工Mask与算法Mask可计算IoU、面积误差和中心像素误差。"
+  - "Labelme contamination Polygon/Circle可被严格校验并转换为同尺寸二值Mask；人工Mask与算法Mask可计算IoU、Precision/Recall、FP/FN、面积误差和中心像素误差。comparison_summary 把 labeled、develop、holdout 分开，并按算法汇总。"
   - "Labelme批量转换可从JSON的imagePath自动定位data/raw_images内原图，支持Polygon/Circle；当前13份JSON已全部转换，报告为13成功、0失败。"
   - "public_001.jpg已完成质量检查、人工Polygon、人工Mask、HSV预测Mask和定量评价：IoU=0.0739，算法面积比人工多911px，中心误差86.87px。该证据证明链路可运行，同时证明当前HSV基线在此图上失败。"
-  - "metadata_builder默认dry-run，可自动填写文件名和分辨率并保留人工行；已执行apply生成13条记录，public_001标记为labeled。"
+  - "邻域差异 local-contrast-v0.1 已实现：Lab 局部背景差 + Otsu + 丢掉细长块。Demo 与 run_baseline 默认均为 local；HSV 仅对照。看见污渍不会发泵。留出评价另见 comparison_summary，这不是识别过关。"
+  - "metadata_builder默认dry-run，可自动填写文件名和分辨率并保留人工行；已执行apply生成13条记录，13张均标记为labeled。"
   - "USBCamera实现CameraPort，使用OpenCV VideoCapture、预热帧、无损PNG、现有质量检查和build_observation；7项FakeVideoCapture测试覆盖正常抓帧、驱动异常及四类失败并确认release。"
-  - "MCV1电脑端协议可编码PING/STATUS/STOP/受限PUMP并解析PONG/STATUS/ACK/DONE/ERR；6项无硬件合同测试通过，探测脚本默认不打开COM。"
+  - "MCV1电脑端协议可编码PING/STATUS/STOP/受限PUMP并解析PONG/STATUS/ACK/DONE/ERR；STM32SerialController 实现 ControllerPort，默认拒泵，可 stop 且不发泵；探测脚本默认不打开COM、不发PUMP。"
 
 unvalidated_claims:
   - U500实机能否被本机OpenCV VideoCapture打开、真实分辨率/FPS和质量阈值
   - PLA彩色水溶性标记物的适用性
-  - HSV在真实项目图片上的分割效果
+  - HSV / Otsu / local 在 13 张 labeled 图上的过关效果（须看冻结留出集）
   - 人工mask、前后图配准和真实复检准确性
   - mask路线在真实污染形状、真实喷头覆盖范围和运动约束下的有效性
   - 像素到工作台毫米坐标的标定
-  - STM32、XY、泵或喷头通信与执行
-  - NUCLEO固件是否按MCV1返回PONG/STATUS，以及PB5/PB12实机状态
+  - NUCLEO固件源码是否已烧录，以及实机 PONG/STATUS/PB5/12V 喷液
   - 真实清洗效果、损伤和硬件闭环
 
 current_interfaces:
@@ -69,8 +70,9 @@ software_loop:
   demo_entry: demo/demo_pipeline.py
   mock_entry: microcleaning/control_system/mock_mcl.py
   replay_entry: microcleaning/control_system/replay_mcl.py
-  controller: microcleaning/control_system/fake_serial.py
-  note: "public_001真实像素已穿过A质量、人工Mask、B分割、状态和C路线，但来源尚未核实；无真实标定、执行和动作后复检。"
+  controller: microcleaning/control_system/stm32_serial.py
+  fake_controller: microcleaning/control_system/fake_serial.py
+  note: "public_001真实像素已穿过A质量、人工Mask、B分割、状态和C路线，但来源尚未核实；无真实标定、无实机执行和动作后复检。泵路径软件已接线，真机未通。"
 
 current_dataset:
   status: raw_images_staged_13_source_unverified_registered
@@ -83,10 +85,10 @@ current_dataset:
   metadata_record_count: 13
   labelme_json_file_count: 13
   converted_manual_mask_count: 13
-  metadata_labeled_count: 1
-  evaluated_prediction_count: 1
+  metadata_labeled_count: 13
+  evaluated_prediction_count: 39
   gate1_flagged_count: 12
-  evidence_note: "文件夹名public不等于来源证据；Gate 1 flag来自暂定阈值，不能写成科学质量结论。"
+  evidence_note: "13张已人工复核为labeled；开发9张、留出public_002/public_011/M9/M12冻结。文件夹名public不等于来源证据；Gate 1 flag来自暂定阈值，不能写成科学质量结论。"
   planned_primary_source: U500_USB显微镜
   auxiliary_source: 手机链路图片
   planned_baseline: "PLA平面试片 + 经过可行性检查的水溶性彩色标记物 + 固定俯视成像"
@@ -106,10 +108,12 @@ hardware_boundary:
   stm32_pump_pin_plan: "PB5 / D4 -> MOSFET / 泵控制；未验证"
   stm32_estop_pin_plan: "PB12 -> E-stop状态检测；未验证有效电平和固件行为"
   stm32_pc_connection_plan: "USB / ST-LINK VCP；电脑端MCV1暂定115200 8N1，等待固件实机确认"
-  stm32_firmware_status: host_protocol_defined_firmware_missing
+  stm32_firmware_status: source_in_repo_unburned_no_pong
+  stm32_firmware_path: firmware/nucleo_f401re/f401re-stage1/
   stm32_host_protocol: microcleaning/control_system/stm32_protocol.py
+  stm32_controller: microcleaning/control_system/stm32_serial.py
   stm32_probe_entry: scripts/probe_stm32_link.py
-  serial_protocol_status: mcv1_host_codec_tested_firmware_unverified
+  serial_protocol_status: mcv1_host_and_controller_tested_hardware_unverified
 
 development_environment:
   recommended_python: "CPython 3.12 + 项目本地.venv"
@@ -128,24 +132,26 @@ major_risks:
 
 blockers:
   - "U500尚未在本机执行probe和capture-test；适配器通过FakeVideoCapture测试不能写成实机接入完成。"
-  - "A尚未提供结构化USB显微镜原图和采集批次；现有13份Labelme JSON已自动转换为13张Mask，但仍需逐份人工复核，其中只有1份在metadata中标记为labeled并完成算法对照。"
+  - "A尚未提供结构化USB显微镜原图和采集批次；现有13张已labeled并冻结开发/留出，但来源仍unknown，不能写成U500数据。"
   - "真实标记物、样本状态和固定成像条件尚未形成证据。"
-  - "MCV1电脑端协议已经定义，但STM32固件、实机回执、标定和硬件状态事实仍缺失。"
-  - "NUCLEO真实CubeIDE工程尚未上传；当前MCV1只有电脑端测试，没有PONG/STATUS实机回执。"
+  - "MCV1电脑端与STM32SerialController已实现，固件源码在仓，但无.elf/烧录/实机PONG；不得把host C测试或FakeSerial写成联调完成。"
+  - "NUCLEO 可烧录目标尚未生成；CubeMX 需在本仓 .ioc 上 Keep User Code 生成工程。"
 
 next_actions:
   - "A-P1-U500-01：插入U500后运行scripts/probe_usb_camera.py，再运行--capture-test；保存index、分辨率、FPS、PNG、SHA256和质量结果。"
   - "A-P1-DATA-01：13张已登记；继续核实来源、设备、倍率和日期，无法核实的字段保持unknown。"
-  - "A-P1-LABEL-01：逐份复核自动生成的13张Mask并同步metadata。至少冻结3张开发图和2张留出图，包含1张无目标或困难负样本。"
-  - "B-P1-HSV-02：保持v0.1结果不变，针对细长铜色横线误检建立连通域形状诊断和场景限定的v0.2候选；用至少5张人工Mask做A/B，不在单图上宣布提升。"
+  - "A-P1-LABEL-01：13张已labeled；开发9张、留出public_002/public_011/M9/M12已冻结。不要为刷分改留出标注。"
+  - "B-P1-LOCAL-01：Demo 默认已改为 local。HSV 只作对照。不要为刷分改留出标注；暂不改 LocalContrastPolicy。"
   - "A-P1-CAPTURE-01：补采至少12张、两个批次的USB显微镜图片；先导入1张运行analyze，再扩展到50张。"
   - "B-P1-REAL-01：检查真实图片的mask/面积/中心；记录漏检、误检和反光失败，不凭合成结果调结论。"
   - "C-P1-REAL-01：读取B的真实mask并检查分段路线；暂不增加复杂规划。"
   - "TEAM-P1-INT-01：保存第一次真实图片Demo输出，并由三人共同检查路径图。"
-  - "HW-P1-01：硬件组上传可编译NUCLEO-F401RE工程，并提供PING/PONG、急停正常/按下两组STATUS记录。"
+  - "HW-MVP1-01：本仓 f401re-stage1.ioc 生成 CubeIDE 工程并烧录；只接板载 USB；泵与 12V 断开。"
+  - "C-MVP1-01：人认 ST-LINK COM 后运行 probe ping/status 与 Demo ping-only；保存 PONG 原文。"
 
 documentation:
   navigation: 说明文档/README.md
+  battle_plan: 说明文档/总流程说明/项目作战总表.md
   roadmap: 说明文档/未来计划/长期分阶段研发规划.md
   team_index: 说明文档/README.md
   task_board: 说明文档/总流程说明/团队任务看板.md

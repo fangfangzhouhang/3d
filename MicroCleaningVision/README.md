@@ -5,11 +5,13 @@ MicroCleaningVision 是一个显微表面智能处理科研项目。当前三人
 ## 当前真实状态
 
 - 软件组件：E1；A/B/C软件集成：E2。程序生成图和FakeSerial已回归，第一张来源待核实的真实像素图已完成A/B评价。
-- Demo v0.1：已能输出图片、mask、面积、中心、路线、模拟动作与Episode。
-- 当前回归：项目`.venv`中87项测试全部执行并通过，无跳过。
+- Demo v0.2：文件/合成图/相机抓帧可进入同一 Demo；`analyze`/`camera-analyze` 默认不发泵；`ping-only` 只探测通信；`arm-pump` 需人工关卡，STM32 还需 `--arm-pump`。
+- 当前回归：项目`.venv`中150项测试全部执行并通过，无跳过。
+- 13 张图均已人工 Mask 且 `labeled`；开发 9 / 留出 4 已冻结。Demo 默认改为邻域差异 `local`；Otsu 可对照；HSV 只留作失败对照，不再当主算法。这不是识别过关。
 - `public_001.jpg` 已完成人工Mask与HSV预测比较：IoU为0.0739，证明链路可运行，也证明当前HSV基线在此图上失败。
 - U500 USB数码显微镜适配器：已实现并通过FakeVideoCapture测试；尚未运行实机probe，团队采集数据仍未进入证据链。
-- NUCLEO接口：MCV1电脑端协议和只读`PING/STATUS`探测入口已通过无硬件测试；真实固件尚未上传，无实机回执。
+- NUCLEO接口：MCV1 电脑端协议、`STM32SerialController` 和只读 `PING/STATUS` 已通过无硬件测试；默认不发 PUMP。**固件源码已在** `firmware/nucleo_f401re/f401re-stage1/`；**无**可烧录 `.elf`、**无**烧录记录、**无**实机 PONG/喷洗回执。
+- 近场执行准则：[说明文档/总流程说明/项目作战总表.md](说明文档/总流程说明/项目作战总表.md)。当前卡在 MVP-1。
 - 像素到毫米标定：尚未验证。
 - STM32、运动和喷洗：E0，无真实执行证据。
 
@@ -83,7 +85,9 @@ python -m venv .venv
 
 测试通过表示软件接口和回归正常，不表示真实相机、标定、STM32或清洗有效。
 
-## Demo v0.1：现在最明确的程序入口
+## Demo v0.2：现在最明确的程序入口
+
+输入必须三选一：`--input`、`--generate-sample` 或 `--from-camera`。模式决定证据边界，默认不发泵。
 
 ### 1. 不依赖外部图片的完整软件模拟
 
@@ -117,8 +121,58 @@ output/demo/<run_id>/
   --mode analyze
 ```
 
-这个模式输出真实像素的mask、面积、中心和像素路线。因为目前没有真实像素到毫米标定，所以 `ActionRequest` 必须为空；这不是程序缺陷，而是在证据不足时拒绝伪造物理坐标。
+这个模式输出真实像素的mask、面积、中心和像素路线。因为目前没有真实像素到毫米标定，所以 `SPRAY_AT_POINT` 申请必须为空；这不是程序缺陷，而是在证据不足时拒绝伪造物理坐标。
 
+### 3. 从 USB 相机抓一帧再分析（默认不发泵）
+
+```powershell
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --mode analyze
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --mode camera-analyze --camera-index 0 --warmup-frames 5
+```
+
+内部调用已有 `USBCamera.capture()`，再走现有 B 分割和 C `plan_cleaning` 可视化。输出仍在 `output/demo/<run_id>/`。没有相机时会以 `CAMERA_OPEN_FAILED` 明确失败。本路径默认不发送 PUMP。
+
+显微镜已确认编号后，用实时窗口对焦：默认叠加邻域差异 `local`（`O` 切 Otsu，`H` 切 HSV 对照，`G`/`E` 切色指数），**空格**冻结当前帧并写入一次正式 analyze。看见污渍**不会**自动喷水。`Q` 只暂停预览；暂停画面上按其他键重新打开，再按 `Q` 结束程序。
+
+```powershell
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --live --camera-index 1
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --live --camera-index 1 --wait-usb
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --live --camera-index 1 --algorithm otsu
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --live --camera-index 1 --algorithm exg
+```
+
+`--wait-usb` 适合先运行命令再插显微镜：检测到 1 号设备可读后自动打开预览。Windows 不会在你没运行程序时因插上 USB 自己启动 Demo。
+
+点开窗口后：默认 `L` 邻域差异；`O` = Otsu，`H` = HSV（对照，不再当主算法），`G` = ExG，`E` = ExR。空格分析，`Q` 暂停。空格后的结果在 `output/demo/<run_id>/`。要探测或短喷 STM32，必须另开 `ping-only` / `arm-pump`，并人工确认。这不是识别过关。
+
+### 4. 只探测 STM32 通信（不发泵）
+
+```powershell
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --generate-sample --mode ping-only
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --mode ping-only --serial-port COM5
+```
+
+未给 `--serial-port` 时只记录将要发送的 `MCV1|PING` / `STATUS`，不打开 COM。给了端口也只允许 PING/STATUS。
+
+### 5. 人工确认后的定点短喷申请
+
+无 XY 标定时使用 `PUMP_IN_PLACE`：坐标系 `nozzle_fixed`，目标 `(0,0)` 表示喷头原地脉冲，不是伪造的 `work_mm`。治理器对第一次泵动作返回 HUMAN；没有 `--confirm-pump` 不会发泵。STM32 路径还要显式 `--arm-pump` 才会翻译 PUMP。
+
+```powershell
+# 软件一拍：人工确认 + FakeSerial，不打开 COM
+.\.venv\Scripts\python.exe -m demo.demo_pipeline `
+  --generate-sample --mode arm-pump --confirm-pump --controller fake
+
+# 看申请但不发泵（缺人工关卡）
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --generate-sample --mode arm-pump
+
+# STM32 武装路径（仍须人在场；未接 12V 不能写成实喷有效）
+.\.venv\Scripts\python.exe -m demo.demo_pipeline `
+  --from-camera --mode arm-pump --confirm-pump --arm-pump `
+  --controller stm32 --serial-port COM5 --pump-duration-ms 200
+```
+
+`simulate` 不能与 `--from-camera` 混用。不要把这条链写成清洗有效或识别已过关。
 ## 数据集入口
 
 Dataset v0.2 由 `data/` 目录管理，规范见 [data/dataset_management.md](data/dataset_management.md)：新图先进入 `data/raw_images/`，经过质量检查、metadata登记和必要的人工Mask后再交给视觉算法。

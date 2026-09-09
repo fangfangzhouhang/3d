@@ -220,6 +220,10 @@ class MaskEvaluationTests(unittest.TestCase):
         self.assertEqual(1.0, result.iou)
         self.assertEqual(0, result.area_error_px)
         self.assertEqual(0.0, result.centroid_error_px)
+        self.assertEqual(1.0, result.precision)
+        self.assertEqual(1.0, result.recall)
+        self.assertEqual(0, result.false_positive_px)
+        self.assertEqual(0, result.false_negative_px)
 
     def test_identical_masks_have_iou_one(self):
         mask = np.zeros((5, 5), dtype=np.uint8)
@@ -228,6 +232,10 @@ class MaskEvaluationTests(unittest.TestCase):
         self.assertEqual(1.0, result.iou)
         self.assertEqual(0, result.area_error_px)
         self.assertEqual(0.0, result.centroid_error_px)
+        self.assertEqual(1.0, result.precision)
+        self.assertEqual(1.0, result.recall)
+        self.assertEqual(0, result.false_positive_px)
+        self.assertEqual(0, result.false_negative_px)
 
     def test_disjoint_masks_have_iou_zero(self):
         ground_truth = np.zeros((5, 5), dtype=np.uint8)
@@ -237,6 +245,10 @@ class MaskEvaluationTests(unittest.TestCase):
         result = evaluate_masks(ground_truth, predicted)
         self.assertEqual(0.0, result.iou)
         self.assertAlmostEqual(math.sqrt(32), result.centroid_error_px)
+        self.assertEqual(0.0, result.precision)
+        self.assertEqual(0.0, result.recall)
+        self.assertEqual(1, result.false_positive_px)
+        self.assertEqual(1, result.false_negative_px)
 
     def test_partial_overlap_reports_expected_iou_and_centroid_error(self):
         ground_truth = np.zeros((4, 4), dtype=np.uint8)
@@ -247,6 +259,32 @@ class MaskEvaluationTests(unittest.TestCase):
         self.assertAlmostEqual(1 / 7, result.iou)
         self.assertEqual(0, result.area_error_px)
         self.assertAlmostEqual(math.sqrt(2), result.centroid_error_px)
+        self.assertAlmostEqual(0.25, result.precision)
+        self.assertAlmostEqual(0.25, result.recall)
+        self.assertEqual(3, result.false_positive_px)
+        self.assertEqual(3, result.false_negative_px)
+
+    def test_empty_prediction_against_ground_truth_is_all_false_negatives(self):
+        ground_truth = np.zeros((4, 4), dtype=np.uint8)
+        ground_truth[0:2, 0:2] = 255
+        predicted = np.zeros((4, 4), dtype=np.uint8)
+        result = evaluate_masks(ground_truth, predicted)
+        self.assertEqual(0.0, result.iou)
+        self.assertEqual(1.0, result.precision)
+        self.assertEqual(0.0, result.recall)
+        self.assertEqual(0, result.false_positive_px)
+        self.assertEqual(4, result.false_negative_px)
+
+    def test_prediction_without_ground_truth_is_all_false_positives(self):
+        ground_truth = np.zeros((4, 4), dtype=np.uint8)
+        predicted = np.zeros((4, 4), dtype=np.uint8)
+        predicted[0:2, 0:2] = 255
+        result = evaluate_masks(ground_truth, predicted)
+        self.assertEqual(0.0, result.iou)
+        self.assertEqual(0.0, result.precision)
+        self.assertEqual(1.0, result.recall)
+        self.assertEqual(4, result.false_positive_px)
+        self.assertEqual(0, result.false_negative_px)
 
     def test_size_mismatch_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "尺寸不一致"):
@@ -254,6 +292,109 @@ class MaskEvaluationTests(unittest.TestCase):
                 np.zeros((4, 4), dtype=np.uint8),
                 np.zeros((5, 4), dtype=np.uint8),
             )
+
+
+class MaskEvaluationSummaryTests(unittest.TestCase):
+    def test_labeled_kpi_is_separated_from_unlabeled_preview(self):
+        from microcleaning.data_learning.mask_evaluation import summarize_mask_evaluations
+
+        summary = summarize_mask_evaluations(
+            [
+                {
+                    "image_stem": "public_001",
+                    "annotation_status": "labeled",
+                    "iou": 0.0739,
+                    "precision": 0.083,
+                    "recall": 0.5,
+                    "f1": 0.14,
+                    "false_positive_px": 900,
+                    "false_negative_px": 100,
+                    "centroid_error_px": 86.87,
+                },
+                {
+                    "image_stem": "public_002",
+                    "annotation_status": "unlabeled",
+                    "iou": 0.9,
+                    "precision": 0.9,
+                    "recall": 0.9,
+                    "f1": 0.9,
+                    "false_positive_px": 1,
+                    "false_negative_px": 1,
+                    "centroid_error_px": 0.5,
+                },
+            ]
+        )
+        self.assertEqual(1, summary["labeled_image_count"])
+        self.assertEqual(1, summary["unlabeled_image_count"])
+        self.assertAlmostEqual(0.0739, summary["labeled_kpi"]["mean_iou"])
+        self.assertAlmostEqual(0.9, summary["unlabeled_preview"]["mean_iou"])
+        self.assertIn("labeled_kpi", summary["note"])
+
+    def test_develop_and_holdout_are_split_on_labeled_rows(self):
+        from microcleaning.data_learning.mask_evaluation import summarize_mask_evaluations
+
+        metrics = {
+            "precision": 0.5,
+            "recall": 0.5,
+            "f1": 0.5,
+            "false_positive_px": 10,
+            "false_negative_px": 10,
+            "centroid_error_px": 1.0,
+        }
+        summary = summarize_mask_evaluations(
+            [
+                {
+                    "image_stem": "public_001",
+                    "annotation_status": "labeled",
+                    "algorithm": "local",
+                    "iou": 0.40,
+                    **metrics,
+                },
+                {
+                    "image_stem": "public_002",
+                    "annotation_status": "labeled",
+                    "algorithm": "local",
+                    "iou": 0.20,
+                    **metrics,
+                },
+                {
+                    "image_stem": "public_003",
+                    "annotation_status": "unlabeled",
+                    "algorithm": "local",
+                    "iou": 0.99,
+                    **metrics,
+                },
+            ]
+        )
+        self.assertEqual(2, summary["labeled_image_count"])
+        self.assertEqual(1, summary["develop_row_count"])
+        self.assertEqual(1, summary["holdout_row_count"])
+        self.assertAlmostEqual(0.40, summary["develop_by_algorithm"]["local"]["mean_iou"])
+        self.assertAlmostEqual(0.20, summary["holdout_by_algorithm"]["local"]["mean_iou"])
+        self.assertAlmostEqual(0.30, summary["labeled_kpi"]["mean_iou"])
+        self.assertAlmostEqual(0.99, summary["unlabeled_preview"]["mean_iou"])
+
+
+class Public001HsvLockTests(unittest.TestCase):
+    def test_default_hsv_iou_stays_near_documented_failure_when_pixels_exist(self):
+        from microcleaning.data_learning.mask_evaluation import evaluate_masks
+        from microcleaning.vision.hsv_baseline import read_bgr_image, segment_contamination
+
+        root = Path(__file__).resolve().parents[2]
+        image_path = root / "data" / "raw_images" / "public" / "public_001.jpg"
+        mask_path = root / "data" / "annotations" / "masks" / "public_001.png"
+        if not image_path.is_file() or not mask_path.is_file():
+            return
+        payload = mask_path.read_bytes()
+        if payload[:8] != b"\x89PNG\r\n\x1a\n":
+            return
+        image = read_bgr_image(image_path)
+        predicted = segment_contamination(image).mask
+        ground_truth = cv2.imdecode(np.frombuffer(payload, dtype=np.uint8), cv2.IMREAD_GRAYSCALE)
+        if ground_truth is None or ground_truth.size == 0:
+            return
+        result = evaluate_masks(ground_truth, predicted)
+        self.assertAlmostEqual(0.0739, result.iou, places=4)
 
 
 if __name__ == "__main__":

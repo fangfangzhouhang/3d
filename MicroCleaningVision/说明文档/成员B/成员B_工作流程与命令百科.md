@@ -2,13 +2,14 @@
 
 > 成员 B 的目标：把 A 提供的原图变成可检查的算法 Mask、污染面积和污染中心，并让 A 能量化评价、让 C 能继续规划。
 
-## 0. 当前该做什么（2026-09-05）
+## 0. 当前该做什么（2026-09-07）
 
-根目录 `p1_baseline.py` 已迁入 `microcleaning/vision/otsu_baseline.py`。拉取后先生成本机 `output/`（该目录不进 Git），再按失败类型改**一个**参数。
+13 张图都有人工 Mask，且已全部标成 `labeled`。B 和 Demo 的默认找法都是邻域差异 `local`。Otsu 可对照。HSV 只留作失败对照，不再当主算法。看见污渍不会发泵。
 
 ```powershell
 cd "D:\大创\3d\MicroCleaningVision"
 git pull
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline --algorithm local --input-dir "data\raw_images\public"
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline --algorithm otsu --input-dir "data\raw_images\public"
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline --algorithm hsv --input-dir "data\raw_images\public"
 .\.venv\Scripts\python.exe scripts\evaluate_vision_baselines.py
@@ -23,19 +24,17 @@ output/vision/<algorithm>_<图名>_<时间>/contamination_overlay.png
 
 | 该朝哪努力 | 不要做什么 |
 |---|---|
-| HSV：很多 public 图整张涂白，先收紧饱和度/颜色范围，或加形状过滤打掉细长横线 | 不要删掉 HSV 只留 Otsu |
-| Otsu：中心常对，`public_001` 画成空心圈、面积偏大 | 不要在一张图上调到完美再当证明 |
-| 一次只改 `HSVSegmentationPolicy` 或 `OtsuSegmentationPolicy` 里的一个字段，并升级版本号 | 不要改 `contracts.py`、不要输出毫米、不要让 C 改接口 |
+| 调参只看 9 张开发图 | 不要为刷分去改留出图，也不要临时从网上下图 |
+| 是否更好只看 `holdout_by_algorithm` | 不要看混在一起的 `labeled_kpi` 宣布过关 |
+| HSV 仍保留：红色标记物对照 | 不要删掉 HSV 只留 local |
+| 一次只改 `LocalContrastPolicy` 里的一个字段，并升级版本号 | 不要改 `contracts.py`、不要输出毫米、不要让 C 改接口 |
 
-开发 / 留出（A 复核完成前只是候选）：
+已冻结：
 
 ```text
-开发图：public_001（唯一 labeled）、public_003、public_008
-留出图：public_002、public_011
-先放下：M9、M12
+开发图：public_001、public_003～public_010（共 9 张）
+留出图：public_002、public_011、M9、M12（共 4 张）
 ```
-
-只有 `public_001` 可写进正式结论。其余 Mask 未人工验收，只用于看图和失败分类。
 
 ## 目录
 
@@ -61,15 +60,15 @@ A提供原图
 ↓
 B读取像素
 ↓
-HSV基线筛选候选颜色
+邻域差异（默认）或 HSV/Otsu 对照
 ↓
-去除小噪点并形成算法Mask
+去除细长线和过小块，形成算法Mask
 ↓
 计算污染面积、中心和连通块数
 ↓
 A用人工Mask评价
 ↓
-B依据多张开发图修改算法
+B只在开发图上改一个参数
 ↓
 冻结算法版本
 ↓
@@ -118,9 +117,12 @@ B 不输出毫米坐标、喷射时长、COM口或电机指令。
 
 ```text
 microcleaning/vision/
-├── hsv_baseline.py       # 官方HSV基线：高饱和红色标记物
+├── hsv_baseline.py       # 官方HSV基线：高饱和红色标记物；可选长条过滤不改默认
 ├── otsu_baseline.py      # Otsu/自适应阈值候选：假设污渍比背景暗
-├── run_baseline.py       # B自己跑算法Mask的入口
+├── local_contrast_baseline.py  # 邻域差异：和周围差得多才当污渍
+├── exg_baseline.py       # 可选 Excess Green / Excess Red（OWL 色指数，不接硬件）
+├── scale_measure.py      # 离线 mm/px；禁止写入动作申请
+├── run_baseline.py       # B自己跑算法Mask的入口；默认 local
 ├── contamination.py      # 污染测量数据结构
 ├── state_estimator.py    # 测量变成状态
 └── verification.py       # 动作前后视觉结果比较
@@ -134,10 +136,14 @@ test/vision/
 ```python
 HSV_BASELINE_VERSION = "hsv-red-baseline-v0.1"      # hsv_baseline.py
 OTSU_BASELINE_VERSION = "otsu-v-baseline-v0.1"      # otsu_baseline.py
+LOCAL_CONTRAST_VERSION = "local-contrast-v0.1"      # local_contrast_baseline.py
+EXG_BASELINE_VERSION = "exg-owl-v0.1"               # exg_baseline.py
+EXR_BASELINE_VERSION = "exr-owl-v0.1"               # 同文件 Excess Red
 ```
 
-- 官方 Demo 链（给 C 看路线）仍默认 HSV。
-- B 对照人工 Mask、做 A/B 和调参时，用 `run_baseline.py`。默认跑 Otsu 候选。
+- 官方 Demo 链（给 C 看路线）默认 `local`。实时窗口 `O` 切 Otsu，`H` 切 HSV 对照。`exg` / `exr` 只是对照。
+- B 对照人工 Mask、做 A/B 和调参时，用 `run_baseline.py`。默认跑 `local`。
+- HSV 的 `max_aspect_ratio` 默认关闭，避免改掉 `public_001` 的 v0.1 数字。
 - 算法行为发生变化时必须升级版本，不能覆盖结果后仍写旧版本。
 - 根目录旧文件 `p1_baseline.py` 已迁走；不要再从那里运行，也不要把中文 bbox 字典交给 C。
 
@@ -185,7 +191,7 @@ B 要得到**自己的算法 Mask**时，用视觉入口，不要再用根目录
 
 ```powershell
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
-  --algorithm otsu `
+  --algorithm local `
   --input "data\raw_images\public\public_001.jpg"
 ```
 
@@ -197,11 +203,30 @@ B 要得到**自己的算法 Mask**时，用视觉入口，不要再用根目录
   --input "data\raw_images\public\public_001.jpg"
 ```
 
-整目录批量：
+对照 Otsu（假设污渍比背景暗）：
 
 ```powershell
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
   --algorithm otsu `
+  --input "data\raw_images\public\public_001.jpg"
+```
+
+对照 Excess Green / Excess Red（不改 Demo 默认）：
+
+```powershell
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm exg `
+  --input "data\raw_images\public\public_001.jpg"
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm exr `
+  --input "data\raw_images\public\public_001.jpg"
+```
+
+整目录批量：
+
+```powershell
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm local `
   --input-dir "data\raw_images\public"
 ```
 
@@ -215,7 +240,7 @@ B 要得到**自己的算法 Mask**时，用视觉入口，不要再用根目录
 
 输出在 `output/vision/<algorithm>_<图片名>_<时间>/`。坐标单位是 `image_px`，不是毫米。
 
-需要连上 C 的路线预览时，才用集成 Demo（默认仍是 HSV）：
+需要连上 C 的路线预览时，才用集成 Demo（默认 `local`）：
 
 ```powershell
 .\.venv\Scripts\python.exe -m demo.demo_pipeline `
@@ -297,14 +322,16 @@ B 收到指标后，还必须看图并将失败分成：误检、漏检、边界
 
 | 失败 | 先改哪套 | 建议动的参数 |
 |---|---|---|
+| 浅斑、深斑都能看见，但细线也被画上 | `local_contrast_baseline.py` | `max_aspect_ratio` 再收紧 |
+| 纹理底把整张图点花 | `local_contrast_baseline.py` | `min_component_area_px` 或 `min_residual` |
+| 大块污渍被切掉 | `local_contrast_baseline.py` | `max_area_ratio` 略放宽 |
 | HSV 整图变白 | `hsv_baseline.py` | `saturation_min` 提高，或收窄 hue |
-| HSV 把铜色横线当污染 | `hsv_baseline.py` | 连通域长宽比/细长度过滤；升到 v0.2 |
-| Otsu 空心圈、面积偏大 | `otsu_baseline.py` | `max_area_ratio`、形态学核；升到 v0.2 |
-| 大图 M9/M12 全失败 | 先记录，不作为第一刀 | 等 A 说明这两张是否同一成像条件 |
+| Otsu 空心圈、面积偏大 | `otsu_baseline.py` | `max_area_ratio`、形态学核 |
+| 大图 M9/M12 全失败 | 先看留出数字，不在这两张上调参 | 属于冻结留出图 |
 
-改完必须升级版本常量，例如 `hsv-red-baseline-v0.2` 或 `otsu-v-baseline-v0.2`。
+改完必须升级版本常量，例如 `local-contrast-v0.2`。
 
-Demo 默认 HSV 在切换前保持不变。只有留出图对照证明候选更好，才讨论是否让 Demo 改用 Otsu。
+Demo 默认已改为 `local`。HSV 只作对照，不要再把它当主算法。
 
 每次只解决一个可复现问题，例如：
 
@@ -399,21 +426,35 @@ cd "D:\大创\3d\MicroCleaningVision"
 git pull
 
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm local --input-dir "data\raw_images\public"
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
   --algorithm otsu --input-dir "data\raw_images\public"
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
   --algorithm hsv --input-dir "data\raw_images\public"
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm exg --input-dir "data\raw_images\public"
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm exr --input-dir "data\raw_images\public"
 .\.venv\Scripts\python.exe scripts\evaluate_vision_baselines.py
+```
+
+有测微尺图时只写离线尺度，不要接动作：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\measure_scale_mm_per_px.py `
+  --p1 10,20 --p2 110,20 --known-mm 1.0 `
+  --output "output\calibration\scale_mm_per_px.json"
 ```
 
 改完算法后，用开发图复跑并再评价：
 
 ```powershell
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
-  --algorithm otsu --input "data\raw_images\public\public_001.jpg"
+  --algorithm local --input "data\raw_images\public\public_001.jpg"
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
-  --algorithm otsu --input "data\raw_images\public\public_003.jpg"
+  --algorithm local --input "data\raw_images\public\public_003.jpg"
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
-  --algorithm otsu --input "data\raw_images\public\public_008.jpg"
+  --algorithm local --input "data\raw_images\public\public_008.jpg"
 
 .\.venv\Scripts\python.exe scripts\evaluate_vision_baselines.py
 
@@ -428,7 +469,7 @@ git pull
 [ ] 输出算法Mask
 [ ] 输出面积、中心、连通块数和算法版本
 [ ] 保存叠加图并肉眼检查
-[ ] 开发图与留出图分开；未labeled的图不写入正式结论
+[ ] 开发图与留出图分开；升降只看留出图
 [ ] 改参后升级版本号并复跑 scripts/evaluate_vision_baselines.py
 [ ] A可以复现评价结果
 [ ] C知道mask路径和坐标单位

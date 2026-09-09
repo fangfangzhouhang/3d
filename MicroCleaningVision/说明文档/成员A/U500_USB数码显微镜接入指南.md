@@ -81,6 +81,23 @@ frame_read = true
 
 才说明 OpenCV 从该编号读到了一帧。它仍不代表倍率、视野或像素—毫米标定完成。
 
+探测只输出 JSON，没有实时画面。电脑上常有笔记本摄像头和显微镜两个可读设备，用预览确认哪一个是 U500：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\probe_usb_camera.py --preview --device-index 0
+.\.venv\Scripts\python.exe scripts\probe_usb_camera.py --preview --device-index 1
+```
+
+会弹出 OpenCV 窗口。对焦该窗口后按 `Q` 或 `Esc` 退出。这不是 Demo，也不会发给 B/C 或泵。若窗口被挡在终端后面，到任务栏点一下。
+
+要在预览里看到 B 的污渍叠加，并按空格抓帧进入正式分析，改用 Demo 实时窗口（显微镜已确认为 index 1）。看见污渍不会自动喷。`Q` 暂停；其他键重开：
+
+```powershell
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --live --camera-index 1 --wait-usb
+```
+
+点窗口后：空格 = 冻结并分析；`H` = HSV；`O` = Otsu；`Q` 退出。叠加只辅助对焦，空格之后的 `output/demo/<run_id>/` 才是正式结果。该窗口默认不发泵。
+
 如果电脑视频设备很多，可扩大范围：
 
 ```powershell

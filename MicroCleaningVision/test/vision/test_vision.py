@@ -88,6 +88,26 @@ class HSVBaselineTests(unittest.TestCase):
         self.assertEqual(0.0, result.measurement.area_px)
         self.assertIsNone(result.measurement.centroid_px)
 
+    def test_optional_aspect_filter_drops_thin_lines_without_changing_default(self):
+        import cv2
+        import numpy as np
+
+        from microcleaning.vision.hsv_baseline import (
+            HSV_BASELINE_VERSION,
+            HSVSegmentationPolicy,
+            segment_contamination,
+        )
+
+        image = np.full((80, 160, 3), 210, dtype=np.uint8)
+        image[8:12, 8:150] = (0, 0, 230)
+        cv2.circle(image, (40, 50), 12, (0, 0, 230), -1)
+        default = segment_contamination(image)
+        filtered = segment_contamination(image, policy=HSVSegmentationPolicy(max_aspect_ratio=4.0))
+        self.assertGreaterEqual(default.measurement.component_count, 2)
+        self.assertEqual(HSV_BASELINE_VERSION, default.measurement.algorithm_version)
+        self.assertEqual(1, filtered.measurement.component_count)
+        self.assertEqual("hsv-red-baseline-v0.2-aspect", filtered.measurement.algorithm_version)
+
 
 @unittest.skipUnless(HAS_PERCEPTION_DEPS, "需要 requirements/perception-opencv.txt")
 class OtsuBaselineTests(unittest.TestCase):
@@ -138,6 +158,120 @@ class OtsuBaselineTests(unittest.TestCase):
         image = np.full((40, 40, 3), 200, dtype=np.uint8)
         with self.assertRaises(ValueError):
             segment_contamination(image, policy=OtsuSegmentationPolicy(blur_kernel_px=4))
+
+
+@unittest.skipUnless(HAS_PERCEPTION_DEPS, "需要 requirements/perception-opencv.txt")
+class ColorIndexBaselineTests(unittest.TestCase):
+    def test_excess_green_keeps_green_and_ignores_red(self):
+        import cv2
+        import numpy as np
+
+        from microcleaning.vision.exg_baseline import EXG_BASELINE_VERSION, segment_contamination
+
+        green = np.full((120, 160, 3), 210, dtype=np.uint8)
+        cv2.circle(green, (80, 60), 18, (0, 220, 0), -1)
+        red = np.full((120, 160, 3), 210, dtype=np.uint8)
+        cv2.circle(red, (80, 60), 18, (0, 0, 230), -1)
+        green_result = segment_contamination(green)
+        red_result = segment_contamination(red)
+        self.assertGreater(green_result.measurement.area_px, 500)
+        self.assertEqual(EXG_BASELINE_VERSION, green_result.measurement.algorithm_version)
+        self.assertEqual(0.0, red_result.measurement.area_px)
+
+    def test_excess_red_keeps_red_marker(self):
+        import cv2
+        import numpy as np
+
+        from microcleaning.vision.exg_baseline import EXR_BASELINE_VERSION, segment_excess_red
+
+        image = np.full((120, 160, 3), 210, dtype=np.uint8)
+        cv2.circle(image, (80, 60), 18, (0, 0, 230), -1)
+        result = segment_excess_red(image)
+        self.assertGreater(result.measurement.area_px, 500)
+        self.assertEqual(EXR_BASELINE_VERSION, result.measurement.algorithm_version)
+        self.assertAlmostEqual(80.0, result.measurement.centroid_px[0], delta=3.0)
+
+
+@unittest.skipUnless(HAS_PERCEPTION_DEPS, "需要 requirements/perception-opencv.txt")
+class LocalContrastBaselineTests(unittest.TestCase):
+    def test_dark_blob_on_tan_is_marked(self):
+        import cv2
+        import numpy as np
+
+        from microcleaning.vision.local_contrast_baseline import (
+            LOCAL_CONTRAST_VERSION,
+            segment_contamination,
+        )
+
+        image = np.full((160, 200, 3), (90, 170, 210), dtype=np.uint8)
+        cv2.circle(image, (100, 80), 16, (25, 25, 25), -1)
+        result = segment_contamination(image)
+        self.assertEqual(LOCAL_CONTRAST_VERSION, result.measurement.algorithm_version)
+        self.assertGreater(result.measurement.area_px, 400)
+        self.assertAlmostEqual(100.0, result.measurement.centroid_px[0], delta=4.0)
+        self.assertAlmostEqual(80.0, result.measurement.centroid_px[1], delta=4.0)
+        self.assertEqual(1, result.measurement.component_count)
+
+    def test_light_blob_on_dark_is_marked(self):
+        import cv2
+        import numpy as np
+
+        from microcleaning.vision.local_contrast_baseline import segment_contamination
+
+        image = np.full((160, 200, 3), (25, 25, 25), dtype=np.uint8)
+        cv2.circle(image, (90, 70), 16, (210, 190, 160), -1)
+        result = segment_contamination(image)
+        self.assertGreater(result.measurement.area_px, 400)
+        self.assertAlmostEqual(90.0, result.measurement.centroid_px[0], delta=4.0)
+        self.assertAlmostEqual(70.0, result.measurement.centroid_px[1], delta=4.0)
+
+    def test_red_blob_is_still_found_without_hue_range(self):
+        import cv2
+        import numpy as np
+
+        from microcleaning.vision.local_contrast_baseline import segment_contamination
+
+        image = np.full((120, 160, 3), 210, dtype=np.uint8)
+        cv2.circle(image, (80, 60), 18, (0, 0, 230), -1)
+        result = segment_contamination(image)
+        self.assertGreater(result.measurement.area_px, 500)
+
+    def test_thin_line_is_dropped_while_blob_is_kept(self):
+        import cv2
+        import numpy as np
+
+        from microcleaning.vision.local_contrast_baseline import segment_contamination
+
+        image = np.full((80, 160, 3), 210, dtype=np.uint8)
+        image[8:12, 8:150] = (0, 0, 230)
+        cv2.circle(image, (40, 50), 12, (0, 0, 230), -1)
+        result = segment_contamination(image)
+        self.assertEqual(1, result.measurement.component_count)
+        self.assertGreater(result.measurement.area_px, 200)
+        self.assertAlmostEqual(40.0, result.measurement.centroid_px[0], delta=8.0)
+        self.assertAlmostEqual(50.0, result.measurement.centroid_px[1], delta=8.0)
+
+    def test_uniform_image_has_empty_mask(self):
+        import numpy as np
+
+        from microcleaning.vision.local_contrast_baseline import segment_contamination
+
+        image = np.full((80, 80, 3), 180, dtype=np.uint8)
+        result = segment_contamination(image)
+        self.assertEqual(0.0, result.measurement.area_px)
+        self.assertIsNone(result.measurement.centroid_px)
+
+    def test_invalid_policy_is_rejected(self):
+        import numpy as np
+
+        from microcleaning.vision.local_contrast_baseline import (
+            LocalContrastPolicy,
+            segment_contamination,
+        )
+
+        image = np.full((40, 40, 3), 180, dtype=np.uint8)
+        with self.assertRaises(ValueError):
+            segment_contamination(image, policy=LocalContrastPolicy(blur_kernel_px=4))
 
 
 if __name__ == "__main__":
