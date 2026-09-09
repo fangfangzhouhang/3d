@@ -64,6 +64,21 @@ class StateEstimate:
 
 @dataclass(frozen=True)
 class ActionRequest:
+    """软件建议的下一步动作；不是硬件命令。
+
+    ``target_centroid_mm`` 保持必填，避免把“没有坐标”伪装成可执行目标：
+    - ``coordinate_frame="work_mm"``：工作台毫米坐标，必须来自有效标定。
+    - ``coordinate_frame="nozzle_fixed"`` 且目标 ``(0, 0)``：喷头不动的定点脉冲，
+      不是伪造的 ``work_mm`` 标定。约束里必须写明禁止 XY。
+
+    合法 ``primitive``：``SPRAY_AT_POINT``（需 ``work_mm``）、``PUMP_IN_PLACE``（无 XY）。
+
+    消费者：``fixed_rule.py``、``governor.py``、``fake_serial.py``、
+    ``stm32_serial.py``、``replay_mcl.py``、``mock_mcl.py``、``demo/demo_pipeline.py``。
+    字段未改，接口版本仍为 ``mcl-v0.1``。失败测试见
+    ``test/control_system/test_pump_in_place.py`` 与 ``test_stm32_serial.py``。
+    """
+
     action_id: str
     task_id: str
     state_id: str

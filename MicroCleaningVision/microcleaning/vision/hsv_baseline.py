@@ -26,6 +26,7 @@ class HSVSegmentationPolicy:
     value_min: int = 45
     min_component_area_px: int = 30
     morphology_kernel_px: int = 3
+    max_aspect_ratio: float | None = None
 
     def validate(self) -> None:
         if not 0 <= self.hue_low_1 <= self.hue_high_1 <= 179:
@@ -38,6 +39,12 @@ class HSVSegmentationPolicy:
             raise ValueError("min_component_area_px必须大于0")
         if self.morphology_kernel_px <= 0 or self.morphology_kernel_px % 2 == 0:
             raise ValueError("形态学核必须是正奇数")
+        if self.max_aspect_ratio is not None and (
+            not isinstance(self.max_aspect_ratio, (int, float))
+            or isinstance(self.max_aspect_ratio, bool)
+            or self.max_aspect_ratio < 1.0
+        ):
+            raise ValueError("max_aspect_ratio必须≥1，或不启用")
 
 
 @dataclass(frozen=True)
@@ -92,9 +99,16 @@ def segment_contamination(
     kept_components = 0
     for label in range(1, count):
         area = int(stats[label, cv2.CC_STAT_AREA])
-        if area >= policy.min_component_area_px:
-            mask[labels == label] = 255
-            kept_components += 1
+        if area < policy.min_component_area_px:
+            continue
+        if policy.max_aspect_ratio is not None:
+            width = max(int(stats[label, cv2.CC_STAT_WIDTH]), 1)
+            height = max(int(stats[label, cv2.CC_STAT_HEIGHT]), 1)
+            aspect = max(width, height) / min(width, height)
+            if aspect > policy.max_aspect_ratio:
+                continue
+        mask[labels == label] = 255
+        kept_components += 1
 
     area_px = float(cv2.countNonZero(mask))
     if area_px > 0:
@@ -113,7 +127,11 @@ def segment_contamination(
         uncertainty_px=uncertainty_px,
         confidence=confidence,
         component_count=kept_components,
-        algorithm_version=HSV_BASELINE_VERSION,
+        algorithm_version=(
+            HSV_BASELINE_VERSION
+            if policy.max_aspect_ratio is None
+            else "hsv-red-baseline-v0.2-aspect"
+        ),
     )
     measurement.validate()
     return SegmentationResult(measurement=measurement, mask=mask)

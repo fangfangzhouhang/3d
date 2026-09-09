@@ -1,28 +1,31 @@
 # MicroCleaningVision 共同上下文
 
-> 人和 AI 开始任务时依次阅读：本文件 → `project_state.yaml` → `说明文档/README.md` → 团队任务看板 → 自己的长期手册。
+> 人和 AI 开始任务时依次阅读：本文件 → `project_state.yaml` → `说明文档/README.md` → [项目作战总表](说明文档/总流程说明/项目作战总表.md) → 团队任务看板 → 自己的长期手册。
 
 ## 这个项目现在到底在做什么
 
-长期目标是研究机器怎样感知、处理并复检微观表面。当前三人团队只负责视觉成像和上位机软件，最多为未来STM32保留受限串口接口；不负责机械设计、STM32固件或真实喷洗控制。
+长期目标是研究机器怎样感知、处理并复检微观表面。当前主线仍是视觉和上位机软件；NUCLEO-F401RE 的 MCV1 **源码已在本仓**，但 **真机未验收**（无烧录证据、无实机 PONG）。真机未验收 ≠ 软件未实现。
 
 当前软件主线：
 
 ```text
 A真实图片/数据
 → B污染mask、面积和中心
-→ C目标点、路线、动作申请和控制仿真
-→ 动作后视觉复检
+→ C目标点、路线、动作申请
+→ Safety Governor → Human Gate
+→ FakeSerial 或 STM32SerialController（默认不发泵）
+→ 动作后视觉复检（真实后图仍缺）
 → Episode
 ```
 
-FakeSerial只模拟确认、超时和错误，不打开COM口。软件回放不是硬件闭环，更不证明真实清洗有效。
+FakeSerial只模拟确认、超时和错误，不打开COM口。软件回放不是硬件闭环，更不证明真实清洗有效。`analyze` / `--live` 默认不发送 PUMP。
 
 ## 三个人的责任和目录
 
 - A 数据与模型：`microcleaning/data_learning/`、`test/data_learning/`。
 - B 视觉识别与测量：`microcleaning/vision/`、`test/vision/`。
 - C 目标规划与控制仿真：`microcleaning/control_system/`、`test/control_system/`。
+- 硬件组：`firmware/nucleo_f401re/`（源码在仓；可烧录工程与实机记录由硬件组留下，不提交 `.elf`）。
 
 所有人理解整条链，但只直接修改自己的业务目录。上游未到位时使用合成fixture继续，不把fixture写成真实证据。
 
@@ -58,15 +61,17 @@ FakeSerial只模拟确认、超时和错误，不打开COM口。软件回放不�
 ## 证据和复杂度规则
 
 - E0：设计或框架；E1：单组件可重复；E2：多个真实模块交接；E3：真实闭环；E4：重复对照与误差/局限分析。
-- HSV简单基线先行。只有固定条件下出现稳定失败，并有人工标注与独立测试集，才讨论学习模型。
+- HSV 已退出 Demo 默认。主入口用邻域差异 `local`（看一块和旁边差多少）；Otsu 可对照。只有固定条件下出现稳定失败，并有人工标注与独立测试集，才讨论学习模型。
 - 第二视角、3D、Transformer、PINN、强化学习或World Model必须对应已记录失败和最小A/B。
 - 模型、Agent或LLM不能通过自然语言直接控制泵、电机、阀、平台或喷头。
 
 ## 当前最低硬件边界
 
-1. 默认不打开真实串口；
-2. 没有有效标定不产生毫米动作；
-3. 自然语言不能成为硬件命令；
-4. 第一次真实动作必须经过Human Gate并有人在场。
+1. 默认不打开真实串口；`ping-only` / probe 必须使用人确认的 ST-LINK COM，禁止扫口。
+2. 没有有效标定不产生毫米动作（`work_mm` / `SPRAY_AT_POINT`）。`PUMP_IN_PLACE` 的 `nozzle_fixed (0,0)` 不是伪造工作台坐标。
+3. 自然语言、模型或 LLM 不能成为硬件命令。
+4. 第一次真实泵动作必须经过 Safety Governor（HUMAN）→ `--confirm-pump` → `--arm-pump`，并有人在场。缺一不可。
+5. 视觉模块不得 `serial.write`。未接 12V 的 PUMP 回执只能写逻辑脚/协议，不能写清洗有效。
+6. 固件源码在仓不等于已烧录、不等于已联调。
 
-完整任务、术语、Git和长期阶段见 `说明文档/README.md`。
+完整任务、术语、Git、作战总表和长期阶段见 `说明文档/README.md`。

@@ -3,29 +3,30 @@
 > 用途：成员 A 不需要每次询问“下一条命令是什么”。从图片进入项目，到交给 B，再到评价 B 的算法，全部按本文件执行。  
 > 当前边界：本文件只记录仓库中已经存在、可以运行的命令。模型训练仍未实现，不要伪装成现成功能。
 
-## 0. 当前该做什么（2026-09-05）
+## 0. 当前该做什么（2026-09-07）
 
-仓库里已经有 13 张原图、13 份 Labelme JSON、13 张转换 Mask，以及 HSV / Otsu 两套算法的批量对照。`output/` 不进 Git，拉取后若本机没有评价文件，按第 12 节重跑即可。
+仓库里已经有 13 张原图、13 份 Labelme JSON、13 张人工 Mask。13 张在 metadata 里都是 `labeled`。不要再从网上临时抓一批图来刷分：成像条件不同，分数不能跟这 13 张比。
 
 | 事实 | 含义 |
 |---|---|
-| 只有 `public_001` 的 `annotation_status=labeled` | 这是目前唯一正式判卷图 |
-| 其余 12 张 Mask 是自动转换结果 | 可看图、分类失败；复核前不要改成 `labeled` |
-| B 的官方 Demo 默认仍是 HSV | A 评价两套算法，不要让 C 先切换入口 |
-| 批量评价入口已存在 | `scripts/evaluate_vision_baselines.py` |
+| 13 张都已复核为 `labeled` | 可以正式判卷 |
+| 开发 9 张 / 留出 4 张已冻结 | 调参只看开发图；留出图改完再看一次 |
+| 留出图 | `public_002`、`public_011`、`M9`、`M12` |
+| B 的新找法叫 `local` | 看一块地方和周围差多少，不规定必须是红色 |
+| Demo 默认已改为 `local` | HSV 只作对照；Otsu 可按 `O` 切换 |
 
 A 现在只做三件事，不要改 `microcleaning/vision/`：
 
-1. 肉眼复核自动 Mask，先过 `public_003`、`public_008`、`public_009`、`public_002`、`public_011`。贴合的才改 metadata 为 `labeled`。
-2. 冻结 3 张开发图 + 2 张留出图，书面告诉 B；留出图禁止给 B 调参。
-3. B 改完算法后重跑第 12 节批量评价，只在已 `labeled` 的图上宣布升降。
+1. 不要为了刷分去改已经冻结的留出图标注。
+2. B 改完算法后重跑第 12 节批量评价，只看 `holdout_by_algorithm` 宣布升降。
+3. 新图仍然要走质量检查和 metadata；U500 实拍另算一批。
 
-建议划分（复核完成前只是候选，不是冻结）：
+已冻结划分：
 
 ```text
-开发图候选：public_001（已复核）、public_003、public_008
-留出图候选：public_002、public_011
-先不拿来调参：M9、M12（960×1280，两套算法都接近失败）
+开发图：public_001、public_003、public_004、public_005、public_006、
+        public_007、public_008、public_009、public_010
+留出图：public_002、public_011、M9、M12
 ```
 
 ## 目录
@@ -213,6 +214,19 @@ U500 的专用流程、错误码和实机验收见 [U500 USB 数码显微镜接�
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\probe_usb_camera.py
+```
+
+若有两个可读设备，弹出实时画面确认哪一个是显微镜（按 Q 退出）：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\probe_usb_camera.py --preview --device-index 0
+.\.venv\Scripts\python.exe scripts\probe_usb_camera.py --preview --device-index 1
+```
+
+确认显微镜编号后，用 Demo 实时窗口看 B 叠加并空格抓帧分析（不发泵）：
+
+```powershell
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --live --camera-index 1
 ```
 
 确认存在可读 index 后再保存测试帧：
@@ -467,11 +481,15 @@ A 不通过聊天重新发送一套图片；A/B 在同一仓库按路径交接�
 
 ## 11. 运行 B 的视觉算法
 
-评价算法时用 B 自己的入口，不要只用 Demo。Demo 默认 HSV，还会生成 C 的路线图。
+评价算法时用 B 自己的入口，不要只用 Demo。Demo 默认 `local`，还会生成 C 的路线图。
 
 单张：
 
 ```powershell
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm local `
+  --input "data\raw_images\public\public_001.jpg"
+
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
   --algorithm otsu `
   --input "data\raw_images\public\public_001.jpg"
@@ -484,6 +502,10 @@ A 不通过聊天重新发送一套图片；A/B 在同一仓库按路径交接�
 整目录：
 
 ```powershell
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm local `
+  --input-dir "data\raw_images\public"
+
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
   --algorithm otsu `
   --input-dir "data\raw_images\public"
@@ -503,7 +525,7 @@ output/vision/<algorithm>_<图片名>_<时间>/
 └── summary.json                  ← 面积、中心、algorithm_version
 ```
 
-需要 C 的路线预览时再跑 Demo（默认仍是 HSV）：
+需要 C 的路线预览时再跑 Demo（默认 `local`）：
 
 ```powershell
 .\.venv\Scripts\python.exe -m demo.demo_pipeline `
@@ -521,15 +543,18 @@ output/vision/<algorithm>_<图片名>_<时间>/
 .\.venv\Scripts\python.exe scripts\evaluate_vision_baselines.py
 ```
 
-它会读取最新的 `output/vision/otsu_*` 和 `hsv_*`，对照 `data/annotations/masks/`，写出：
+它会读取最新的 `output/vision/local_*`、`otsu_*`、`hsv_*`（若已跑则还有 `exg_*` / `exr_*`），对照 `data/annotations/masks/`，写出：
 
 ```text
 output/data_learning/evaluations/
-├── comparison_summary.json
+├── comparison_summary.json   # 含 develop/holdout 分表与按算法平均
+├── public_001_local_evaluation.json
 ├── public_001_otsu_evaluation.json
 ├── public_001_hsv_evaluation.json
-└── ...每张图各两份
+└── ...每张图各算法一份
 ```
+
+正式升降只读 `holdout_by_algorithm`。调参只看 `develop_by_algorithm`。缺少可选算法输出会记入 `skipped_optional`，不会当成失败。
 
 单张仍可用 A 的评价模块：
 
@@ -584,7 +609,7 @@ A 需要同时查看：原图、人工 Mask、`output/vision/` 里的算法 Mask
 | 碎裂 | 一个目标被切成很多块 |
 | 粘连 | 多个目标被合并成一块 |
 
-第一轮至少准备 5 张人工 Mask：3 张开发图供 B 分析，2 张留出图在参数冻结后评价。不能在同一张图上反复调参后再用它宣布算法优秀。
+第一轮 13 张已复核。开发 9 张、留出 4 张已冻结。不能在同一张留出图上反复调参后再宣布算法优秀。
 
 ## 14. 测试和 Git 命令
 
@@ -695,6 +720,8 @@ cd "D:\大创\3d\MicroCleaningVision"
 
   .\.venv\Scripts\python.exe -m microcleaning.data_learning.annotation_tools --batch
 
+.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
+  --algorithm local --input-dir "data\raw_images\public"
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `
   --algorithm otsu --input-dir "data\raw_images\public"
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline `

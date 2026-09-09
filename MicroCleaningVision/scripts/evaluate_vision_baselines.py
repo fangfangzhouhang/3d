@@ -1,7 +1,8 @@
 """批量比较 B 的算法 Mask 与 A 转换的人工 Mask。
 
 只写评价 JSON，不修改算法。metadata 里 unlabeled 的 Mask 视为候选真值，
-不能当成已人工验收的 Ground Truth。
+不能当成已人工验收的 Ground Truth。当前 13 张均为 labeled；开发/留出由
+eval_split 冻结，调参禁止看 holdout。
 """
 
 from __future__ import annotations
@@ -17,14 +18,17 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from microcleaning.data_learning.mask_evaluation import evaluate_mask_files
+from microcleaning.data_learning.eval_split import HOLD_OUT_STEMS, eval_split_for
+from microcleaning.data_learning.mask_evaluation import evaluate_mask_files, summarize_mask_evaluations
 
 RAW_DIR = PROJECT_ROOT / "data" / "raw_images" / "public"
 MASK_DIR = PROJECT_ROOT / "data" / "annotations" / "masks"
 METADATA = PROJECT_ROOT / "data" / "metadata.csv"
 VISION_ROOT = PROJECT_ROOT / "output" / "vision"
 EVAL_ROOT = PROJECT_ROOT / "output" / "data_learning" / "evaluations"
-ALGORITHMS = ("otsu", "hsv")
+CORE_ALGORITHMS = ("otsu", "hsv", "local")
+OPTIONAL_ALGORITHMS = ("exg", "exr")
+ALGORITHMS = CORE_ALGORITHMS + OPTIONAL_ALGORITHMS
 
 
 def main() -> int:
@@ -33,6 +37,7 @@ def main() -> int:
     EVAL_ROOT.mkdir(parents=True, exist_ok=True)
     rows: list[dict[str, object]] = []
     failures: list[dict[str, str]] = []
+    skipped: list[dict[str, str]] = []
 
     for stem in stems:
         mask_path = MASK_DIR / f"{stem}.png"
@@ -43,7 +48,11 @@ def main() -> int:
         for algorithm in ALGORITHMS:
             run_dir = _latest_run(algorithm, stem)
             if run_dir is None:
-                failures.append({"image": stem, "error": f"缺少{algorithm}输出，请先 run_baseline"})
+                item = {"image": stem, "error": f"缺少{algorithm}输出，请先 run_baseline"}
+                if algorithm in CORE_ALGORITHMS:
+                    failures.append(item)
+                else:
+                    skipped.append(item)
                 continue
             predicted = run_dir / "mask.png"
             try:
@@ -56,6 +65,7 @@ def main() -> int:
                 {
                     "image_stem": stem,
                     "algorithm": algorithm,
+                    "eval_split": eval_split_for(stem),
                     "annotation_status": status,
                     "ground_truth_mask": _rel(mask_path),
                     "predicted_mask": _rel(predicted),
@@ -72,16 +82,36 @@ def main() -> int:
             out_path = EVAL_ROOT / f"{stem}_{algorithm}_evaluation.json"
             out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             rows.append(payload)
-            print(f"{stem:12} {algorithm:4}  IoU={result.iou:.4f}  area_err={result.area_error_px:6d}  centroid_err={_fmt(result.centroid_error_px)}  [{status}]")
+            print(
+                f"{stem:12} {algorithm:5}  split={eval_split_for(stem):7}  "
+                f"IoU={result.iou:.4f}  P={result.precision:.4f}  "
+                f"R={result.recall:.4f}  FP={result.false_positive_px:6d}  FN={result.false_negative_px:6d}  "
+                f"centroid_err={_fmt(result.centroid_error_px)}  [{status}]"
+            )
 
+    split = summarize_mask_evaluations(rows)
     summary = {
         "created_at": datetime.now(timezone.utc).isoformat(),
         "evaluation_dir": _rel(EVAL_ROOT),
         "image_count": len(stems),
         "row_count": len(rows),
-        "labeled_count": sum(1 for row in rows if row["annotation_status"] == "labeled"),
+        "labeled_count": split["labeled_row_count"],
+        "labeled_image_count": split["labeled_image_count"],
+        "unlabeled_row_count": split["unlabeled_row_count"],
+        "unlabeled_image_count": split["unlabeled_image_count"],
+        "hold_out_stems": sorted(HOLD_OUT_STEMS),
+        "develop_row_count": split["develop_row_count"],
+        "holdout_row_count": split["holdout_row_count"],
+        "labeled_kpi": split["labeled_kpi"],
+        "develop_kpi": split["develop_kpi"],
+        "holdout_kpi": split["holdout_kpi"],
+        "labeled_by_algorithm": split["labeled_by_algorithm"],
+        "develop_by_algorithm": split["develop_by_algorithm"],
+        "holdout_by_algorithm": split["holdout_by_algorithm"],
+        "unlabeled_preview": split["unlabeled_preview"],
         "failures": failures,
-        "note": "只有 annotation_status=labeled 的图可进入正式A/B结论；其余仅供看图和失败分类。",
+        "skipped_optional": skipped,
+        "note": split["note"],
         "rows": rows,
     }
     summary_path = EVAL_ROOT / "comparison_summary.json"
