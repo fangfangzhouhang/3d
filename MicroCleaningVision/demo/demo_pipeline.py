@@ -5,12 +5,15 @@
     python -m demo.demo_pipeline --input path/to/image.png --mode analyze
     python -m demo.demo_pipeline --from-camera --mode analyze
     python -m demo.demo_pipeline --from-camera --live --camera-index 1
+    python -m demo.demo_pipeline --from-camera --live --mode arm-pump --confirm-pump --arm-pump --controller stm32 --serial-port COM5
     python -m demo.demo_pipeline --from-camera --mode camera-analyze
     python -m demo.demo_pipeline --generate-sample --mode ping-only
     python -m demo.demo_pipeline --generate-sample --mode arm-pump --confirm-pump --controller fake
 
 ``analyze`` / ``camera-analyze`` 只输出像素测量和路线，默认不发送 PUMP。
-``--live`` 打开带 B 分割叠加的实时窗口，空格冻结当前帧再走 analyze；预览叠加不是正式证据。
+``--live`` 打开带 B 分割叠加的实时窗口，空格冻结当前帧；默认走 analyze。
+``--live --mode arm-pump --confirm-pump --arm-pump --controller stm32 --serial-port COMx``
+时，空格在识别到目标后发送限时 PUMP。预览循环不会自动喷。
 ``simulate`` 使用明确标记的归一化虚拟标定，只授权 FakeSerial，不访问COM口。
 ``ping-only`` 在视觉结果之外只探测 PING/STATUS。
 ``arm-pump`` 可申请定点短喷，但第一次泵动作必须经过人工关卡；STM32 路径还要 ``--arm-pump``。
@@ -827,7 +830,7 @@ def main(argv: list[str] | None = None) -> int:
         "--mode",
         choices=DEMO_MODES,
         default="analyze",
-        help="analyze/camera-analyze 只分析；ping-only 只探测通信；arm-pump 需人工确认才可能发泵",
+        help="analyze/camera-analyze 只分析；ping-only 只探测通信；arm-pump 需人工确认才可能发泵；可与 --live 组合",
     )
     parser.add_argument("--output-root", default=str(Path("output") / "demo"))
     parser.add_argument("--camera-index", type=int, default=0, help="OpenCV VideoCapture 设备序号")
@@ -850,7 +853,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--live",
         action="store_true",
-        help="打开实时窗口：B 分割叠加辅助对焦，空格抓帧分析；不发泵",
+        help="打开实时窗口：B 分割叠加辅助对焦，空格抓帧；默认不发泵。与 --mode arm-pump 组合后，空格在有目标时发泵",
     )
     parser.add_argument(
         "--algorithm",
@@ -867,10 +870,24 @@ def main(argv: list[str] | None = None) -> int:
     if args.live:
         if not args.from_camera:
             parser.error("--live 必须与 --from-camera 一起使用")
-        if args.mode not in {"analyze", "camera-analyze"}:
-            parser.error("--live 只能与 analyze/camera-analyze 一起使用，不能发泵")
-        if args.arm_pump or args.confirm_pump:
-            parser.error("--live 不能与 --arm-pump / --confirm-pump 一起使用")
+        pump_on_analyze = False
+        if args.mode in {"analyze", "camera-analyze"}:
+            if args.arm_pump or args.confirm_pump:
+                parser.error(
+                    "默认 --live 不发泵。要实喷请使用 --mode arm-pump --confirm-pump "
+                    "--arm-pump --controller stm32 --serial-port COMx"
+                )
+        elif args.mode == "arm-pump":
+            if not args.confirm_pump:
+                parser.error("--live --mode arm-pump 必须加 --confirm-pump（空格=人在场确认这一帧）")
+            if args.controller == "stm32":
+                if not args.arm_pump:
+                    parser.error("STM32 实喷还必须加 --arm-pump")
+                if not args.serial_port:
+                    parser.error("STM32 实喷必须指定 --serial-port，例如 COM5")
+            pump_on_analyze = True
+        else:
+            parser.error("--live 只能与 analyze/camera-analyze 或 arm-pump 一起使用")
         from demo.live_station import run_live_session
         from microcleaning.data_learning.usb_camera import USBCameraError
 
@@ -884,6 +901,14 @@ def main(argv: list[str] | None = None) -> int:
                 camera_height=args.camera_height,
                 camera_backend=args.camera_backend,
                 wait_usb=args.wait_usb,
+                pump_on_analyze=pump_on_analyze,
+                confirm_pump=args.confirm_pump,
+                arm_pump=args.arm_pump,
+                controller_kind=args.controller,
+                serial_port=args.serial_port,
+                baudrate=args.baudrate,
+                serial_timeout=args.serial_timeout,
+                pump_duration_ms=args.pump_duration_ms,
             )
         except USBCameraError as exc:
             print(f"相机采集失败：{exc}", file=sys.stderr)

@@ -13,6 +13,41 @@ from microcleaning.data_learning.usb_camera import USBCameraError
 HAS_PERCEPTION_DEPS = importlib.util.find_spec("cv2") is not None and importlib.util.find_spec("numpy") is not None
 
 
+class _ScriptedNucleoSerial:
+    def __init__(self) -> None:
+        self.writes: list[bytes] = []
+        self._queue: list[bytes] = []
+
+    def reset_input_buffer(self) -> None:
+        return None
+
+    def write(self, data: bytes) -> int:
+        self.writes.append(data)
+        line = data.decode("ascii").strip()
+        parts = line.split("|")
+        kind = parts[1] if len(parts) > 1 else ""
+        if kind == "PING":
+            self._queue.append(b"MCV1|PONG\n")
+        elif kind == "STATUS":
+            self._queue.append(b"MCV1|STATUS|ESTOP=0|PUMP=0\n")
+        elif kind == "PUMP" and len(parts) >= 3:
+            action_id = parts[2].encode("ascii")
+            self._queue.append(b"MCV1|ACK|" + action_id + b"\n")
+            self._queue.append(b"MCV1|DONE|" + action_id + b"\n")
+        return len(data)
+
+    def flush(self) -> None:
+        return None
+
+    def readline(self) -> bytes:
+        if not self._queue:
+            return b""
+        return self._queue.pop(0)
+
+    def close(self) -> None:
+        return None
+
+
 class FakeVideoCapture:
     def __init__(self, *, opened: bool = True, reads=None) -> None:
         self.opened = opened
@@ -153,15 +188,112 @@ class LiveStationTests(unittest.TestCase):
             self.assertEqual("CAMERA_OPEN_FAILED", caught.exception.reason_code)
             self.assertTrue(fake.released)
 
-    def test_main_rejects_live_without_camera_or_with_pump_flags(self):
+    def test_main_rejects_live_without_camera_or_incomplete_pump_flags(self):
         from demo.demo_pipeline import main
 
         with self.assertRaises(SystemExit):
             main(["--generate-sample", "--live"])
         with self.assertRaises(SystemExit):
+            main(["--from-camera", "--live", "--confirm-pump"])
+        with self.assertRaises(SystemExit):
             main(["--from-camera", "--live", "--mode", "arm-pump"])
         with self.assertRaises(SystemExit):
-            main(["--from-camera", "--live", "--confirm-pump"])
+            main(
+                [
+                    "--from-camera",
+                    "--live",
+                    "--mode",
+                    "arm-pump",
+                    "--confirm-pump",
+                    "--arm-pump",
+                    "--controller",
+                    "stm32",
+                ]
+            )
+
+    def test_space_arm_pump_fake_sends_receipt_when_target_present(self):
+        from demo.live_station import LIVE_WINDOW_PUMP
+
+        fake = FakeVideoCapture(reads=[(True, self._red_frame())])
+        shown: list[str] = []
+        keys = [32, ord("q")]
+
+        with tempfile.TemporaryDirectory() as folder:
+            run_dirs = run_live_station(
+                camera_index=1,
+                output_root=folder,
+                warmup_frames=0,
+                capture_factory=lambda *args, **kwargs: fake,
+                imshow=lambda name, image: shown.append(name),
+                wait_key=lambda delay: keys.pop(0) if keys else ord("q"),
+                destroy_windows=lambda: None,
+                max_frames=8,
+                pump_on_analyze=True,
+                confirm_pump=True,
+                controller_kind="fake",
+            )
+            self.assertEqual(1, len(run_dirs))
+            summary = json.loads((run_dirs[0] / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual("arm-pump", summary["mode"])
+            self.assertEqual("PUMP_IN_PLACE", summary["action_request"]["primitive"])
+            self.assertEqual("ALLOW", summary["safety_decision"]["outcome"])
+            self.assertTrue(summary["execution_receipt"]["success"])
+            self.assertEqual("fake_serial", summary["execution_receipt"]["mode"])
+            self.assertIn(LIVE_WINDOW_PUMP, shown)
+
+    def test_space_arm_pump_skips_when_no_target(self):
+        import numpy as np
+
+        blank = np.zeros((120, 160, 3), dtype=np.uint8)
+        fake = FakeVideoCapture(reads=[(True, blank)])
+        keys = [32, ord("q")]
+
+        with tempfile.TemporaryDirectory() as folder:
+            run_dirs = run_live_station(
+                camera_index=1,
+                algorithm="hsv",
+                output_root=folder,
+                warmup_frames=0,
+                capture_factory=lambda *args, **kwargs: fake,
+                imshow=lambda name, image: None,
+                wait_key=lambda delay: keys.pop(0) if keys else ord("q"),
+                destroy_windows=lambda: None,
+                max_frames=8,
+                pump_on_analyze=True,
+                confirm_pump=True,
+                controller_kind="fake",
+            )
+            summary = json.loads((run_dirs[0] / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual("arm-pump", summary["mode"])
+            self.assertIsNone(summary["action_request"])
+            self.assertIsNone(summary["execution_receipt"])
+            self.assertIn("NO_TARGET", summary["verification"]["reason_codes"])
+
+    def test_space_arm_pump_stm32_writes_mcv1_pump(self):
+        serial = _ScriptedNucleoSerial()
+        fake = FakeVideoCapture(reads=[(True, self._red_frame())])
+        keys = [32, ord("q")]
+
+        with tempfile.TemporaryDirectory() as folder:
+            run_dirs = run_live_station(
+                camera_index=1,
+                output_root=folder,
+                warmup_frames=0,
+                capture_factory=lambda *args, **kwargs: fake,
+                imshow=lambda name, image: None,
+                wait_key=lambda delay: keys.pop(0) if keys else ord("q"),
+                destroy_windows=lambda: None,
+                max_frames=8,
+                pump_on_analyze=True,
+                confirm_pump=True,
+                arm_pump=True,
+                controller_kind="stm32",
+                serial_port="COM9",
+                serial_factory=lambda: serial,
+            )
+            summary = json.loads((run_dirs[0] / "summary.json").read_text(encoding="utf-8"))
+            self.assertTrue(summary["execution_receipt"]["success"])
+            self.assertTrue(any(item.startswith(b"MCV1|PUMP|") for item in serial.writes))
 
     def test_session_q_pauses_then_other_key_reopens(self):
         from demo.live_station import IDLE_WINDOW, run_live_session
