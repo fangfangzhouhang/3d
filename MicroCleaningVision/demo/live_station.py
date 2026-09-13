@@ -1,7 +1,8 @@
-"""操作员实时窗口：B 分割辅助对焦，空格冻结后走 Demo 分析。
+"""操作员实时窗口：B 分割辅助对焦，空格冻结后走 Demo。
 
 实时叠加不是正式证据；空格抓到的那一帧才会写入 ``output/demo/<run_id>/``。
-本窗口不发送 PUMP。看见污渍不会自动喷水。
+默认只分析、不发泵。显式 ``arm-pump`` 时，空格在识别到目标后发送限时 PUMP。
+看见污渍不会在预览循环里自动喷水，必须按空格。
 
 Q 只关闭预览并释放相机；暂停画面上按其他键重新打开，再按 Q 才结束整个程序。
 ``--wait-usb`` 会等到指定编号的相机可读再进入预览（适合先启动命令再插上显微镜）。
@@ -9,6 +10,7 @@ Q 只关闭预览并释放相机；暂停画面上按其他键重新打开，再
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -16,6 +18,7 @@ from typing import Any, Callable
 from microcleaning.data_learning.usb_camera import CAMERA_OPEN_FAILED, FRAME_READ_FAILED, USBCameraError
 
 CaptureFactory = Callable[..., Any]
+SerialFactory = Callable[[], Any]
 ShowFrame = Callable[[str, Any], None]
 WaitKey = Callable[[int], int]
 DestroyWindows = Callable[[], None]
@@ -23,6 +26,7 @@ AnalyzeFrame = Callable[..., Path]
 SleepFn = Callable[[float], None]
 
 LIVE_WINDOW = "MicroCleaningVision live  SPACE=analyze  H/O/G/E/L=algo  Q=pause"
+LIVE_WINDOW_PUMP = "MicroCleaningVision live  SPACE=analyze+pump if target  Q=pause"
 RESULT_WINDOW = "Last Demo analysis (path overlay)"
 IDLE_WINDOW = "Paused  any key=reopen  Q=exit program"
 QUIT_KEYS = {ord("q"), ord("Q"), 27}
@@ -55,6 +59,15 @@ def run_live_session(
     sleep: SleepFn = time.sleep,
     max_wait_attempts: int | None = None,
     max_idle_frames: int | None = None,
+    pump_on_analyze: bool = False,
+    confirm_pump: bool = False,
+    arm_pump: bool = False,
+    controller_kind: str = "fake",
+    serial_port: str | None = None,
+    baudrate: int = 115200,
+    serial_timeout: float = 2.0,
+    pump_duration_ms: int = 200,
+    serial_factory: SerialFactory | None = None,
 ) -> list[Path]:
     """实时预览会话：Q 暂停，其他键重开；默认不发泵。"""
 
@@ -71,7 +84,10 @@ def run_live_session(
     algorithm_state = [algorithm]
     run_dirs: list[Path] = []
 
-    print("看见污渍不会自动喷水。空格只分析；喷泵必须另外走人工确认的 arm-pump。")
+    if pump_on_analyze:
+        print("空格会分析当前帧；识别到目标后发送限时 PUMP。预览画面本身不会自动喷。人必须在场。")
+    else:
+        print("看见污渍不会自动喷水。空格只分析；喷泵必须另外走人工确认的 arm-pump。")
     if wait_usb:
         print(f"等待 USB 相机 device_index={camera_index} … 插上显微镜后会自动打开预览。")
 
@@ -103,6 +119,15 @@ def run_live_session(
                     max_frames=max_frames,
                     algorithm_state=algorithm_state,
                     existing_capture=existing_capture,
+                    pump_on_analyze=pump_on_analyze,
+                    confirm_pump=confirm_pump,
+                    arm_pump=arm_pump,
+                    controller_kind=controller_kind,
+                    serial_port=serial_port,
+                    baudrate=baudrate,
+                    serial_timeout=serial_timeout,
+                    pump_duration_ms=pump_duration_ms,
+                    serial_factory=serial_factory,
                 )
             )
         except USBCameraError as exc:
@@ -144,8 +169,17 @@ def run_live_station(
     max_frames: int | None = None,
     algorithm_state: list[str] | None = None,
     existing_capture: Any | None = None,
+    pump_on_analyze: bool = False,
+    confirm_pump: bool = False,
+    arm_pump: bool = False,
+    controller_kind: str = "fake",
+    serial_port: str | None = None,
+    baudrate: int = 115200,
+    serial_timeout: float = 2.0,
+    pump_duration_ms: int = 200,
+    serial_factory: SerialFactory | None = None,
 ) -> list[Path]:
-    """打开相机循环显示 B 叠加；空格把当前帧交给 ``run_demo(mode=analyze)``。"""
+    """打开相机循环显示 B 叠加；空格把当前帧交给 ``run_demo``。"""
 
     from demo.demo_pipeline import _draw_contamination, _load_dependencies, run_demo, segment_demo_image
 
@@ -157,6 +191,7 @@ def run_live_station(
     show = imshow if imshow is not None else cv2.imshow
     key_fn = wait_key if wait_key is not None else cv2.waitKey
     close = destroy_windows if destroy_windows is not None else cv2.destroyAllWindows
+    preview_window = LIVE_WINDOW_PUMP if pump_on_analyze else LIVE_WINDOW
     analyze = analyze_frame if analyze_frame is not None else (
         lambda image, current_algorithm: _analyze_frozen_frame(
             image,
@@ -165,12 +200,25 @@ def run_live_station(
             camera_index=camera_index,
             cv2=cv2,
             run_demo=run_demo,
+            pump_on_analyze=pump_on_analyze,
+            confirm_pump=confirm_pump,
+            arm_pump=arm_pump,
+            controller_kind=controller_kind,
+            serial_port=serial_port,
+            baudrate=baudrate,
+            serial_timeout=serial_timeout,
+            pump_duration_ms=pump_duration_ms,
+            serial_factory=serial_factory,
         )
     )
 
     capture: Any = None
     run_dirs: list[Path] = []
-    last_status = "SPACE=analyze  Q=pause  no auto pump"
+    last_status = (
+        "SPACE=analyze+pump if target  Q=pause"
+        if pump_on_analyze
+        else "SPACE=analyze  Q=pause  no auto pump"
+    )
     current_algorithm = algorithm_state[0] if algorithm_state else algorithm
     frames_shown = 0
     try:
@@ -187,7 +235,10 @@ def run_live_station(
                 raise USBCameraError(FRAME_READ_FAILED, f"warm-up 第 {warmup_index + 1} 帧失败")
 
         print(f"实时窗口已打开：device_index={camera_index}。空格抓帧分析，H=HSV，O=Otsu，G=ExG，E=ExR，L=邻域差异，Q暂停预览。")
-        print("预览叠加只辅助对焦；正式结果在空格之后的 output/demo/<run_id>/。看见污渍不会发泵。")
+        if pump_on_analyze:
+            print("已武装实喷：空格在识别到目标后发限时 PUMP；无目标不发。预览循环不会自动喷。")
+        else:
+            print("预览叠加只辅助对焦；正式结果在空格之后的 output/demo/<run_id>/。看见污渍不会发泵。")
 
         while max_frames is None or frames_shown < max_frames:
             ok, frame = capture.read()
@@ -202,8 +253,9 @@ def run_live_station(
                 cv2=cv2,
                 segment_demo_image=segment_demo_image,
                 draw_contamination=_draw_contamination,
+                pump_on_analyze=pump_on_analyze,
             )
-            show(LIVE_WINDOW, view)
+            show(preview_window, view)
             frames_shown += 1
             key = int(key_fn(1))
             if key < 0:
@@ -234,7 +286,7 @@ def run_live_station(
             if key == SPACE_KEY:
                 run_dir = analyze(frame, current_algorithm)
                 run_dirs.append(run_dir)
-                last_status = f"saved {run_dir.name}  no pump"
+                last_status = _status_after_analyze(run_dir, pump_on_analyze=pump_on_analyze)
                 result_path = run_dir / "path_overlay.png"
                 if result_path.is_file():
                     result = cv2.imread(str(result_path), cv2.IMREAD_COLOR)
@@ -263,6 +315,15 @@ def _analyze_frozen_frame(
     camera_index: int,
     cv2,
     run_demo,
+    pump_on_analyze: bool = False,
+    confirm_pump: bool = False,
+    arm_pump: bool = False,
+    controller_kind: str = "fake",
+    serial_port: str | None = None,
+    baudrate: int = 115200,
+    serial_timeout: float = 2.0,
+    pump_duration_ms: int = 200,
+    serial_factory: SerialFactory | None = None,
 ) -> Path:
     staging_dir = Path(output_root)
     staging_dir.mkdir(parents=True, exist_ok=True)
@@ -271,13 +332,43 @@ def _analyze_frozen_frame(
         raise OSError(f"无法写入冻结帧：{staging}")
     return run_demo(
         input_path=staging,
-        mode="analyze",
+        mode="arm-pump" if pump_on_analyze else "analyze",
         output_root=output_root,
         algorithm=algorithm,
         camera_index=camera_index,
         source_kind_override="camera",
         input_source_override=f"usb-live:index={camera_index}",
+        confirm_pump=confirm_pump if pump_on_analyze else False,
+        arm_pump=arm_pump if pump_on_analyze else False,
+        controller_kind=controller_kind if pump_on_analyze else "fake",
+        serial_port=serial_port if pump_on_analyze else None,
+        baudrate=baudrate,
+        serial_timeout=serial_timeout,
+        pump_duration_ms=pump_duration_ms,
+        serial_factory=serial_factory if pump_on_analyze else None,
     )
+
+
+def _status_after_analyze(run_dir: Path, *, pump_on_analyze: bool) -> str:
+    summary_path = run_dir / "summary.json"
+    if not summary_path.is_file():
+        return f"saved {run_dir.name}"
+    try:
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return f"saved {run_dir.name}"
+    receipt = summary.get("execution_receipt") or {}
+    reasons = tuple((summary.get("verification") or {}).get("reason_codes") or ())
+    if not pump_on_analyze:
+        return f"saved {run_dir.name}  no pump"
+    if receipt.get("success"):
+        return f"PUMP sent {run_dir.name}"
+    if "NO_TARGET" in reasons:
+        return f"no target, no pump  {run_dir.name}"
+    if "ESTOP_ACTIVE" in reasons or receipt.get("error_code") == "ESTOP":
+        return f"ESTOP blocked pump  {run_dir.name}"
+    outcome = ((summary.get("safety_decision") or {}).get("outcome")) or "none"
+    return f"pump blocked ({outcome})  {run_dir.name}"
 
 
 def _wait_until_camera_readable(
@@ -341,6 +432,7 @@ def _compose_preview(
     cv2,
     segment_demo_image,
     draw_contamination,
+    pump_on_analyze: bool = False,
 ):
     try:
         segmentation = segment_demo_image(frame, algorithm)
@@ -352,7 +444,8 @@ def _compose_preview(
         view = frame.copy()
         hint = f"segment failed: {type(exc).__name__}"
         status = hint
-    _put_hud(view, cv2, f"index={camera_index}  {algorithm}  SPACE=analyze  H/O/G/E/L=algo  Q=pause")
+    space_hint = "SPACE=analyze+pump" if pump_on_analyze else "SPACE=analyze"
+    _put_hud(view, cv2, f"index={camera_index}  {algorithm}  {space_hint}  H/O/G/E/L=algo  Q=pause")
     _put_hud(view, cv2, hint, y=56)
     _put_hud(view, cv2, status, y=80)
     return view, status

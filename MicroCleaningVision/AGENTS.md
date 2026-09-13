@@ -18,7 +18,7 @@ A真实图片/数据
 → Episode
 ```
 
-FakeSerial只模拟确认、超时和错误，不打开COM口。软件回放不是硬件闭环，更不证明真实清洗有效。`analyze` / `--live` 默认不发送 PUMP。
+FakeSerial只模拟确认、超时和错误，不打开COM口。软件回放不是硬件闭环，更不证明真实清洗有效。`analyze` / 默认 `--live` 不发送 PUMP。`--live --mode arm-pump --confirm-pump --arm-pump` 时，空格在识别到目标后才发限时 PUMP。
 
 ## 三个人的责任和目录
 

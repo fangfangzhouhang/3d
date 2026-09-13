@@ -132,10 +132,18 @@ output/demo/<run_id>/
 
 内部调用已有 `USBCamera.capture()`，再走现有 B 分割和 C `plan_cleaning` 可视化。输出仍在 `output/demo/<run_id>/`。没有相机时会以 `CAMERA_OPEN_FAILED` 明确失败。本路径默认不发送 PUMP。
 
-显微镜已确认编号后，用实时窗口对焦：默认叠加邻域差异 `local`（`O` 切 Otsu，`H` 切 HSV 对照，`G`/`E` 切色指数），**空格**冻结当前帧并写入一次正式 analyze。看见污渍**不会**自动喷水。`Q` 只暂停预览；暂停画面上按其他键重新打开，再按 `Q` 结束程序。
+显微镜已确认编号后，用实时窗口对焦：默认叠加邻域差异 `local`（`O` 切 Otsu，`H` 切 HSV 对照，`G`/`E` 切色指数），**空格**冻结当前帧。默认 `--live` **不会**发泵。
 
 ```powershell
+# 只看画面、空格只分析
 .\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --live --camera-index 1
+
+# 链路实喷：空格分析，识别到目标后发限时 PUMP（人必须在场；把 COM5 换成设备管理器里的 ST-LINK 口）
+.\.venv\Scripts\python.exe -m demo.demo_pipeline `
+  --from-camera --live --camera-index 1 `
+  --mode arm-pump --confirm-pump --arm-pump `
+  --controller stm32 --serial-port COM5 --pump-duration-ms 200
+
 .\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --live --camera-index 1 --wait-usb
 .\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --live --camera-index 1 --algorithm otsu
 .\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --live --camera-index 1 --algorithm exg
@@ -143,7 +151,17 @@ output/demo/<run_id>/
 
 `--wait-usb` 适合先运行命令再插显微镜：检测到 1 号设备可读后自动打开预览。Windows 不会在你没运行程序时因插上 USB 自己启动 Demo。
 
-点开窗口后：默认 `L` 邻域差异；`O` = Otsu，`H` = HSV（对照，不再当主算法），`G` = ExG，`E` = ExR。空格分析，`Q` 暂停。空格后的结果在 `output/demo/<run_id>/`。要探测或短喷 STM32，必须另开 `ping-only` / `arm-pump`，并人工确认。这不是识别过关。
+点开窗口后：默认 `L` 邻域差异；`O` = Otsu，`H` = HSV（对照，不再当主算法），`G` = ExG，`E` = ExR。空格分析（武装后有目标才喷），`Q` 暂停。空格后的结果在 `output/demo/<run_id>/`。这不是识别过关，也不能写成清洗有效。
+
+实机（显微镜 + NUCLEO 那台 Windows）开跑前只确认三个接口，不要猜：
+
+| 接口 | 在哪看 | 填到命令里 |
+|------|--------|------------|
+| USB 显微镜 | `.\.venv\Scripts\python.exe scripts\probe_usb_camera.py` 或先 `--live --camera-index 0` 再试 `1` | `--camera-index N` |
+| STM32 串口 | 设备管理器 → 端口 → `STLink Virtual COM Port (COMx)` | `--serial-port COMx` |
+| 串口参数 | 固件固定 | `115200 8N1`（默认，不用改） |
+
+先 `ping-only` 看到 `PONG` 且 `ESTOP=0`，再武装 live。若 `ESTOP=1`，急停未接时把 **PB12 接到 GND**。时长 `--pump-duration-ms` 只允许 100～300。云端 Agent 没有相机和 STM32，测不了真喷。
 
 ### 4. 只探测 STM32 通信（不发泵）
 
