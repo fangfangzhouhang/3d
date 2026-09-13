@@ -157,7 +157,7 @@ output/demo/<run_id>/
 
 | 接口 | 在哪看 | 填到命令里 |
 |------|--------|------------|
-| USB 显微镜 | `python -m scripts.probe_usb_camera` 或先 `--live --camera-index 0` 再试 `1` | `--camera-index N` |
+| USB 显微镜 | `.\.venv\Scripts\python.exe scripts\probe_usb_camera.py` 或先 `--live --camera-index 0` 再试 `1` | `--camera-index N` |
 | STM32 串口 | 设备管理器 → 端口 → `STLink Virtual COM Port (COMx)` | `--serial-port COMx` |
 | 串口参数 | 固件固定 | `115200 8N1`（默认，不用改） |
 
