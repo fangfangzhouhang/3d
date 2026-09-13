@@ -100,9 +100,10 @@ fw_inputs_t stm32f103_hal_read_inputs(void) {
 }
 
 void stm32f103_hal_apply_outputs(fw_outputs_t outputs) {
+  /* 泵走低电平触发继电器：pump_on=TRUE 拉低吸合；空闲/错误默认拉高释放。 */
   GPIO_WriteBit(PUMP_CTRL_GPIO_Port,
                 PUMP_CTRL_Pin,
-                outputs.pump_on ? Bit_SET : Bit_RESET);
+                outputs.pump_on ? Bit_RESET : Bit_SET);
   GPIO_WriteBit(STATUS_LED_GPIO_Port,
                 STATUS_LED_Pin,
                 outputs.led_on ? Bit_SET : Bit_RESET);
