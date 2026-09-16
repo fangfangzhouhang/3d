@@ -12,14 +12,17 @@ if ($testSources.Count -eq 0) {
   throw "No C test files found under $(Join-Path $stageRoot 'tests')"
 }
 
-$appSources = @(Get-ChildItem -Path (Join-Path $stageRoot 'app/src') -Filter '*.c' -File -ErrorAction SilentlyContinue |
-  Sort-Object FullName |
-  ForEach-Object FullName)
+$appSources = @(
+  Get-ChildItem -Path (Join-Path $stageRoot 'system_b') -Filter '*.c' -File -ErrorAction SilentlyContinue |
+    Sort-Object FullName |
+    ForEach-Object FullName
+  (Join-Path $stageRoot 'driver_a/uart_rx_guard.c')
+)
 
 $exitCode = 0
 foreach ($testSource in $testSources) {
   $testExe = Join-Path ([System.IO.Path]::GetTempPath()) ("f103-stage1-$($testSource.BaseName).exe")
-  & $zig cc -std=c11 -Wall -Wextra -Werror -DFW_PROTOCOL_TESTING "-I$(Join-Path $stageRoot 'app/include')" $appSources $testSource -o $testExe
+  & $zig cc -std=c11 -Wall -Wextra -Werror -DFW_PROTOCOL_TESTING "-I$(Join-Path $stageRoot 'system_b')" "-I$(Join-Path $stageRoot 'driver_a')" "-I$(Join-Path $stageRoot 'common')" $appSources $testSource -o $testExe
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   & $testExe
   if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }

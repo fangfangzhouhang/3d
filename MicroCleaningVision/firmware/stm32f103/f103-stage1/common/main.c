@@ -1,5 +1,9 @@
 /* STM32F103 stage-one spray controller firmware (experimental copy).
  * MCV1 协议与 F401 相同。芯片、引脚和标准库只用于走通实验。
+ *
+ * 分区维护（common 文件，跨区修改前先知会另一方）：
+ * 【A 负责】SystemClock_Config / MX_GPIO_Init / MX_USART2_UART_Init / Error_Handler
+ * 【B 负责】main() 主循环 / process_line / flush_responses / send_response
  */
 #include "main.h"
 
