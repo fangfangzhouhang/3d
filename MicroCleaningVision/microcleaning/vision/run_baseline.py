@@ -31,23 +31,13 @@ def run_baseline(
     input_path: str | Path,
     algorithm: str = "local",
     output_root: str | Path = Path("output") / "vision",
-    policy_path: str | Path | None = None,
-    use_tuned_policy: bool | None = None,
 ) -> Path:
     """对一张图运行指定基线，返回本次不可覆盖的输出目录。"""
 
     cv2, _np = _load_dependencies()
     source = Path(input_path)
     image = read_bgr_image(source)
-    local_policy = None
-    if algorithm == "local":
-        from microcleaning.vision.local_contrast_baseline import resolve_local_contrast_policy
-
-        local_policy = resolve_local_contrast_policy(
-            policy_path=policy_path,
-            use_tuned_policy=use_tuned_policy,
-        )
-    segmentation = _segment(image, algorithm, policy=local_policy)
+    segmentation = _segment(image, algorithm)
     run_id = (
         f"{algorithm}_{source.stem}_"
         f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}_{uuid4().hex[:8]}"
@@ -75,7 +65,6 @@ def run_baseline(
         "coordinate_frame": "image_px",
         "evidence_boundary": "算法Mask与像素测量；不是毫米定位，也不是清洗有效证据",
         "contamination": asdict(measurement),
-        "local_policy": asdict(local_policy) if local_policy is not None else None,
         "artifacts": {
             "input": "input.png",
             "mask": "mask.png",
@@ -99,8 +88,6 @@ def run_baseline_dir(
     input_dir: str | Path,
     algorithm: str = "local",
     output_root: str | Path = Path("output") / "vision",
-    policy_path: str | Path | None = None,
-    use_tuned_policy: bool | None = None,
 ) -> list[Path]:
     """对目录内全部 jpg/png 各跑一次。"""
 
@@ -113,13 +100,7 @@ def run_baseline_dir(
     if not images:
         raise FileNotFoundError(f"目录中没有jpg/png：{folder}")
     return [
-        run_baseline(
-            input_path=path,
-            algorithm=algorithm,
-            output_root=output_root,
-            policy_path=policy_path,
-            use_tuned_policy=use_tuned_policy,
-        )
+        run_baseline(input_path=path, algorithm=algorithm, output_root=output_root)
         for path in images
     ]
 
@@ -136,42 +117,17 @@ def main(argv: list[str] | None = None) -> int:
         help="默认 local=邻域差异；hsv 仍是 Demo 默认",
     )
     parser.add_argument("--output-root", type=Path, default=Path("output") / "vision")
-    parser.add_argument(
-        "--policy",
-        type=Path,
-        help="local 策略 JSON；省略时若存在 data/models/local_contrast_policy.json 则自动使用",
-    )
-    parser.add_argument(
-        "--no-tuned-policy",
-        action="store_true",
-        help="忽略已调参 JSON，使用代码内 local-contrast-v0.1",
-    )
     args = parser.parse_args(argv)
-    use_tuned_policy = False if args.no_tuned_policy else None
     if args.input is not None:
-        run_baseline(
-            input_path=args.input,
-            algorithm=args.algorithm,
-            output_root=args.output_root,
-            policy_path=args.policy,
-            use_tuned_policy=use_tuned_policy,
-        )
+        run_baseline(input_path=args.input, algorithm=args.algorithm, output_root=args.output_root)
     else:
-        run_baseline_dir(
-            input_dir=args.input_dir,
-            algorithm=args.algorithm,
-            output_root=args.output_root,
-            policy_path=args.policy,
-            use_tuned_policy=use_tuned_policy,
-        )
+        run_baseline_dir(input_dir=args.input_dir, algorithm=args.algorithm, output_root=args.output_root)
     return 0
 
 
-def _segment(image, algorithm: str, policy=None):
+def _segment(image, algorithm: str):
     if algorithm == "local":
-        if policy is None:
-            return segment_local(image)
-        return segment_local(image, policy=policy)
+        return segment_local(image)
     if algorithm == "otsu":
         return segment_otsu(image)
     if algorithm == "hsv":

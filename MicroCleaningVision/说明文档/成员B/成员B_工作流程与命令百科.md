@@ -2,11 +2,9 @@
 
 > 成员 B 的目标：把 A 提供的原图变成可检查的算法 Mask、污染面积和污染中心，并让 A 能量化评价、让 C 能继续规划。
 
-## 0. 当前该做什么（2026-09-15）
+## 0. 当前该做什么（2026-09-07）
 
-喷水已在同学机走通，**本机不冻结代码**。B 近场是：等 A 的 U500 实拍，在新开发集上一次只改 `LocalContrastPolicy` 一个字段；旧 13 张留出仍冻结。也可用训练入口自动搜参（仍是一次一字段、只看开发集），见 [成员 A 第 18 节](../成员A/成员A_工作流程与命令百科.md#18-opencv-训练入口自动调参)。完整顺序见 [喷水后下一阶段讨论](../总流程说明/喷水后下一阶段讨论.md)。
-
-13 张图都有人工 Mask，且已全部标成 `labeled`。B 和 Demo 的默认找法都是邻域差异 `local`。Otsu 可对照。HSV 只留作失败对照，不再当主算法。看见污渍不会发泵。升级对象是 U500，不是 public 那 13 张。
+13 张图都有人工 Mask，且已全部标成 `labeled`。B 和 Demo 的默认找法都是邻域差异 `local`。Otsu 可对照。HSV 只留作失败对照，不再当主算法。看见污渍不会发泵。
 
 ```powershell
 cd "D:\大创\3d\MicroCleaningVision"
@@ -332,15 +330,6 @@ B 收到指标后，还必须看图并将失败分成：误检、漏检、边界
 | 大图 M9/M12 全失败 | 先看留出数字，不在这两张上调参 | 属于冻结留出图 |
 
 改完必须升级版本常量，例如 `local-contrast-v0.2`。
-
-自动对照（默认：终端逐步提示，只改一轮后停下等人检查）：
-
-```powershell
-.\.venv\Scripts\python.exe -m microcleaning.data_learning.train_entry
-.\.venv\Scripts\python.exe -m microcleaning.data_learning.train_entry --apply
-```
-
-静默网格搜索仍可用：`--workflow search`。`--apply` 只在开发集提升且留出集未变差时写入 `data/models/local_contrast_policy.json`。`run_baseline` / Demo 的 local 会读它；`--no-tuned-policy` 回退 v0.1。不要把自动搜参当成语义分割训练，也不要为刷分改留出标注。
 
 Demo 默认已改为 `local`。HSV 只作对照，不要再把它当主算法。
 

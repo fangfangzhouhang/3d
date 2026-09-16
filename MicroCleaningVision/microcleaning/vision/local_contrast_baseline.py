@@ -8,9 +8,7 @@
 
 from __future__ import annotations
 
-import json
-from dataclasses import asdict, dataclass, fields
-from pathlib import Path
+from dataclasses import dataclass
 from typing import Any
 
 from microcleaning.vision.contamination import ContaminationMeasurement
@@ -18,10 +16,6 @@ from microcleaning.vision.hsv_baseline import SegmentationResult
 
 
 LOCAL_CONTRAST_VERSION = "local-contrast-v0.1"
-ACTIVE_LOCAL_CONTRAST_POLICY_PATH = Path("data") / "models" / "local_contrast_policy.json"
-_INT_POLICY_FIELDS = frozenset(
-    {"blur_kernel_px", "min_component_area_px", "morphology_kernel_px"}
-)
 
 
 @dataclass(frozen=True)
@@ -52,88 +46,6 @@ class LocalContrastPolicy:
             raise ValueError("max_area_ratio必须位于0～1之间")
         if self.morphology_kernel_px <= 0 or self.morphology_kernel_px % 2 == 0:
             raise ValueError("形态学核必须是正奇数")
-
-
-def local_contrast_policy_from_mapping(payload: dict[str, Any]) -> LocalContrastPolicy:
-    """从 JSON 字典恢复策略；只读取已知字段。"""
-
-    if not isinstance(payload, dict):
-        raise ValueError("策略JSON必须是对象")
-    body = payload.get("policy")
-    if isinstance(body, dict):
-        payload = body
-    known = {item.name for item in fields(LocalContrastPolicy)}
-    kwargs: dict[str, Any] = {}
-    for name, value in payload.items():
-        if name not in known:
-            continue
-        if name in _INT_POLICY_FIELDS:
-            kwargs[name] = int(value)
-        else:
-            kwargs[name] = float(value)
-    policy = LocalContrastPolicy(**kwargs)
-    policy.validate()
-    return policy
-
-
-def load_local_contrast_policy(path: str | Path) -> LocalContrastPolicy:
-    source = Path(path)
-    if not source.is_file():
-        raise FileNotFoundError(f"策略文件不存在：{source}")
-    try:
-        payload = json.loads(source.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"策略JSON无法解析：{source}") from exc
-    if not isinstance(payload, dict):
-        raise ValueError(f"策略JSON必须是对象：{source}")
-    return local_contrast_policy_from_mapping(payload)
-
-
-def save_local_contrast_policy(
-    policy: LocalContrastPolicy,
-    path: str | Path,
-    *,
-    extra: dict[str, Any] | None = None,
-) -> Path:
-    policy.validate()
-    target = Path(path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    payload: dict[str, Any] = {
-        "algorithm": "local",
-        "base_version": LOCAL_CONTRAST_VERSION,
-        "feeds_action_request": False,
-        "policy": asdict(policy),
-        "note": "仅OpenCV邻域差异策略；不是语义分割训练，也不是清洗有效证据",
-    }
-    if extra:
-        payload.update(extra)
-        payload["policy"] = asdict(policy)
-        payload["feeds_action_request"] = False
-    target.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    return target
-
-
-def resolve_local_contrast_policy(
-    *,
-    policy_path: str | Path | None = None,
-    use_tuned_policy: bool | None = None,
-    active_path: str | Path | None = None,
-) -> LocalContrastPolicy | None:
-    """显式路径优先；True 必须读到生效文件；None 则文件存在才用；False 忽略。"""
-
-    if policy_path is not None:
-        return load_local_contrast_policy(policy_path)
-    if use_tuned_policy is False:
-        return None
-    target = Path(active_path) if active_path is not None else ACTIVE_LOCAL_CONTRAST_POLICY_PATH
-    if target.is_file():
-        return load_local_contrast_policy(target)
-    if use_tuned_policy is True:
-        raise FileNotFoundError(f"没有已调参策略文件：{target}。请先运行 train_entry --apply")
-    return None
 
 
 def segment_contamination(
@@ -196,11 +108,7 @@ def segment_contamination(
         uncertainty_px=uncertainty_px,
         confidence=confidence,
         component_count=kept_components,
-        algorithm_version=(
-            LOCAL_CONTRAST_VERSION
-            if policy == LocalContrastPolicy()
-            else f"{LOCAL_CONTRAST_VERSION}+auto"
-        ),
+        algorithm_version=LOCAL_CONTRAST_VERSION,
     )
     measurement.validate()
     return SegmentationResult(measurement=measurement, mask=mask)

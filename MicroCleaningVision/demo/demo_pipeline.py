@@ -100,8 +100,6 @@ def run_demo(
     algorithm: str = "local",
     source_kind_override: str | None = None,
     input_source_override: str | None = None,
-    policy_path: str | Path | None = None,
-    use_tuned_policy: bool | None = None,
 ) -> Path:
     """运行一次Demo并返回本次不可覆盖的输出目录。"""
 
@@ -154,12 +152,7 @@ def run_demo(
         software_version=f"{DEMO_VERSION}/{inspection.algorithm_version}",
     )
 
-    segmentation = segment_demo_image(
-        image,
-        algorithm,
-        policy_path=policy_path,
-        use_tuned_policy=use_tuned_policy,
-    )
+    segmentation = segment_demo_image(image, algorithm)
     mask_path = run_dir / "mask.png"
     if not cv2.imwrite(str(mask_path), segmentation.mask):
         raise OSError(f"无法写入mask：{mask_path}")
@@ -395,14 +388,7 @@ def _load_demo_image(
     return read_bgr_image(captured), f"usb-camera:index={camera_index}", "camera"
 
 
-def segment_demo_image(
-    image,
-    algorithm: str = "local",
-    policy=None,
-    *,
-    policy_path: str | Path | None = None,
-    use_tuned_policy: bool | None = None,
-):
+def segment_demo_image(image, algorithm: str = "local"):
     """按 Demo 当前选择的 B 算法分割；默认是邻域差异 local。HSV 只作对照。"""
 
     if algorithm == "otsu":
@@ -414,17 +400,7 @@ def segment_demo_image(
     if algorithm == "exr":
         return segment_exr(image)
     if algorithm == "local":
-        from microcleaning.vision.local_contrast_baseline import resolve_local_contrast_policy
-
-        resolved = policy
-        if resolved is None:
-            resolved = resolve_local_contrast_policy(
-                policy_path=policy_path,
-                use_tuned_policy=use_tuned_policy,
-            )
-        if resolved is None:
-            return segment_local(image)
-        return segment_local(image, policy=resolved)
+        return segment_local(image)
     raise ValueError(f"algorithm必须是{'/'.join(VISION_ALGORITHMS)}")
 
 
@@ -886,16 +862,6 @@ def main(argv: list[str] | None = None) -> int:
         help="B 分割算法；默认 local=邻域差异。实时窗口 H/O/G/E/L 可切换。HSV 只作对照，不是主算法",
     )
     parser.add_argument(
-        "--policy",
-        type=Path,
-        help="local 策略 JSON；省略时若存在 data/models/local_contrast_policy.json 则自动使用",
-    )
-    parser.add_argument(
-        "--no-tuned-policy",
-        action="store_true",
-        help="忽略已调参 JSON，使用代码内 local-contrast-v0.1",
-    )
-    parser.add_argument(
         "--wait-usb",
         action="store_true",
         help="实时会话：先等待指定 camera-index 可读取再打开预览；Q暂停后按其他键重开",
@@ -968,8 +934,6 @@ def main(argv: list[str] | None = None) -> int:
             controller_kind=args.controller,
             pump_duration_ms=args.pump_duration_ms,
             algorithm=args.algorithm,
-            policy_path=args.policy,
-            use_tuned_policy=False if args.no_tuned_policy else None,
         )
     except Exception as exc:
         from microcleaning.data_learning.usb_camera import USBCameraError
