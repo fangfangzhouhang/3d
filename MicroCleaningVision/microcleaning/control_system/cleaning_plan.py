@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import math
 from typing import Any
 
 
@@ -23,10 +24,15 @@ class CleaningPlanPolicy:
     raster_step_px: int = 16
 
     def validate(self) -> None:
-        if not 0 < self.small_target_ratio < 1:
+        if (
+            isinstance(self.small_target_ratio, bool)
+            or not isinstance(self.small_target_ratio, (int, float))
+            or not math.isfinite(self.small_target_ratio)
+            or not 0 < self.small_target_ratio < 1
+        ):
             raise ValueError("small_target_ratio必须位于0～1")
-        if self.raster_step_px <= 0:
-            raise ValueError("raster_step_px必须大于0")
+        if isinstance(self.raster_step_px, bool) or not isinstance(self.raster_step_px, int) or self.raster_step_px <= 0:
+            raise ValueError("raster_step_px必须是大于0的整数")
 
 
 @dataclass(frozen=True)
@@ -36,6 +42,7 @@ class CleaningPlan:
     image_size_px: tuple[int, int]
     contamination_area_px: float
     path_px: tuple[tuple[float, float], ...]
+    # 每个索引开始一个连续预览段；同一污染块遇到孔洞也可以拆成多段。
     segment_start_indices: tuple[int, ...]
     reason: str
 
@@ -75,7 +82,7 @@ def plan_cleaning(
     )
     if area / float(width * height) <= policy.small_target_ratio:
         centers = tuple(
-            (float(component_centroids[label][0]), float(component_centroids[label][1]))
+            _in_mask_center(labels == label, component_centroids[label], np)
             for label in component_labels
         )
         return CleaningPlan(
@@ -111,14 +118,14 @@ def plan_cleaning(
             row_index += 1
         if component_path:
             segment_starts.append(len(path))
-            path.extend(component_path)
+            for index, point in enumerate(component_path):
+                if index and not _line_in_component(component, component_path[index - 1], point):
+                    segment_starts.append(len(path))
+                path.append(point)
     if not path:
         segment_starts = [0]
         path = [
-            (
-                float(component_centroids[component_labels[0]][0]),
-                float(component_centroids[component_labels[0]][1]),
-            )
+            _in_mask_center(labels == component_labels[0], component_centroids[component_labels[0]], np)
         ]
     return CleaningPlan(
         CleaningStrategy.RASTER_SCAN,
@@ -127,8 +134,50 @@ def plan_cleaning(
         area,
         tuple(path),
         tuple(segment_starts),
-        "污染面积较大；每个独立污染块分别生成往复式扫描段，段间移动默认关闭喷射",
+        "污染面积较大；按污染块生成往复式像素路线，跨背景连线拆段；段间不表示连续喷射，仅用于预览",
     )
+
+
+def _in_mask_center(component: Any, centroid: Any, np: Any) -> tuple[float, float]:
+    """保留区域内质心；质心落在背景时取最近白色像素，同距按行列顺序。"""
+    x, y = float(centroid[0]), float(centroid[1])
+    if component[round(y), round(x)]:
+        return x, y
+    ys, xs = np.nonzero(component)
+    index = int(np.argmin((xs - x) ** 2 + (ys - y) ** 2))
+    return float(xs[index]), float(ys[index])
+
+
+def _line_in_component(component: Any, start: tuple[float, float], end: tuple[float, float]) -> bool:
+    """检查线段经过的像素网格；过网格角时也检查两侧，保守避免跨背景。
+
+    只检查几何中心线，不代表喷幅或物理覆盖已经验证。
+    """
+    x, y = map(round, start)
+    end_x, end_y = map(round, end)
+    dx, dy = abs(end_x - x), abs(end_y - y)
+    sx, sy = (1 if end_x > x else -1), (1 if end_y > y else -1)
+    ix = iy = 0
+    if not component[y, x]:
+        return False
+    while ix < dx or iy < dy:
+        comparison = (1 + 2 * ix) * dy - (1 + 2 * iy) * dx
+        if comparison == 0:
+            if not component[y, x + sx] or not component[y + sy, x]:
+                return False
+            x += sx
+            y += sy
+            ix += 1
+            iy += 1
+        elif comparison < 0:
+            x += sx
+            ix += 1
+        else:
+            y += sy
+            iy += 1
+        if not component[y, x]:
+            return False
+    return True
 
 
 def simulate_first_action(mask: Any, plan: CleaningPlan, *, radius_px: int = 18) -> Any:
