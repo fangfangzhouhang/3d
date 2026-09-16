@@ -6,6 +6,9 @@ __pycache__/
 # 运行产物
 output/
 
+# 自动调参生效文件（不把一次搜参结果当成仓库默认算法）
+data/models/*.json
+
 # STM32CubeIDE：真实工程由硬件组首次上传时创建；只忽略可重新生成的产物。
 firmware/**/Debug/
 firmware/**/Release/
