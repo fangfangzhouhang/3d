@@ -48,7 +48,9 @@ int main(void) {
   MX_GPIO_Init();
   MX_USART2_UART_Init();
 
-  GPIO_ResetBits(PUMP_CTRL_GPIO_Port, PUMP_CTRL_Pin | BUZZER_Pin);
+  /* 低电平触发继电器：空闲时 PB0 拉高 = 释放。 */
+  GPIO_SetBits(PUMP_CTRL_GPIO_Port, PUMP_CTRL_Pin);
+  GPIO_ResetBits(BUZZER_GPIO_Port, BUZZER_Pin);
 
   mcv1_init(&mcv1_controller, &config);
   fw_line_receiver_init(&line_receiver);
@@ -182,7 +184,8 @@ static void MX_GPIO_Init(void) {
   GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
 
   GPIO_ResetBits(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
-  GPIO_ResetBits(PUMP_CTRL_GPIO_Port, PUMP_CTRL_Pin | BUZZER_Pin);
+  GPIO_SetBits(PUMP_CTRL_GPIO_Port, PUMP_CTRL_Pin);
+  GPIO_ResetBits(BUZZER_GPIO_Port, BUZZER_Pin);
 
   gpio.GPIO_Speed = GPIO_Speed_2MHz;
 
@@ -205,7 +208,9 @@ static void MX_GPIO_Init(void) {
 
 void Error_Handler(void) {
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-  GPIO_ResetBits(PUMP_CTRL_GPIO_Port, PUMP_CTRL_Pin | BUZZER_Pin);
+  /* 错误态：泵必须释放（低触发继电器 = 拉高）。 */
+  GPIO_SetBits(PUMP_CTRL_GPIO_Port, PUMP_CTRL_Pin);
+  GPIO_ResetBits(BUZZER_GPIO_Port, BUZZER_Pin);
   __disable_irq();
   while (1) {
   }
