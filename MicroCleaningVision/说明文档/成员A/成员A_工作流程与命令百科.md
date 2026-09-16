@@ -1,9 +1,11 @@
 # 成员 A 工作流程与命令百科
 
 > 用途：成员 A 不需要每次询问“下一条命令是什么”。从图片进入项目，到交给 B，再到评价 B 的算法，全部按本文件执行。  
-> 当前边界：本文件只记录仓库中已经存在、可以运行的命令。模型训练仍未实现，不要伪装成现成功能。
+> 当前边界：本文件只记录仓库中已经存在、可以运行的命令。语义分割训练仍未实现；OpenCV 邻域差异自动调参见第 18 节，不要把它写成深度学习已上线。
 
-## 0. 当前该做什么（2026-09-07）
+## 0. 当前该做什么（2026-09-15）
+
+喷水走通在同学机，本机不冻结代码。A 近场：U500 probe、固定成像、按批次导入；**先 1 张 analyze，再扩到两批次**。不要改已冻结留出标。讨论稿：[喷水后下一阶段讨论](../总流程说明/喷水后下一阶段讨论.md)。
 
 仓库里已经有 13 张原图、13 份 Labelme JSON、13 张人工 Mask。13 张在 metadata 里都是 `labeled`。不要再从网上临时抓一批图来刷分：成像条件不同，分数不能跟这 13 张比。
 
@@ -48,6 +50,7 @@ A 现在只做三件事，不要改 `microcleaning/vision/`：
 15. [常见报错](#15-常见报错)
 16. [单张图片完整复制版](#16-单张图片完整复制版)
 17. [A 的完成标准](#17-a-的完成标准)
+18. [OpenCV 训练入口（自动调参）](#18-opencv-训练入口自动调参)
 
 ## 1. 先看懂 A 的完整工作流
 
@@ -754,3 +757,35 @@ Get-Content -Raw -Encoding UTF8 `
 A 和 B 的关系可以记成一句话：
 
 > A 制作可信的题目和人工参照答案，B 在不偷看答案的情况下解题，A 再独立判卷。
+
+## 18. OpenCV 训练入口（自动调参）
+
+这是当前唯一实现的「训练」。默认命令会在**终端逐步提示**：先跑 B 的算法并标出 Mask，再和人工 Mask 对比、打印指标、简要分析，然后**只改一个参数**，复跑一次后停下等人检查。代码里的 `local-contrast-v0.1` 默认值不会被直接改写。语义分割 / YOLO / AutoDL 会拒绝。
+
+标注好原图和同名 Mask 之后，一条总命令：
+
+```powershell
+.\.venv\Scripts\python.exe -m microcleaning.data_learning.train_entry
+```
+
+或：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\train_vision.py
+```
+
+默认会读：
+
+```text
+data/raw_images/          原图（可分子文件夹）
+data/annotations/masks/   与文件名同 stem 的人工 Mask
+data/metadata.csv         可选；写了 unlabeled 的图会跳过
+```
+
+按文件名主干配对，例如 `public_003.jpg` 对应 `public_003.png`。`--output-dir` 只是结果目录，不选图。
+
+冻结留出图 `public_002` / `public_011` / `M9` / `M12` 可以对照，但不能拿来改参数。调参请不要加 `--stems`，让 9 张开发图一起跑，避免单张过拟合。`--stems public_001` 只做检查。
+
+终端会依次打印第 1～7 步，以及每步真实用时和每个候选的 IoU。叠加图在 `output/data_learning/tuning/<本次>/before/` 和 `after/`。本轮**不会**写入 `data/models/local_contrast_policy.json`。你看过叠加图、确认提升后再加 `--apply`。
+
+旧的静默网格搜索仍可用：`--workflow search`。
