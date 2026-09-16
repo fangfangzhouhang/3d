@@ -6,6 +6,12 @@ __pycache__/
 # 运行产物
 output/
 
+# 数据集（本地保留原始字节与标注，不入库；分发走团队数据渠道）
+data/
+
+# 本地工具链（scripts/bootstrap-zig.ps1 自动下载，可重新生成）
+.tools/
+
 # STM32CubeIDE：真实工程由硬件组首次上传时创建；只忽略可重新生成的产物。
 firmware/**/Debug/
 firmware/**/Release/
