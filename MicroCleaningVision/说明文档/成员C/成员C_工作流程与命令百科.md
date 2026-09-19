@@ -2,9 +2,20 @@
 
 > 成员 C 的目标：把 B 的算法 Mask 变成可解释的像素目标点和分段路径，并保留未来像素—毫米标定与 STM32 协议入口。
 
-## 0. 当前该做什么（2026-09-15）
+## 0. 当前该做什么（2026-09-16）
 
-路径已经能画 `CENTER_POINT` / `RASTER_SCAN` overlay，**还不能驱动 XY**。近场把 overlay 做成人能读（编号、分段）；湿斑直径到位后再改步长。`path_px` 禁止直连串口。顺序见 [喷水后下一阶段讨论](../总流程说明/喷水后下一阶段讨论.md)。
+本周待办和答辩日志以 [当前该做什么与项目日志](../总流程说明/当前该做什么与项目日志.md) 为准。下文是命令字典。
+
+路径只能预览，不能驱动 XY。`path_px` 禁止直连串口。
+
+**一条总命令（看 Mask 和路线，不发泵）：**
+
+```powershell
+cd "D:\大创\3d\MicroCleaningVision"
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --input "data\raw_images\public\public_001.jpg" --mode analyze
+```
+
+看 `output/demo/demo_*/path_overlay.png`。人认 COM 后才 ping，禁止扫口。
 
 ## 目录
 

@@ -147,9 +147,10 @@ next_actions:
   - "A-P1-DATA-01：13张已登记；继续核实来源、设备、倍率和日期，无法核实的字段保持unknown。"
   - "A-P1-LABEL-01：13张已labeled；开发9张、留出public_002/public_011/M9/M12已冻结。不要为刷分改留出标注。"
   - "A-P1-CAPTURE-01：补采至少12张、两个批次的USB显微镜图片；先导入1张运行analyze，再扩展到50张。"
-  - "说明：近场讨论见 说明文档/总流程说明/喷水后下一阶段讨论.md。正式 F401 烧录/PONG 仍待入库。"
+  - "说明：每天先看 说明文档/总流程说明/当前该做什么与项目日志.md。正式 F401 烧录/PONG 仍待入库。"
 
 documentation:
+  weekly_hub: 说明文档/总流程说明/当前该做什么与项目日志.md
   navigation: 说明文档/README.md
   battle_plan: 说明文档/总流程说明/项目作战总表.md
   roadmap: 说明文档/未来计划/长期分阶段研发规划.md
