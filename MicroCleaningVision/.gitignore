@@ -3,8 +3,12 @@ __pycache__/
 *.pyc
 .venv/
 
-# 运行产物
-output/
+# 运行产物默认不入库；演示图片数据（png/jpg/jpeg）随仓库分发。
+output/**
+!output/**/
+!output/**/*.png
+!output/**/*.jpg
+!output/**/*.jpeg
 
 # 数据集（本地保留原始字节与标注，不入库；分发走团队数据渠道）
 data/

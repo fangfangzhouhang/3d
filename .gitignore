@@ -19,9 +19,8 @@ env/
 .env.*
 !.env.example
 
-# 运行输出和原始实验数据不直接进入 Git；只提交清单、协议和小型示例。
-output/
-MicroCleaningVision/output/
+# 运行输出规则由各子项目 .gitignore 就近管理（图片数据放行、其余产物忽略）。
+# 原始实验数据不直接进入 Git；只提交清单、协议和小型示例。
 MicroCleaningVision/data/episodes/
 MicroCleaningVision/data/datasets/*/raw/
 
