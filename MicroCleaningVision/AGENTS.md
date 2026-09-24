@@ -4,7 +4,7 @@
 
 ## 这个项目现在到底在做什么
 
-长期目标是研究机器怎样感知、处理并复检微观表面。当前主线仍是视觉和上位机软件；NUCLEO-F401RE 的 MCV1 **源码已在本仓**，但 **真机未验收**（无烧录证据、无实机 PONG）。真机未验收 ≠ 软件未实现。
+长期目标是研究机器怎样感知、处理并复检微观表面。当前软件主线仍是视觉和上位机软件。NUCLEO-F401RE 的 MCV1 **源码已在本仓**；同学机已报 **STM32F103** 受限短喷，**证据未入库**，不得把本机代码冻结为官方实喷。真机未验收 ≠ 软件未实现。正式板仍是 F401。
 
 当前软件主线：
 
@@ -25,7 +25,7 @@ FakeSerial只模拟确认、超时和错误，不打开COM口。软件回放不�
 - A 数据与模型：`microcleaning/data_learning/`、`test/data_learning/`。
 - B 视觉识别与测量：`microcleaning/vision/`、`test/vision/`。
 - C 目标规划与控制仿真：`microcleaning/control_system/`、`test/control_system/`。
-- 硬件组：`firmware/nucleo_f401re/`（源码在仓；可烧录工程与实机记录由硬件组留下，不提交 `.elf`）。
+- 硬件组：`firmware/nucleo_f401re/`（正式目标）与 `firmware/stm32f103/`（走通实验）。源码在仓；可烧录工程与实机记录由硬件组留下，不提交 `.elf`。不要把 F103 走通写成 F401 已验收。
 
 所有人理解整条链，但只直接修改自己的业务目录。上游未到位时使用合成fixture继续，不把fixture写成真实证据。
 

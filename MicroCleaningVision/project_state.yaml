@@ -1,7 +1,7 @@
 # 全团队唯一的当前事实。计划、愿景和代码文件不能自动成为事实。
 # 近场执行与阶段表以 说明文档/总流程说明/项目作战总表.md 为准。
-updated_at: 2026-09-07
-current_phase: "P1/MVP-1 - 软件链与 MCV1 上位机已就绪；固件源码在仓；等待 U500 实机 probe、NUCLEO 烧录与实机 PONG"
+updated_at: 2026-09-15
+current_phase: "喷水走通后不冻结本机代码：同学机已报 F103 短喷，证据未入库；近场先做 U500 识别与路径预览，正式 F401 仍待 PONG 入库"
 
 current_evidence_level:
   overall_hardware: E0
@@ -43,6 +43,7 @@ unvalidated_claims:
   - mask路线在真实污染形状、真实喷头覆盖范围和运动约束下的有效性
   - 像素到工作台毫米坐标的标定
   - NUCLEO固件源码是否已烧录，以及实机 PONG/STATUS/PB5/12V 喷液
+  - 同学电脑上的 F103 抓帧-识别-发泵-喷水（人报；本仓无 Episode/PONG 原文，不能冻结为本机官方实喷）
   - 真实清洗效果、损伤和硬件闭环
 
 current_interfaces:
@@ -138,16 +139,15 @@ blockers:
   - "NUCLEO 可烧录目标尚未生成；CubeMX 需在本仓 .ioc 上 Keep User Code 生成工程。"
 
 next_actions:
+  - "TEAM-POST-01：从同学机拷回成功 Episode、PONG 原文和命令；不要在无 diff 时覆盖本机 demo/ 当官方实喷。"
   - "A-P1-U500-01：插入U500后运行scripts/probe_usb_camera.py，再运行--capture-test；保存index、分辨率、FPS、PNG、SHA256和质量结果。"
+  - "B-U500-01：只在 U500 开发集一次改 LocalContrastPolicy 一个字段；升降看新留出，不碰 public_002/011/M9/M12。"
+  - "C-PATH-01：path_overlay 可读（编号/分段）；path_px 不发送 STM32；无标定不申请 SPRAY_AT_POINT。"
+  - "HW-SPOT-01：量一次定点喷湿斑和托盘外廓；行程数字写入前不采购 XY。"
   - "A-P1-DATA-01：13张已登记；继续核实来源、设备、倍率和日期，无法核实的字段保持unknown。"
   - "A-P1-LABEL-01：13张已labeled；开发9张、留出public_002/public_011/M9/M12已冻结。不要为刷分改留出标注。"
-  - "B-P1-LOCAL-01：Demo 默认已改为 local。HSV 只作对照。不要为刷分改留出标注；暂不改 LocalContrastPolicy。"
   - "A-P1-CAPTURE-01：补采至少12张、两个批次的USB显微镜图片；先导入1张运行analyze，再扩展到50张。"
-  - "B-P1-REAL-01：检查真实图片的mask/面积/中心；记录漏检、误检和反光失败，不凭合成结果调结论。"
-  - "C-P1-REAL-01：读取B的真实mask并检查分段路线；暂不增加复杂规划。"
-  - "TEAM-P1-INT-01：保存第一次真实图片Demo输出，并由三人共同检查路径图。"
-  - "HW-MVP1-01：本仓 f401re-stage1.ioc 生成 CubeIDE 工程并烧录；只接板载 USB；泵与 12V 断开。"
-  - "C-MVP1-01：人认 ST-LINK COM 后运行 probe ping/status 与 Demo ping-only；保存 PONG 原文。"
+  - "说明：近场讨论见 说明文档/总流程说明/喷水后下一阶段讨论.md。正式 F401 烧录/PONG 仍待入库。"
 
 documentation:
   navigation: 说明文档/README.md
