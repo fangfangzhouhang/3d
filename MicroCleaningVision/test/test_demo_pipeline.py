@@ -94,6 +94,10 @@ class DemoPipelineTests(unittest.TestCase):
             self.assertIsNone(summary["action_request"])
             self.assertIn("不执行动作", summary["evidence_boundary"])
             self.assertEqual("local", summary["vision_algorithm"])
+            self.assertFalse(summary["path_preview"]["feeds_action_request"])
+            self.assertFalse(summary["path_preview"]["send_to_controller"])
+            self.assertTrue(summary["path_preview"]["narrative"])
+            self.assertTrue((run_dir / "path_narrative.txt").is_file())
 
     def test_exg_analyze_still_does_not_send_pump(self):
         from demo.demo_pipeline import run_demo

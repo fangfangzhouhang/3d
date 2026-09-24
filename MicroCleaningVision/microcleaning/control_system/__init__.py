@@ -1,10 +1,14 @@
-"""成员 C 独占的目标规划与控制仿真模块。
+"""成员 C：目标规划与控制仿真。
 
-当前保留固定动作申请、定点短喷申请、最低安全边界、FakeSerial、STM32 串口适配器
-和软件回放。XY/MOVE 与像素到毫米标定仍未接入。
+按功能分子包，不要把业务文件继续堆在这一层：
+
+- ``planning``  路径规则、假设毫米、步进对照
+- ``safety``    动作申请与安全闸
+- ``serial``    FakeSerial 与 STM32 协议
+- ``replay``    软件回放、Episode、Mock 基线
 """
 
-from .cleaning_plan import (
+from .planning.cleaning_plan import (
     CleaningPlan,
     CleaningPlanPolicy,
     CleaningStrategy,

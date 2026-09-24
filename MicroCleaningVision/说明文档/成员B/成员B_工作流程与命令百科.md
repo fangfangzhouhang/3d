@@ -2,40 +2,26 @@
 
 > 成员 B 的目标：把 A 提供的原图变成可检查的算法 Mask、污染面积和污染中心，并让 A 能量化评价、让 C 能继续规划。
 
-## 0. 当前该做什么（2026-09-15）
+## 0. 当前该做什么（2026-09-16）
 
-喷水已在同学机走通，**本机不冻结代码**。B 近场是：等 A 的 U500 实拍，在新开发集上一次只改 `LocalContrastPolicy` 一个字段；旧 13 张留出仍冻结。也可用训练入口自动搜参（仍是一次一字段、只看开发集），见 [成员 A 第 18 节](../成员A/成员A_工作流程与命令百科.md#18-opencv-训练入口自动调参)。完整顺序见 [喷水后下一阶段讨论](../总流程说明/喷水后下一阶段讨论.md)。
+本周待办和答辩日志以 [当前该做什么与项目日志](../总流程说明/当前该做什么与项目日志.md) 为准。下文是命令字典。
 
-13 张图都有人工 Mask，且已全部标成 `labeled`。B 和 Demo 的默认找法都是邻域差异 `local`。Otsu 可对照。HSV 只留作失败对照，不再当主算法。看见污渍不会发泵。升级对象是 U500，不是 public 那 13 张。
+默认算法是邻域差异 `local`，不是 HSV，也还不是神经网络。看见污渍不会发泵。有 U500 新图之前，不要靠拧 13 张网图过关。
+
+**一条总命令（人工 Mask 对照，改一轮一个字段后停下）：**
 
 ```powershell
 cd "D:\大创\3d\MicroCleaningVision"
-git pull
+.\.venv\Scripts\python.exe -m microcleaning.data_learning.train_entry
+```
+
+不要加 `--apply`，除非人看过叠加图。留出 `public_002` / `public_011` / `M9` / `M12` 不准调参。禁止 `--backend yolo/torch`。
+
+只跑算法、不调参时：
+
+```powershell
 .\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline --algorithm local --input-dir "data\raw_images\public"
-.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline --algorithm otsu --input-dir "data\raw_images\public"
-.\.venv\Scripts\python.exe -m microcleaning.vision.run_baseline --algorithm hsv --input-dir "data\raw_images\public"
 .\.venv\Scripts\python.exe scripts\evaluate_vision_baselines.py
-```
-
-打开：
-
-```text
-output/data_learning/evaluations/comparison_summary.json
-output/vision/<algorithm>_<图名>_<时间>/contamination_overlay.png
-```
-
-| 该朝哪努力 | 不要做什么 |
-|---|---|
-| 调参只看 9 张开发图 | 不要为刷分去改留出图，也不要临时从网上下图 |
-| 是否更好只看 `holdout_by_algorithm` | 不要看混在一起的 `labeled_kpi` 宣布过关 |
-| HSV 仍保留：红色标记物对照 | 不要删掉 HSV 只留 local |
-| 一次只改 `LocalContrastPolicy` 里的一个字段，并升级版本号 | 不要改 `contracts.py`、不要输出毫米、不要让 C 改接口 |
-
-已冻结：
-
-```text
-开发图：public_001、public_003～public_010（共 9 张）
-留出图：public_002、public_011、M9、M12（共 4 张）
 ```
 
 ## 目录
