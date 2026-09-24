@@ -3,15 +3,15 @@ __pycache__/
 *.pyc
 .venv/
 
-# 运行产物默认不入库；演示图片数据（png/jpg/jpeg）随仓库分发。
-output/**
-!output/**/
-!output/**/*.png
-!output/**/*.jpg
-!output/**/*.jpeg
+# 运行产物（结果图片及相关文件）全部不入库。
+output/
 
-# 数据集（本地保留原始字节与标注，不入库；分发走团队数据渠道）
-data/
+# 数据集仅放行图片（png/jpg/jpeg）；原始字节、标注等不入库。
+data/**
+!data/**/
+!data/**/*.png
+!data/**/*.jpg
+!data/**/*.jpeg
 
 # 本地工具链（scripts/bootstrap-zig.ps1 自动下载，可重新生成）
 .tools/
