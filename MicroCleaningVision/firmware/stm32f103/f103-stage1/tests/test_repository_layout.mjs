@@ -7,19 +7,19 @@ const testDirectory = dirname(fileURLToPath(import.meta.url));
 const firmwareDirectory = resolve(testDirectory, "..");
 const projectDirectory = resolve(firmwareDirectory, "../../..");
 const gitignore = readFileSync(resolve(projectDirectory, ".gitignore"), "utf8");
-const mainSource = readFileSync(resolve(firmwareDirectory, "Core/Src/main.c"), "utf8");
-const mainHeader = readFileSync(resolve(firmwareDirectory, "Core/Inc/main.h"), "utf8");
+const mainSource = readFileSync(resolve(firmwareDirectory, "common/main.c"), "utf8");
+const mainHeader = readFileSync(resolve(firmwareDirectory, "driver_a/main.h"), "utf8");
 const receiverHeader = readFileSync(
-  resolve(firmwareDirectory, "app/include/line_receiver.h"),
+  resolve(firmwareDirectory, "system_b/line_receiver.h"),
   "utf8",
 );
 
 for (const relativePath of [
-  "Core/Src/main.c",
-  "Core/Inc/main.h",
-  "platform/stm32f103_hal.c",
-  "app/src/mcv1_protocol.c",
-  "app/include/mcv1_protocol.h",
+  "common/main.c",
+  "driver_a/main.h",
+  "driver_a/stm32f103_hal.c",
+  "system_b/mcv1_protocol.c",
+  "system_b/mcv1_protocol.h",
   "README.md",
 ]) {
   assert.ok(existsSync(resolve(firmwareDirectory, relativePath)), `${relativePath} must be versioned`);

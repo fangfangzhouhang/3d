@@ -3,9 +3,18 @@ __pycache__/
 *.pyc
 .venv/
 
-# 运行产物
+# 运行产物（结果图片及相关文件）全部不入库。
 output/
 
+# 数据集仅放行图片（png/jpg/jpeg）；原始字节、标注等不入库。
+data/**
+!data/**/
+!data/**/*.png
+!data/**/*.jpg
+!data/**/*.jpeg
+
+# 本地工具链（scripts/bootstrap-zig.ps1 自动下载，可重新生成）
+.tools/
 # 自动调参生效文件（不把一次搜参结果当成仓库默认算法）
 data/models/*.json
 
