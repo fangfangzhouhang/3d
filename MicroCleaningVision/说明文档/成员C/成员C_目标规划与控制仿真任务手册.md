@@ -1,6 +1,6 @@
 # 成员 C 长期任务手册：目标规划与控制仿真负责人
 
-日常输入、输出和可复制命令统一见 [成员 C 工作流程与命令百科](成员C_工作流程与命令百科.md)。本手册负责解释长期职责、学习路线和硬件接口边界。
+本周待办见 [当前该做什么与项目日志](../总流程说明/当前该做什么与项目日志.md)。日常命令见 [成员 C 工作流程与命令百科](成员C_工作流程与命令百科.md)。本手册只解释长期职责和硬件接口边界。
 
 ## 1. 你的角色到底有什么用
 
@@ -22,17 +22,16 @@ A和B让系统“看见”，C让系统知道“下一步准备怎样动”，�
 
 ```text
 microcleaning/control_system/
-├── cleaning_plan.py       # Mask变成点喷或分段往复路线
-├── fixed_rule.py          # 当前固定动作申请
-├── governor.py            # 最低动作边界
-├── fake_serial.py         # 模拟控制器回执
-├── replay_mcl.py          # 软件回放编排
-├── episode_store.py       # 回合持久化
-└── mock_mcl.py            # 合成回归基线
+├── planning/            # 路径规则、工作平面占位、步进对照
+├── safety/              # 动作申请与安全闸
+├── serial/              # FakeSerial 与 STM32
+└── replay/              # 软件回放、Episode、Mock 基线
 
 test/control_system/
-├── test_control_system.py
-└── test_mock_mcl.py
+├── planning/
+├── safety/
+├── serial/
+└── replay/
 ```
 
 你接下来的核心新增文件不是报告工具，而是经任务批准后的目标点、路线、坐标变换和FakeSTM32程序。
