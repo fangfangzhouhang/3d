@@ -1,20 +1,18 @@
 /* stepmotor.c — DM542 步进电机驱动
  *
- * 实现方式：TIM2 输出比较 + Toggle 模式
- *   TIM2_CH1 输出 → PA0 → DM542 PUL+
- *   每次比较事件：PA0 翻转（PWM 半个周期）
- *   两次翻转 = 一个完整脉冲 = 一步
- *   到达目标步数后关 TIM2 中断，PA0 停在高电平（DM542 默认不转）
+ * 实现方式：TIM2 CH1 标准 PWM 模式（PWM1，50% 占空比）
+ *   TIM2_CH1 输出 → PA0 → DM542 PUL-（共阳接法，PUL+ 接 5V）
+ *   每个 ARR 周期产生一个完整脉冲 = 电机走一步
+ *   用 UPDATE 中断计数：N 次溢出 = N 个脉冲 = N 步，精确无倍数
+ *   到达目标步数后关 TIM2，PA0 停在高电平（光耦关 = 安全态）
  *
- * 方向：PA1 推挽输出
+ * 方向：PA1 推挽输出 → DM542 DIR-（DIR+ 接 5V）
  *   FWD = PA1 低电平
  *   REV = PA1 高电平
- *   （具体极性可实测后改 —— 先试低=正转）
  *
  * TIM2 时钟：Stage2 用 HSI 8MHz，未锁 PLL
- *   PWM 频率 = TIM2_CLK / (PSC+1) / (ARR+1)
+ *   脉冲频率 = TIM2_CLK / (PSC+1) / (ARR+1)
  *   默认 500Hz：PSC=7, ARR=1999 → 8MHz/8/2000 = 500Hz
- *   1kHz：PSC=7, ARR=999 → 8MHz/8/1000 = 1kHz
  */
 #include "stepmotor.h"
 
@@ -39,7 +37,6 @@ static volatile bool sm_busy;
 static volatile uint32_t sm_step_sent;     /* 已完成的完整脉冲数 */
 static volatile uint32_t sm_step_target;   /* 目标脉冲数 */
 static volatile sm_dir_t sm_dir;
-static uint32_t sm_freq_hz;
 
 /* PSC/ARR 缓存，set_freq 时重算，start 时写入 TIM2。 */
 static uint16_t sm_psc;
@@ -106,15 +103,15 @@ void sm_init(void) {
   tim.TIM_CounterMode = TIM_CounterMode_Up;
   TIM_TimeBaseInit(TIM2, &tim);
 
-  /* OC1 通道 —— Toggle 模式（每比较事件翻转 PA0） */
-  oc.TIM_OCMode = TIM_OCMode_Toggle;
+  /* OC1 通道 —— PWM1 模式，CCR = 半个周期 → 50% 占空比 */
+  oc.TIM_OCMode = TIM_OCMode_PWM1;
   oc.TIM_OutputState = TIM_OutputState_Enable;
-  oc.TIM_Pulse = 0u;  /* CCR = 0 → CNT==0 时翻转（ARR 溢出时也会翻转？实际上 Toggle 模式下比较事件每次都触发） */
+  oc.TIM_Pulse = (uint16_t)(((uint32_t)sm_arr + 1u) / 2u);
   oc.TIM_OCPolarity = TIM_OCPolarity_High;
   TIM_OC1Init(TIM2, &oc);
   TIM_OC1PreloadConfig(TIM2, TIM_OCPreload_Enable);
 
-  /* TIM2 中断 —— CC1 比较事件 */
+  /* TIM2 中断 —— UPDATE 溢出事件（每事件 = 一个完整脉冲） */
   TIM_ClearITPendingBit(TIM2, TIM_IT_CC1 | TIM_IT_Update);
   nvic.NVIC_IRQChannel = TIM2_IRQn;
   nvic.NVIC_IRQChannelPreemptionPriority = 2u;
@@ -125,20 +122,19 @@ void sm_init(void) {
   sm_busy = false;
   sm_step_sent = 0u;
   sm_step_target = 0u;
-  sm_freq_hz = SM_DEFAULT_FREQ_HZ;
 }
 
 void sm_set_freq(uint32_t hz) {
   if (hz < SM_MIN_FREQ_HZ) hz = SM_MIN_FREQ_HZ;
   if (hz > SM_MAX_FREQ_HZ) hz = SM_MAX_FREQ_HZ;
 
-  sm_freq_hz = hz;
   sm_calc_psc_arr(hz);
 
-  /* 如果正在运行，立即生效新频率 */
+  /* 如果正在运行，立即生效新频率（ARR/CCR 影子寄存器下次更新时装载） */
   if (sm_busy) {
     TIM2->PSC = sm_psc;
     TIM2->ARR = sm_arr;
+    TIM_SetCompare1(TIM2, (uint16_t)(((uint32_t)sm_arr + 1u) / 2u));
   }
 }
 
@@ -151,17 +147,18 @@ void sm_start(uint32_t steps, sm_dir_t dir) {
   sm_step_sent = 0u;
   sm_step_target = steps;
 
-  /* 重新装载 PSC/ARR（频率可能改过） */
+  /* 重新装载 PSC/ARR/CCR（频率可能改过），50% 占空比 */
   TIM2->PSC = sm_psc;
   TIM2->ARR = sm_arr;
-  TIM_SetCompare1(TIM2, 0u);  /* 每次比较事件都翻转 */
+  TIM_SetCompare1(TIM2, (uint16_t)(((uint32_t)sm_arr + 1u) / 2u));
   TIM_SetCounter(TIM2, 0u);
 
-  /* 清 PA0 为初始低电平（Toggle 模式从 CNT==0 开始就触发翻转？让 PA0 从低开始） */
-  GPIO_ResetBits(SM_PUL_GPIO_PORT, SM_PUL_PIN);
+  /* PA0 保持高电平（光耦关）。PWM1 启动后 CNT<CCR 期间输出高，
+   * 与空闲态一致，不会产生多余边沿。 */
+  GPIO_SetBits(SM_PUL_GPIO_PORT, SM_PUL_PIN);
 
   TIM_ClearITPendingBit(TIM2, TIM_IT_CC1 | TIM_IT_Update);
-  TIM_ITConfig(TIM2, TIM_IT_CC1, ENABLE);
+  TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
   TIM_Cmd(TIM2, ENABLE);
 
   sm_busy = true;
@@ -169,7 +166,7 @@ void sm_start(uint32_t steps, sm_dir_t dir) {
 
 void sm_stop(void) {
   TIM_Cmd(TIM2, DISABLE);
-  TIM_ITConfig(TIM2, TIM_IT_CC1, DISABLE);
+  TIM_ITConfig(TIM2, TIM_IT_Update, DISABLE);
   sm_busy = false;
 }
 
@@ -183,13 +180,13 @@ uint32_t sm_step_count(void) {
 
 /* 在 stm32f10x_it.c 的 TIM2_IRQHandler 里调用 */
 void sm_tim2_irq(void) {
-  if (TIM_GetITStatus(TIM2, TIM_IT_CC1) == SET) {
-    TIM_ClearITPendingBit(TIM2, TIM_IT_CC1);
-    ++sm_step_sent;
+  if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET) {
+    TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+    ++sm_step_sent;   /* 每次溢出 = 一个完整脉冲 = 一步 */
 
     if (sm_step_sent >= sm_step_target) {
       sm_stop();
-      /* PA0 恢复高电平（DM542 安全态） */
+      /* PA0 恢复高电平（光耦关，DM542 安全态） */
       GPIO_SetBits(SM_PUL_GPIO_PORT, SM_PUL_PIN);
     }
   }
