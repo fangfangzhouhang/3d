@@ -8,7 +8,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from microcleaning.control_system.mock_mcl import (
+from microcleaning.control_system.replay.mock_mcl import (
     MockMCLRunner,
     MockScenario,
     MockController,
@@ -152,7 +152,7 @@ class MockMCLTests(unittest.TestCase):
             self.assertEqual("persistence", evidence["task_id"])
             digest_path = path.with_suffix(".sha256")
             self.assertTrue(digest_path.exists())
-            self.assertIn(path.name, digest_path.read_text(encoding="ascii"))
+            self.assertRegex(digest_path.read_text(encoding="ascii").strip().split()[0], r"^[0-9a-f]{64}$")
             with self.assertRaises(FileExistsError):
                 write_episode(episode, folder)
 

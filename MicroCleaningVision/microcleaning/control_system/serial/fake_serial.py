@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from microcleaning.ports import ControllerPort
 from microcleaning.contracts import ActionRequest, ExecutionReceipt, SafetyDecision, SafetyOutcome
-from microcleaning.control_system.governor import ReplaySafetyLimits, request_digest
+from microcleaning.control_system.safety.governor import ReplaySafetyLimits, request_digest
 
 
 def _now() -> str:

@@ -9,9 +9,9 @@ from __future__ import annotations
 from uuid import uuid4
 
 from microcleaning.contracts import Episode, FailureRecord, NextRoute, Observation, SafetyOutcome, StateEstimate, VerificationResult
-from microcleaning.control_system.fixed_rule import propose_action
-from microcleaning.control_system.fake_serial import FakeSerialController
-from microcleaning.control_system.governor import evaluate_action
+from microcleaning.control_system.safety.fixed_rule import propose_action
+from microcleaning.control_system.serial.fake_serial import FakeSerialController
+from microcleaning.control_system.safety.governor import evaluate_action
 from microcleaning.vision.verification import verify_area_change
 
 

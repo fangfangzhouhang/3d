@@ -4,14 +4,14 @@ from dataclasses import replace
 import unittest
 
 from microcleaning.contracts import SafetyOutcome
-from microcleaning.control_system.fixed_rule import (
+from microcleaning.control_system.safety.fixed_rule import (
     IN_PLACE_TARGET_MM,
     NOZZLE_FIXED_FRAME,
     PUMP_IN_PLACE,
     propose_action,
     propose_pump_in_place,
 )
-from microcleaning.control_system.governor import approve_human_gate, evaluate_action
+from microcleaning.control_system.safety.governor import approve_human_gate, evaluate_action
 from microcleaning.data_learning.image_quality import ImageQuality, build_observation
 from microcleaning.vision.contamination import ContaminationMeasurement
 from microcleaning.vision.state_estimator import estimate_state

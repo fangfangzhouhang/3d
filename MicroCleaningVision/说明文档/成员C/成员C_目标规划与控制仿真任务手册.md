@@ -22,17 +22,16 @@ A和B让系统“看见”，C让系统知道“下一步准备怎样动”，�
 
 ```text
 microcleaning/control_system/
-├── cleaning_plan.py       # Mask变成点喷或分段往复路线
-├── fixed_rule.py          # 当前固定动作申请
-├── governor.py            # 最低动作边界
-├── fake_serial.py         # 模拟控制器回执
-├── replay_mcl.py          # 软件回放编排
-├── episode_store.py       # 回合持久化
-└── mock_mcl.py            # 合成回归基线
+├── planning/            # 路径规则、工作平面占位、步进对照
+├── safety/              # 动作申请与安全闸
+├── serial/              # FakeSerial 与 STM32
+└── replay/              # 软件回放、Episode、Mock 基线
 
 test/control_system/
-├── test_control_system.py
-└── test_mock_mcl.py
+├── planning/
+├── safety/
+├── serial/
+└── replay/
 ```
 
 你接下来的核心新增文件不是报告工具，而是经任务批准后的目标点、路线、坐标变换和FakeSTM32程序。

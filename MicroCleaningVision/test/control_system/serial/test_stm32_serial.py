@@ -4,11 +4,11 @@ from dataclasses import replace
 import unittest
 
 from microcleaning.contracts import SafetyOutcome
-from microcleaning.control_system.fake_serial import FakeSerialController
-from microcleaning.control_system.fixed_rule import propose_pump_in_place
-from microcleaning.control_system.governor import approve_human_gate, evaluate_action
-from microcleaning.control_system.stm32_protocol import encode_pump, encode_stop
-from microcleaning.control_system.stm32_serial import STM32SerialController
+from microcleaning.control_system.serial.fake_serial import FakeSerialController
+from microcleaning.control_system.safety.fixed_rule import propose_pump_in_place
+from microcleaning.control_system.safety.governor import approve_human_gate, evaluate_action
+from microcleaning.control_system.serial.stm32_protocol import encode_pump, encode_stop
+from microcleaning.control_system.serial.stm32_serial import STM32SerialController
 from microcleaning.data_learning.image_quality import ImageQuality, build_observation
 from microcleaning.vision.contamination import ContaminationMeasurement
 from microcleaning.vision.state_estimator import estimate_state

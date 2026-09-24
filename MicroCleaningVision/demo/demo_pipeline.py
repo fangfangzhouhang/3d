@@ -39,24 +39,34 @@ from microcleaning.contracts import (
     StateEstimate,
     VerificationResult,
 )
-from microcleaning.control_system.cleaning_plan import (
+from microcleaning.control_system.planning.cleaning_plan import (
     CleaningPlan,
+    cleaning_plan_to_dict,
     plan_cleaning,
     simulate_first_action,
 )
-from microcleaning.control_system.episode_store import write_episode
-from microcleaning.control_system.fake_serial import FakeSerialController
-from microcleaning.control_system.fixed_rule import (
+from microcleaning.control_system.planning.path_preview import (
+    PathPlaceholderConfig,
+    build_path_preview,
+    draw_path_overlay,
+    load_path_placeholders,
+    resolve_plan_policy,
+)
+from microcleaning.control_system.planning.stage2_axes import dispatch_motion, stage2_stepper
+from microcleaning.control_system.serial.stage2_link import Stage2SerialLink
+from microcleaning.control_system.replay.episode_store import write_episode
+from microcleaning.control_system.replay.replay_mcl import ReplayMCLRunner
+from microcleaning.control_system.safety.fixed_rule import (
     DEFAULT_IN_PLACE_DURATION_MS,
     MAX_IN_PLACE_DURATION_MS,
     FixedActionPolicy,
     PUMP_IN_PLACE_RULE_VERSION,
     propose_pump_in_place,
 )
-from microcleaning.control_system.governor import approve_human_gate, evaluate_action
-from microcleaning.control_system.replay_mcl import ReplayMCLRunner
-from microcleaning.control_system.stm32_protocol import encode_ping, encode_status
-from microcleaning.control_system.stm32_serial import STM32SerialController
+from microcleaning.control_system.safety.governor import approve_human_gate, evaluate_action
+from microcleaning.control_system.serial.fake_serial import FakeSerialController
+from microcleaning.control_system.serial.stm32_protocol import encode_ping, encode_status
+from microcleaning.control_system.serial.stm32_serial import STM32SerialController
 from microcleaning.data_learning.image_quality import build_observation, inspect_image_file
 from microcleaning.vision.exg_baseline import (
     segment_contamination as segment_exg,
@@ -102,6 +112,10 @@ def run_demo(
     input_source_override: str | None = None,
     policy_path: str | Path | None = None,
     use_tuned_policy: bool | None = None,
+    path_placeholders: str | Path | None = None,
+    stage2_x: bool = False,
+    arm_stage2_x: bool = False,
+    stage2_max_steps: int = 1600,
 ) -> Path:
     """运行一次Demo并返回本次不可覆盖的输出目录。"""
 
@@ -164,12 +178,43 @@ def run_demo(
     if not cv2.imwrite(str(mask_path), segmentation.mask):
         raise OSError(f"无法写入mask：{mask_path}")
     measurement = replace(segmentation.measurement, mask_ref=mask_path.relative_to(run_dir).as_posix())
-    plan = plan_cleaning(segmentation.mask)
+    placeholders = load_path_placeholders(path_placeholders)
+    if stage2_x:
+        placeholders = PathPlaceholderConfig(
+            work=placeholders.work,
+            stepper=stage2_stepper(),
+            assumed_spray_width_mm=placeholders.assumed_spray_width_mm,
+            visit_start_px=placeholders.visit_start_px,
+        )
+    plan = plan_cleaning(segmentation.mask, policy=resolve_plan_policy(placeholders))
+    path_preview = build_path_preview(plan, placeholders=placeholders)
 
     contamination_overlay = _draw_contamination(image, segmentation.mask, measurement.centroid_px, cv2)
-    path_overlay = _draw_plan(contamination_overlay, plan, cv2)
+    path_overlay = draw_path_overlay(contamination_overlay, path_preview)
     cv2.imwrite(str(run_dir / "contamination_overlay.png"), contamination_overlay)
     cv2.imwrite(str(run_dir / "path_overlay.png"), path_overlay)
+    (run_dir / "path_narrative.txt").write_text("\n".join(path_preview.narrative) + "\n", encoding="utf-8")
+    stage2_dispatch = None
+    stage2_transmit = None
+    if stage2_x:
+        stage2_dispatch = dispatch_motion(path_preview.motion, budget=stage2_max_steps)
+        x_text = "\n".join(stage2_dispatch.x_lines) + ("\n" if stage2_dispatch.x_lines else "")
+        (run_dir / "stage2_x_pulses.txt").write_text(x_text, encoding="utf-8")
+        (run_dir / "stage2_y_held.json").write_text(
+            json.dumps([item.to_dict() for item in stage2_dispatch.y_held], ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        if arm_stage2_x:
+            if arm_pump:
+                raise PermissionError("同一次运行不能既武装喷水又武装步进")
+            link = Stage2SerialLink(
+                port=serial_port,
+                baudrate=baudrate,
+                timeout=serial_timeout,
+                armed=True,
+                serial_factory=serial_factory,
+            )
+            stage2_transmit = link.transmit(stage2_dispatch)
 
     serial_probe: dict[str, object] | None = None
     if mode == "simulate":
@@ -289,6 +334,9 @@ def run_demo(
         "observation": asdict(observation),
         "contamination": asdict(measurement),
         "cleaning_plan": _plan_as_dict(plan),
+        "path_preview": path_preview.to_dict(),
+        "stage2_dispatch": None if stage2_dispatch is None else stage2_dispatch.to_dict(),
+        "stage2_transmit": None if stage2_transmit is None else stage2_transmit.to_dict(),
         "state": asdict(state),
         "action_request": asdict(episode.action_request) if episode.action_request else None,
         "safety_decision": asdict(episode.safety_decision) if episode.safety_decision else None,
@@ -300,6 +348,7 @@ def run_demo(
             "mask": "mask.png",
             "contamination_overlay": "contamination_overlay.png",
             "path_overlay": "path_overlay.png",
+            "path_narrative": "path_narrative.txt",
             "post_mask": "post_mask.png" if mode == "simulate" else None,
         },
     }
@@ -317,6 +366,26 @@ def run_demo(
         print(f"SafetyDecision：{episode.safety_decision.outcome.value}")
     print(f"ExecutionReceipt：{'已生成' if episode.execution_receipt else '未生成'}")
     print(f"下一路由：{episode.verification.next_route.value if episode.verification else 'UNKNOWN'}")
+    for line in path_preview.narrative:
+        print(line)
+    if stage2_dispatch is not None:
+        print("---------- Stage 2：XY 都规划，只准备发送 X ----------")
+        print(
+            f"X 计划 |步|={stage2_dispatch.planned_abs_steps_x}，"
+            f"本次可发 |步|={stage2_dispatch.transmit_abs_steps_x}，预算={stage2_dispatch.budget}，"
+            f"超出预算已截住={stage2_dispatch.truncated}"
+        )
+        for line in stage2_dispatch.x_lines:
+            print(f"  发往 STM32：{line}")
+        if not stage2_dispatch.x_lines:
+            print("  X 没有可发脉冲。")
+        print(f"  Y 轴保留 {len(stage2_dispatch.y_held)} 段，不写入串口。")
+        if stage2_transmit is None:
+            print("  未武装：没有打开 COM。要转动请加 --arm-stage2-x --serial-port COMx")
+        else:
+            print(f"  已发送 {len(stage2_transmit.sent_lines)} 条 X 脉冲。")
+            for reply in stage2_transmit.replies:
+                print(f"  STM32：{reply}")
     return run_dir
 
 
@@ -799,27 +868,12 @@ def _draw_contamination(image, mask, centroid, cv2):
 
 
 def _draw_plan(image, plan: CleaningPlan, cv2):
-    overlay = image.copy()
-    points = [(round(x), round(y)) for x, y in plan.path_px]
-    segment_starts = set(plan.segment_start_indices)
-    for end_index in range(1, len(points)):
-        if end_index not in segment_starts:
-            cv2.line(overlay, points[end_index - 1], points[end_index], (0, 255, 0), 2)
-    for index, point in enumerate(points):
-        cv2.circle(overlay, point, 4 if index else 7, (255, 0, 255) if index else (0, 0, 255), -1)
-    return overlay
+    preview = build_path_preview(plan)
+    return draw_path_overlay(image, preview)
 
 
 def _plan_as_dict(plan: CleaningPlan) -> dict[str, object]:
-    return {
-        "strategy": plan.strategy.value,
-        "coordinate_frame": plan.coordinate_frame,
-        "image_size_px": plan.image_size_px,
-        "contamination_area_px": plan.contamination_area_px,
-        "path_px": plan.path_px,
-        "segment_start_indices": plan.segment_start_indices,
-        "reason": plan.reason,
-    }
+    return cleaning_plan_to_dict(plan)
 
 
 def _generate_sample(np, cv2):
@@ -896,11 +950,40 @@ def main(argv: list[str] | None = None) -> int:
         help="忽略已调参 JSON，使用代码内 local-contrast-v0.1",
     )
     parser.add_argument(
+        "--path-placeholders",
+        type=Path,
+        help="C 路径占位 JSON：mm/px、喷头偏移、步进参数；禁止 feeds_action_request 或发 MOVE",
+    )
+    parser.add_argument(
+        "--stage2-x",
+        action="store_true",
+        help="用 1600 步/转、5 mm/转规划 XY，只把 X 的 PULSE 准备给 Stage 2",
+    )
+    parser.add_argument(
+        "--arm-stage2-x",
+        action="store_true",
+        help="打开指定 COM，HELLO 成功后只发送 X 轴 PULSE",
+    )
+    parser.add_argument(
+        "--stage2-max-steps",
+        type=int,
+        default=1600,
+        help="一次运行允许发给 X 轴的脉冲上限，默认 1600（1 圈，5 mm）",
+    )
+    parser.add_argument(
         "--wait-usb",
         action="store_true",
         help="实时会话：先等待指定 camera-index 可读取再打开预览；Q暂停后按其他键重开",
     )
     args = parser.parse_args(argv)
+    if args.arm_stage2_x and not args.serial_port:
+        parser.error("发送 X 轴必须指定 --serial-port，不扫描 COM")
+    if args.arm_stage2_x and (args.arm_pump or args.mode == "arm-pump"):
+        parser.error("步进发送不能和喷水武装放在同一次运行")
+    if args.stage2_max_steps < 0:
+        parser.error("--stage2-max-steps 不能为负")
+    if args.live and (args.stage2_x or args.arm_stage2_x):
+        parser.error("实时窗口不发送步进；请去掉 --live，用 --from-camera --stage2-x")
     if args.live:
         if not args.from_camera:
             parser.error("--live 必须与 --from-camera 一起使用")
@@ -970,6 +1053,10 @@ def main(argv: list[str] | None = None) -> int:
             algorithm=args.algorithm,
             policy_path=args.policy,
             use_tuned_policy=False if args.no_tuned_policy else None,
+            path_placeholders=args.path_placeholders,
+            stage2_x=args.stage2_x or args.arm_stage2_x,
+            arm_stage2_x=args.arm_stage2_x,
+            stage2_max_steps=args.stage2_max_steps,
         )
     except Exception as exc:
         from microcleaning.data_learning.usb_camera import USBCameraError

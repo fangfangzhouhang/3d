@@ -69,10 +69,10 @@ module_ownership:
 software_loop:
   status: first_source_unverified_real_pixel_evaluation_complete
   demo_entry: demo/demo_pipeline.py
-  mock_entry: microcleaning/control_system/mock_mcl.py
-  replay_entry: microcleaning/control_system/replay_mcl.py
-  controller: microcleaning/control_system/stm32_serial.py
-  fake_controller: microcleaning/control_system/fake_serial.py
+  mock_entry: microcleaning/control_system/replay/mock_mcl.py
+  replay_entry: microcleaning/control_system/replay/replay_mcl.py
+  controller: microcleaning/control_system/serial/stm32_serial.py
+  fake_controller: microcleaning/control_system/serial/fake_serial.py
   note: "public_001真实像素已穿过A质量、人工Mask、B分割、状态和C路线，但来源尚未核实；无真实标定、无实机执行和动作后复检。泵路径软件已接线，真机未通。"
 
 current_dataset:
@@ -111,8 +111,8 @@ hardware_boundary:
   stm32_pc_connection_plan: "USB / ST-LINK VCP；电脑端MCV1暂定115200 8N1，等待固件实机确认"
   stm32_firmware_status: source_in_repo_unburned_no_pong
   stm32_firmware_path: firmware/nucleo_f401re/f401re-stage1/
-  stm32_host_protocol: microcleaning/control_system/stm32_protocol.py
-  stm32_controller: microcleaning/control_system/stm32_serial.py
+  stm32_host_protocol: microcleaning/control_system/serial/stm32_protocol.py
+  stm32_controller: microcleaning/control_system/serial/stm32_serial.py
   stm32_probe_entry: scripts/probe_stm32_link.py
   serial_protocol_status: mcv1_host_and_controller_tested_hardware_unverified
 

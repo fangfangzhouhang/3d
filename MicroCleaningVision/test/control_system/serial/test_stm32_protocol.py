@@ -2,7 +2,7 @@
 
 import unittest
 
-from microcleaning.control_system.stm32_protocol import (
+from microcleaning.control_system.serial.stm32_protocol import (
     MAX_LINE_BYTES,
     STM32ProtocolError,
     encode_ping,

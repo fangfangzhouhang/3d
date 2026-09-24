@@ -11,9 +11,9 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from microcleaning.contracts import ActionRequest, ExecutionReceipt, SafetyDecision, SafetyOutcome
-from microcleaning.control_system.fixed_rule import MAX_IN_PLACE_DURATION_MS, PUMP_IN_PLACE
-from microcleaning.control_system.governor import ReplaySafetyLimits, request_digest
-from microcleaning.control_system.stm32_protocol import (
+from microcleaning.control_system.safety.fixed_rule import MAX_IN_PLACE_DURATION_MS, PUMP_IN_PLACE
+from microcleaning.control_system.safety.governor import ReplaySafetyLimits, request_digest
+from microcleaning.control_system.serial.stm32_protocol import (
     STM32ProtocolError,
     STM32Response,
     encode_ping,

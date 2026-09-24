@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from microcleaning.contracts import ActionRequest, SafetyDecision, SafetyOutcome, StateEstimate
-from microcleaning.control_system.fixed_rule import (
+from microcleaning.control_system.safety.fixed_rule import (
     IN_PLACE_TARGET_MM,
     MAX_IN_PLACE_DURATION_MS,
     NOZZLE_FIXED_FRAME,

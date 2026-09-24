@@ -7,13 +7,9 @@
 
 from __future__ import annotations
 
-import json
-import hashlib
-import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
 from uuid import uuid4
 
 from microcleaning.contracts import (
@@ -28,6 +24,8 @@ from microcleaning.contracts import (
     StateEstimate,
     VerificationResult,
 )
+from microcleaning.control_system.replay.episode_store import write_episode
+from microcleaning.control_system.safety.governor import request_digest as canonical_request_digest
 
 
 def utc_now() -> str:
@@ -36,25 +34,6 @@ def utc_now() -> str:
 
 def uid(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex[:12]}"
-
-
-def canonical_request_digest(request: ActionRequest) -> str:
-    """动作申请进入安全边界前，先生成不可伪造的内容摘要。"""
-    payload = {
-        "action_id": request.action_id,
-        "task_id": request.task_id,
-        "state_id": request.state_id,
-        "target_centroid_mm": request.target_centroid_mm,
-        "coordinate_frame": request.coordinate_frame,
-        "primitive": request.primitive,
-        "duration_ms": request.duration_ms,
-        "pressure": request.pressure,
-        "constraints": request.constraints,
-        "expected_effect": request.expected_effect,
-        "rule_version": request.rule_version,
-    }
-    canonical = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"), allow_nan=False)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -337,34 +316,6 @@ class MockMCLRunner:
         if verification.next_route is not NextRoute.STOP:
             failures.append(FailureRecord(uid("failure"), task_id, "verification", "medium", verification.reason_codes, True, "human review before another action"))
         return Episode(uid("episode"), task_id, "mock", "mock-protocol-v0", pre, state, request, safety, receipt, post, verification, failures)
-
-
-def write_episode(episode: Episode, output_dir: str | Path) -> Path:
-    """Persist an immutable, atomically-written JSON record plus SHA-256 sidecar."""
-    folder = Path(output_dir)
-    folder.mkdir(parents=True, exist_ok=True)
-    output = folder / f"{episode.episode_id}.json"
-    digest_path = folder / f"{episode.episode_id}.sha256"
-    if output.exists():
-        raise FileExistsError(f"refusing to overwrite episode: {output}")
-    if digest_path.exists():
-        raise FileExistsError(f"refusing to overwrite evidence digest: {digest_path}")
-    payload = json.dumps(episode.as_dict(), ensure_ascii=False, indent=2) + "\n"
-    temporary = folder / f".{episode.episode_id}.{uuid4().hex}.tmp"
-    try:
-        with temporary.open("x", encoding="utf-8", newline="\n") as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        if output.exists():
-            raise FileExistsError(f"refusing to overwrite episode: {output}")
-        os.replace(temporary, output)
-        digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-        digest_path.write_text(f"{digest}  {output.name}\n", encoding="ascii", newline="\n")
-    finally:
-        if temporary.exists():
-            temporary.unlink()
-    return output
 
 
 if __name__ == "__main__":
