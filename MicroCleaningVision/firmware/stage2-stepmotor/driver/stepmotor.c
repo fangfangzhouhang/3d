@@ -138,26 +138,54 @@ void sm_set_freq(uint32_t hz) {
   }
 }
 
+static void sm_pulse_idle_high(void) {
+  GPIO_InitTypeDef gpio;
+
+  gpio.GPIO_Pin = SM_PUL_PIN;
+  gpio.GPIO_Speed = GPIO_Speed_50MHz;
+  gpio.GPIO_Mode = GPIO_Mode_Out_PP;
+  GPIO_Init(SM_PUL_GPIO_PORT, &gpio);
+  GPIO_SetBits(SM_PUL_GPIO_PORT, SM_PUL_PIN);
+}
+
+static void sm_pulse_to_timer(void) {
+  GPIO_InitTypeDef gpio;
+
+  gpio.GPIO_Pin = SM_PUL_PIN;
+  gpio.GPIO_Speed = GPIO_Speed_50MHz;
+  gpio.GPIO_Mode = GPIO_Mode_AF_PP;
+  GPIO_Init(SM_PUL_GPIO_PORT, &gpio);
+}
+
+static void sm_delay_us(uint32_t us) {
+  volatile uint32_t count = us * 8u;
+  while (count > 0u) {
+    --count;
+  }
+}
+
 void sm_start(uint32_t steps, sm_dir_t dir) {
   if (steps == 0u) return;
 
-  sm_stop();  /* 确保干净状态 */
+  sm_stop();
+  sm_pulse_idle_high();
   sm_write_dir(dir);
+  sm_delay_us(20);
 
   sm_step_sent = 0u;
   sm_step_target = steps;
 
-  /* 重新装载 PSC/ARR/CCR（频率可能改过），50% 占空比 */
+  /* 重新装载 PSC/ARR/CCR（频率可能改过），PWM1 50% 占空比 */
   TIM2->PSC = sm_psc;
   TIM2->ARR = sm_arr;
   TIM_SetCompare1(TIM2, (uint16_t)(((uint32_t)sm_arr + 1u) / 2u));
   TIM_SetCounter(TIM2, 0u);
 
-  /* PA0 保持高电平（光耦关）。PWM1 启动后 CNT<CCR 期间输出高，
-   * 与空闲态一致，不会产生多余边沿。 */
-  GPIO_SetBits(SM_PUL_GPIO_PORT, SM_PUL_PIN);
-
   TIM_ClearITPendingBit(TIM2, TIM_IT_CC1 | TIM_IT_Update);
+
+  /* PA0 切到 TIM2 复用再启动。PWM1 启动后 CNT<CCR 期间输出高，
+   * 与空闲态一致，不会产生多余边沿。 */
+  sm_pulse_to_timer();
   TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
   TIM_Cmd(TIM2, ENABLE);
 
@@ -186,8 +214,8 @@ void sm_tim2_irq(void) {
 
     if (sm_step_sent >= sm_step_target) {
       sm_stop();
-      /* PA0 恢复高电平（光耦关，DM542 安全态） */
-      GPIO_SetBits(SM_PUL_GPIO_PORT, SM_PUL_PIN);
+      /* PA0 切回普通 GPIO 并置高（光耦关，DM542 安全态） */
+      sm_pulse_idle_high();
     }
   }
 }
