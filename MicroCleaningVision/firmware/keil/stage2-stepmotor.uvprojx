@@ -13,7 +13,7 @@
         <TargetCommonOption>
           <Device>STM32F103C8</Device>
           <Vendor>STMicroelectronics</Vendor>
-          <PackID>Keil.STM32F1xx_DFP.2.4.1</PackID>
+          <PackID>Keil.STM32F1xx_DFP.2.2.0</PackID>
           <PackURL>http://www.keil.com/pack/</PackURL>
           <Cpu>IROM(0x08000000,0x10000) IRAM(0x20000000,0x5000) CPUTYPE("Cortex-M3") CLOCK(8000000) ELITTLE</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
@@ -260,7 +260,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F10X_MD,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\stage2-stepmotor\driver;..\stage2-stepmotor\common;..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.4.1\Device\Include;..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc;..\..\..\..\Keil_v5\ARM\PACK\ARM\CMSIS\5.8.0\CMSIS\Core\Include</IncludePath>
+              <IncludePath>..\stage2-stepmotor\driver;..\stage2-stepmotor\common;..\..\..\..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\Include;..\..\..\..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\inc;..\..\..\..\..\..\..\Keil_v5\ARM\PACK\ARM\CMSIS\5.0.1\CMSIS\Include</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -332,7 +332,7 @@
             <File>
               <FileName>startup_stm32f10x_md.s</FileName>
               <FileType>2</FileType>
-              <FilePath>..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.4.1\Device\Source\ARM\startup_stm32f10x_md.s</FilePath>
+              <FilePath>..\..\..\..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\Source\ARM\startup_stm32f10x_md.s</FilePath>
             </File>
           </Files>
         </Group>
@@ -342,32 +342,32 @@
             <File>
               <FileName>system_stm32f10x.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.4.1\Device\Source\system_stm32f10x.c</FilePath>
+              <FilePath>..\..\..\..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\Source\system_stm32f10x.c</FilePath>
             </File>
             <File>
               <FileName>misc.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\src\misc.c</FilePath>
+              <FilePath>..\..\..\..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\misc.c</FilePath>
             </File>
             <File>
               <FileName>stm32f10x_gpio.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\src\stm32f10x_gpio.c</FilePath>
+              <FilePath>..\..\..\..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\stm32f10x_gpio.c</FilePath>
             </File>
             <File>
               <FileName>stm32f10x_rcc.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\src\stm32f10x_rcc.c</FilePath>
+              <FilePath>..\..\..\..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\stm32f10x_rcc.c</FilePath>
             </File>
             <File>
               <FileName>stm32f10x_usart.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\src\stm32f10x_usart.c</FilePath>
+              <FilePath>..\..\..\..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\stm32f10x_usart.c</FilePath>
             </File>
             <File>
               <FileName>stm32f10x_tim.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\src\stm32f10x_tim.c</FilePath>
+              <FilePath>..\..\..\..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\stm32f10x_tim.c</FilePath>
             </File>
           </Files>
         </Group>
