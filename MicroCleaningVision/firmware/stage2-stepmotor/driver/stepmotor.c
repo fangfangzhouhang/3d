@@ -154,9 +154,9 @@ void sm_start_xy(uint32_t nx, sm_dir_t dx, uint32_t ny, sm_dir_t dy) {
   sm_axis_load(&x_axis, nx, dx);
   sm_axis_load(&y_axis, ny, dy);
 
-  /* 紧邻启动，两轴首个脉冲沿相差仅几条指令 */
-  TIM_Cmd(y_axis.tim, ENABLE);
-  TIM_Cmd(x_axis.tim, ENABLE);
+  /* 紧邻启动；步数为 0 的轴不启动定时器（load 已将 busy 置 false） */
+  if (ny > 0u) TIM_Cmd(y_axis.tim, ENABLE);
+  if (nx > 0u) TIM_Cmd(x_axis.tim, ENABLE);
 }
 
 /* 停止单轴：关定时器，PUL 回到空闲高 */
