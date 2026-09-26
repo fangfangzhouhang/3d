@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -86,7 +87,7 @@ class Stage2SerialLink:
                 if start.kind != "STEP_START" or start.steps != int(steps_text) or start.direction != direction:
                     stopped = self._stop_into(replies)
                     raise Stage2ProtocolError("BAD_START", start.raw)
-                idle = self._wait_idle()
+                idle = self._wait_idle(int(steps_text))
                 replies.append(idle.raw)
                 if idle.busy:
                     stopped = self._stop_into(replies)
@@ -108,12 +109,18 @@ class Stage2SerialLink:
             except Exception:
                 pass
 
-    def _wait_idle(self) -> Stage2Reply:
+    def _wait_idle(self, steps: int) -> Stage2Reply:
+        # 固件默认 500 Hz。按这段步数等它走完，不要在脉冲结束前连续读满就判定失败。
+        deadline = time.monotonic() + (max(steps, 1) / 500.0) + 0.5
         last = Stage2Reply("STEP_SENT", "", busy=True, sent=0)
-        for _ in range(self._read_limit):
+        while time.monotonic() < deadline:
             last = self._exchange(encode_read())
             if last.kind == "STEP_SENT" and not last.busy:
                 return last
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                break
+            time.sleep(min(0.05, remaining))
         return last
 
     def _stop_into(self, replies: list[str]) -> bool:

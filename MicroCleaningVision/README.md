@@ -48,7 +48,6 @@ MicroCleaningVision/
 ├── demo/                    # 明确的软件演示入口
 ├── data/                    # 数据集：raw_images暂存+六类分类+标注预留
 ├── 说明文档/                # 总导航、长期规划、个人手册、Git、术语
-├── legacy/                  # 旧原型，只读参考
 ├── AGENTS.md
 └── project_state.yaml
 ```
