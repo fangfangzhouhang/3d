@@ -5,13 +5,13 @@
  *   PA0 = TIM2_CH1 → PUL (脉冲输出)
  *   PA1 = GPIO推挽 → DIR (方向控制)
  *
- * 接线（共地！24V GND 必须连 STM32 GND）：
- *   STM32 PA0  → DM542 PUL+
- *   STM32 GND  → DM542 PUL-
- *   STM32 PA1  → DM542 DIR+
- *   STM32 GND  → DM542 DIR-
- *   24V+       → DM542 +V
- *   24V GND    → DM542 GND
+ * 接线是共阳极，24V GND 必须和 STM32 GND 接在一起：
+ *   DM542 PUL+、DIR+ → STM32 的 3.3V（不要接 5V，PA0 不耐 5V）
+ *   STM32 PA0        → DM542 PUL-   （推挽，空闲高 = 光耦关）
+ *   STM32 PA1        → DM542 DIR-   （开漏：低 = 正转光耦通，松开 = 反转光耦断）
+ *   ENA+、ENA- 不接
+ *   24V+             → DM542 +V
+ *   24V GND          → DM542 GND
  */
 #ifndef STEPMOTOR_H
 #define STEPMOTOR_H
