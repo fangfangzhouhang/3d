@@ -1,4 +1,4 @@
-"""把已经裁好的 X 轴 PULSE 发给 Stage 2。Y 轴记录不写串口。"""
+"""把已经裁好的 MOVEXY 双轴命令发给 Stage 2 v0.3。两轴都停才进下一段。"""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from microcleaning.control_system.serial.stage2_protocol import (
     Stage2ProtocolError,
     Stage2Reply,
     encode_hello,
-    encode_pulse,
-    encode_read,
+    encode_move_xy,
+    encode_read_xy,
     encode_stop,
     parse_stage2_reply,
 )
@@ -34,12 +34,12 @@ class Stage2TransmitResult:
             "sent_lines": list(self.sent_lines),
             "replies": list(self.replies),
             "stopped": self.stopped,
-            "protocol": "stage2-pulse-v0.2",
+            "protocol": "stage2-movexy-v0.3",
         }
 
 
 class Stage2SerialLink:
-    """HELLO 成功后才发 PULSE。失败时发 STOP。不发送 MCV1|PUMP。"""
+    """HELLO v0.3 成功后才发 MOVEXY。失败时发 STOP。不发送 MCV1|PUMP。"""
 
     def __init__(
         self,
@@ -66,8 +66,6 @@ class Stage2SerialLink:
             raise PermissionError("Stage 2 未武装，拒绝打开发送")
         if not self.port and self._serial_factory is None:
             raise PermissionError("未指定串口，拒绝打开 COM")
-        if any(item.axis != "y" for item in dispatch.y_held):
-            raise PermissionError("保留轴记录异常")
         sent: list[str] = []
         replies: list[str] = []
         stopped = False
@@ -77,25 +75,31 @@ class Stage2SerialLink:
             if hello.kind != "STEP_OK":
                 stopped = self._stop_into(replies)
                 raise Stage2ProtocolError("NO_HELLO", hello.raw)
-            for line in dispatch.x_lines:
-                steps_text, direction = line.split()[1], line.split()[2]
-                payload = encode_pulse(int(steps_text), direction)
-                if b"MCV1" in payload or payload.startswith(b"MOVE"):
-                    raise Stage2ProtocolError("UNSAFE_LINE", line)
+            for line in dispatch.lines:
+                parts = line.split()  # MOVEXY <nx> <dx> <ny> <dy>
+                x_steps = int(parts[1])
+                y_steps = int(parts[3])
+                payload = encode_move_xy(x_steps, parts[2], y_steps, parts[4])
                 start = self._exchange(payload)
                 replies.append(start.raw)
-                if start.kind != "STEP_START" or start.steps != int(steps_text) or start.direction != direction:
+                if (
+                    start.kind != "STEP2_START"
+                    or start.x_steps != x_steps
+                    or start.x_direction != parts[2]
+                    or start.y_steps != y_steps
+                    or start.y_direction != parts[4]
+                ):
                     stopped = self._stop_into(replies)
                     raise Stage2ProtocolError("BAD_START", start.raw)
-                idle = self._wait_idle(int(steps_text))
+                idle = self._wait_idle_xy(max(x_steps, y_steps))
                 replies.append(idle.raw)
-                if idle.busy:
+                if idle.x_busy or idle.y_busy:
                     stopped = self._stop_into(replies)
-                    raise TimeoutError("电机在读取上限内仍 BUSY")
+                    raise TimeoutError("电机在读取上限内仍有轴 BUSY")
                 sent.append(line)
         finally:
             self.close()
-        return Stage2TransmitResult("STEP_OK v0.2", tuple(sent), tuple(replies), stopped)
+        return Stage2TransmitResult("STEP_OK v0.3", tuple(sent), tuple(replies), stopped)
 
     def close(self) -> None:
         connection = self._connection
@@ -109,13 +113,13 @@ class Stage2SerialLink:
             except Exception:
                 pass
 
-    def _wait_idle(self, steps: int) -> Stage2Reply:
-        # 固件默认 500 Hz。按这段步数等它走完，不要在脉冲结束前连续读满就判定失败。
+    def _wait_idle_xy(self, steps: int) -> Stage2Reply:
+        # 固件默认 500 Hz。按较长那一轴的步数等它走完，不要在脉冲结束前连续读满就判定失败。
         deadline = time.monotonic() + (max(steps, 1) / 500.0) + 0.5
-        last = Stage2Reply("STEP_SENT", "", busy=True, sent=0)
+        last = Stage2Reply("STEP2", "", x_busy=True, y_busy=True)
         while time.monotonic() < deadline:
-            last = self._exchange(encode_read())
-            if last.kind == "STEP_SENT" and not last.busy:
+            last = self._exchange(encode_read_xy())
+            if last.kind == "STEP2" and not last.x_busy and not last.y_busy:
                 return last
             remaining = deadline - time.monotonic()
             if remaining <= 0.0:

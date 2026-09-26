@@ -113,8 +113,8 @@ def run_demo(
     policy_path: str | Path | None = None,
     use_tuned_policy: bool | None = None,
     path_placeholders: str | Path | None = None,
-    stage2_x: bool = False,
-    arm_stage2_x: bool = False,
+    stage2_xy: bool = False,
+    arm_stage2_xy: bool = False,
     stage2_max_steps: int = 1600,
 ) -> Path:
     """运行一次Demo并返回本次不可覆盖的输出目录。"""
@@ -179,7 +179,7 @@ def run_demo(
         raise OSError(f"无法写入mask：{mask_path}")
     measurement = replace(segmentation.measurement, mask_ref=mask_path.relative_to(run_dir).as_posix())
     placeholders = load_path_placeholders(path_placeholders)
-    if stage2_x:
+    if stage2_xy:
         placeholders = PathPlaceholderConfig(
             work=placeholders.work,
             stepper=stage2_stepper(),
@@ -196,15 +196,11 @@ def run_demo(
     (run_dir / "path_narrative.txt").write_text("\n".join(path_preview.narrative) + "\n", encoding="utf-8")
     stage2_dispatch = None
     stage2_transmit = None
-    if stage2_x:
+    if stage2_xy:
         stage2_dispatch = dispatch_motion(path_preview.motion, budget=stage2_max_steps)
-        x_text = "\n".join(stage2_dispatch.x_lines) + ("\n" if stage2_dispatch.x_lines else "")
-        (run_dir / "stage2_x_pulses.txt").write_text(x_text, encoding="utf-8")
-        (run_dir / "stage2_y_held.json").write_text(
-            json.dumps([item.to_dict() for item in stage2_dispatch.y_held], ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        if arm_stage2_x:
+        xy_text = "\n".join(stage2_dispatch.lines) + ("\n" if stage2_dispatch.lines else "")
+        (run_dir / "stage2_xy_pulses.txt").write_text(xy_text, encoding="utf-8")
+        if arm_stage2_xy:
             if arm_pump:
                 raise PermissionError("同一次运行不能既武装喷水又武装步进")
             link = Stage2SerialLink(
@@ -369,21 +365,24 @@ def run_demo(
     for line in path_preview.narrative:
         print(line)
     if stage2_dispatch is not None:
-        print("---------- Stage 2：XY 都规划，只准备发送 X ----------")
+        print("---------- Stage 2：XY 双轴规划 ----------")
         print(
             f"X 计划 |步|={stage2_dispatch.planned_abs_steps_x}，"
-            f"本次可发 |步|={stage2_dispatch.transmit_abs_steps_x}，预算={stage2_dispatch.budget}，"
-            f"超出预算已截住={stage2_dispatch.truncated}"
+            f"本次可发 |步|={stage2_dispatch.transmit_abs_steps_x}"
         )
-        for line in stage2_dispatch.x_lines:
+        print(
+            f"Y 计划 |步|={stage2_dispatch.planned_abs_steps_y}，"
+            f"本次可发 |步|={stage2_dispatch.transmit_abs_steps_y}，"
+            f"每轴预算={stage2_dispatch.budget}，超出预算已截住={stage2_dispatch.truncated}"
+        )
+        for line in stage2_dispatch.lines:
             print(f"  发往 STM32：{line}")
-        if not stage2_dispatch.x_lines:
-            print("  X 没有可发脉冲。")
-        print(f"  Y 轴保留 {len(stage2_dispatch.y_held)} 段，不写入串口。")
+        if not stage2_dispatch.lines:
+            print("  没有可发脉冲。")
         if stage2_transmit is None:
-            print("  未武装：没有打开 COM。要转动请加 --arm-stage2-x --serial-port COMx")
+            print("  未武装：没有打开 COM。要转动请加 --arm-stage2-xy --serial-port COMx")
         else:
-            print(f"  已发送 {len(stage2_transmit.sent_lines)} 条 X 脉冲。")
+            print(f"  已发送 {len(stage2_transmit.sent_lines)} 条 MOVEXY 命令。")
             for reply in stage2_transmit.replies:
                 print(f"  STM32：{reply}")
     return run_dir
@@ -955,20 +954,30 @@ def main(argv: list[str] | None = None) -> int:
         help="C 路径占位 JSON：mm/px、喷头偏移、步进参数；禁止 feeds_action_request 或发 MOVE",
     )
     parser.add_argument(
+        "--stage2-xy",
+        action="store_true",
+        help="用 1600 步/转、5 mm/转规划 X/Y，每段生成 MOVEXY 双轴命令",
+    )
+    parser.add_argument(
+        "--arm-stage2-xy",
+        action="store_true",
+        help="打开指定 COM，HELLO v0.3 成功后发送 MOVEXY 双轴命令",
+    )
+    parser.add_argument(
         "--stage2-x",
         action="store_true",
-        help="用 1600 步/转、5 mm/转规划 XY，只把 X 的 PULSE 准备给 Stage 2",
+        help="兼容旧参数，等价 --stage2-xy（当前固件双轴都可发送）",
     )
     parser.add_argument(
         "--arm-stage2-x",
         action="store_true",
-        help="打开指定 COM，HELLO 成功后只发送 X 轴 PULSE",
+        help="兼容旧参数，等价 --arm-stage2-xy",
     )
     parser.add_argument(
         "--stage2-max-steps",
         type=int,
         default=1600,
-        help="一次运行允许发给 X 轴的脉冲上限，默认 1600（1 圈，5 mm）",
+        help="一次运行允许发给每个轴的脉冲上限，默认 1600（1 圈，5 mm）",
     )
     parser.add_argument(
         "--wait-usb",
@@ -976,14 +985,16 @@ def main(argv: list[str] | None = None) -> int:
         help="实时会话：先等待指定 camera-index 可读取再打开预览；Q暂停后按其他键重开",
     )
     args = parser.parse_args(argv)
-    if args.arm_stage2_x and not args.serial_port:
-        parser.error("发送 X 轴必须指定 --serial-port，不扫描 COM")
-    if args.arm_stage2_x and (args.arm_pump or args.mode == "arm-pump"):
+    stage2_armed = args.arm_stage2_x or args.arm_stage2_xy
+    stage2_any = stage2_armed or args.stage2_x or args.stage2_xy
+    if stage2_armed and not args.serial_port:
+        parser.error("发送步进必须指定 --serial-port，不扫描 COM")
+    if stage2_armed and (args.arm_pump or args.mode == "arm-pump"):
         parser.error("步进发送不能和喷水武装放在同一次运行")
     if args.stage2_max_steps < 0:
         parser.error("--stage2-max-steps 不能为负")
-    if args.live and (args.stage2_x or args.arm_stage2_x):
-        parser.error("实时窗口不发送步进；请去掉 --live，用 --from-camera --stage2-x")
+    if args.live and stage2_any:
+        parser.error("实时窗口不发送步进；请去掉 --live，用 --from-camera --stage2-xy")
     if args.live:
         if not args.from_camera:
             parser.error("--live 必须与 --from-camera 一起使用")
@@ -1054,8 +1065,8 @@ def main(argv: list[str] | None = None) -> int:
             policy_path=args.policy,
             use_tuned_policy=False if args.no_tuned_policy else None,
             path_placeholders=args.path_placeholders,
-            stage2_x=args.stage2_x or args.arm_stage2_x,
-            arm_stage2_x=args.arm_stage2_x,
+            stage2_xy=stage2_any,
+            arm_stage2_xy=stage2_armed,
             stage2_max_steps=args.stage2_max_steps,
         )
     except Exception as exc:
