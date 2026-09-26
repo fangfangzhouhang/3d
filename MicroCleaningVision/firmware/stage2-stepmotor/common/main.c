@@ -8,10 +8,10 @@
  *   STOP                 → 立即停止
  *   READ                 → 返回 STEP_SENT=xx BUSY=0|1 FREQ=xxx
  *
- * 接线：
- *   PA0 → DM542 PUL+
- *   PA1 → DM542 DIR+
- *   STM32 GND → DM542 PUL-、DIR-、GND（共地！）
+ * 接线（共阳极）：
+ *   PUL+、DIR+ 接在一起，接到 STM32 的 3.3V，不要接 5V
+ *   PA0 → PUL-，PA1 → DIR-（开漏）
+ *   STM32 GND 与 DM542 GND、24V 地共地；ENA 不接
  *   24V+ → DM542 +V
  */
 #include <stdint.h>

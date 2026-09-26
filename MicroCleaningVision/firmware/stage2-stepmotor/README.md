@@ -1,20 +1,20 @@
 # Stage 2 — DM542 + 57-56 步进电机独立测试
 
-> **前提**：Stage 1 已经在 STM32F103C8T6 上跑通，Keil 工程路径已知。Stage 2 完全独立，不复用 Stage 1 的任何头文件或协议层。
+> **前提**：Stage 1 已经在 STM32F103C8T6 上跑通。Keil 工程是 `firmware/keil/stage2-stepmotor.uvprojx`，与 Stage 1 分开，不复用 Stage 1 的头文件或协议层。
 
 ---
 
 ## 1. 接线图（关键：必须共地！）
 
 ```
+   STM32 3.3V ──┬── PUL+
+               └── DIR+
                      ┌──────────────┐
-   STM32 PA0 ───────┼ PUL+    DIR+ ┼────── STM32 PA1
+   STM32 PA0 ───────┼ PUL-    DIR- ┼────── STM32 PA1（开漏）
                     │              │
-   STM32 GND ───────┼ PUL-    DIR- ┼────── STM32 GND
-                    │              │
-                    │   DM542      │        ⚠️ GND 必须连在一起！
-                    │              │
-   24V+ ────────────┼ +V    GND ──┼────── 24V GND
+                    │   DM542      │        ENA+ / ENA- 不接
+                    │              │        ⚠️ GND 必须连在一起！
+   24V+ ────────────┼ +V    GND ──┼────── 24V GND 和 STM32 GND
                     │              │
                     │ A+   B+      │
                     └──┬─────┬─────┘
@@ -26,9 +26,10 @@
 |---|---|---|
 | **24V+ → DM542 +V** | 独立电源，绝对不能从 STM32 取 | 用 STM32 供电会立刻烧板 |
 | **24V GND → DM542 GND → STM32 GND** | 三个地必须共地 | 不共地 = PUL/DIR 信号不识别 |
-| PA0 → PUL+，GND → PUL- | PUL- 接地（单端接法） | 双端差分接法需要两路反相信号 |
-| PA1 → DIR+，GND → DIR- | 同上 | — |
-| **电平警告** | STM32 3.3V → DM542 PUL+ | 先硬接试，不转再买 TXS0108E 电平转换器 |
+| PUL+、DIR+ 接在一起，接到 STM32 的 3.3V | 共阳极。不要接 5V | PA0 不耐 5V。5V 灌进来会让芯片反复复位，每复位一步，电机就慢慢正转 |
+| PA0 → PUL- | 推挽，空闲高电平 = 光耦关 | PA0 不耐 5V，不要改成开漏去接 5V |
+| PA1 → DIR- | 开漏。低 = 正转，松开 = 反转 | 推挽 3.3V 关不断 5V 光耦，反转会正向狂转 |
+| ENA+、ENA- | 不接 | 接成常通会把驱动器关掉 |
 
 ---
 
@@ -52,7 +53,7 @@ SW5=on  SW6=off  SW7=off  SW8=off  → 1600 步/圈
 
 ## 3. Keil 工程配置
 
-在 Stage 1 现有 Keil 工程里**新建一个 target** 叫 `stage2-stepmotor`，或者新建工程：
+直接打开 `firmware/keil/stage2-stepmotor.uvprojx`。若要手建工程，文件列表如下：
 
 ### User 组源文件（6 个）
 
@@ -93,7 +94,7 @@ Stage 2 的驱动在 `stage2-stepmotor/driver/`，自己一套 `stm32f103_hal.c/
 
 - [ ] DM542 拨码已设（2.84A + 1/8 细分）
 - [ ] STM32 + DM542 + 24V 电源 **三端共地**
-- [ ] PA0 → PUL+，PA1 → DIR+，GND → PUL- / DIR-
+- [ ] 共阳极：PUL+ 和 DIR+ 接到 STM32 的 3.3V，不要接 5V。PA0 → PUL-，PA1 → DIR-，ENA 不接
 - [ ] 24V 电源**先断开**（不先上电，等 STM32 烧好再说）
 - [ ] ST-Link 烧录线接好（烧完拔掉，不要插着 ST-Link 同时开 24V）
 
@@ -135,7 +136,7 @@ STOP                 → 中途紧急停
 | 发命令没任何反应 | STM32 没烧进去 / 接线错 / 24V 没开 | 重烧、检查 PA0/PA1/GND、开 24V |
 | 电机嗡嗡响但不转 | 细分/电流拨码错 / 57-56 接线松 | 重设拨码、拧紧电机四线端子 |
 | 正反转都不动但能发脉冲 | **电平不够**：STM32 3.3V 推不动 DM542 | 买 TXS0108E 电平转换器（¥3） |
-| 正转能动反转不动 | DIR 极性反了 | 交换 `sm_write_dir` 里的 FWD/REV 定义 |
+| 正转精准，反转却正向狂转 | DIR- 用了推挽，3.3V 关不断 5V 光耦 | PA1 必须是开漏，接到 DIR- |
 | 电机一走就停（不是步数不够） | TIM2 中断没触发 / TIM2 时钟没开 | 检查 sm_init RCC_APB1PeriphClockCmd |
 
 ---

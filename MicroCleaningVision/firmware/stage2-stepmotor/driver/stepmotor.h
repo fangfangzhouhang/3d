@@ -2,17 +2,16 @@
  * 独立于 Stage1 MCV1，stage2 专用。
  *
  * 引脚分配：
- *   PA0 = TIM2_CH1 → PUL- (脉冲，PWM 50%)
- *   PA1 = GPIO推挽 → DIR- (方向控制)
+ *   PA0 = TIM2_CH1 → PUL (脉冲输出)
+ *   PA1 = GPIO推挽 → DIR (方向控制)
  *
- * 接线 —— 共阳接法（PUL+/DIR+ 接 +5V，5V 取自 USB-TTL 模块）：
- *   +5V        → DM542 PUL+
- *   STM32 PA0  → DM542 PUL-
- *   +5V        → DM542 DIR+
- *   STM32 PA1  → DM542 DIR-
- *   24V+       → DM542 +V
- *   24V GND    → DM542 GND（必须与 STM32 GND 连通）
- *   ENA+ / ENA- 不接（默认使能）
+ * 接线是共阳极，24V GND 必须和 STM32 GND 接在一起：
+ *   DM542 PUL+、DIR+ → STM32 的 3.3V（不要接 5V，PA0 不耐 5V）
+ *   STM32 PA0        → DM542 PUL-   （推挽，空闲高 = 光耦关）
+ *   STM32 PA1        → DM542 DIR-   （开漏：低 = 正转光耦通，松开 = 反转光耦断）
+ *   ENA+、ENA- 不接
+ *   24V+             → DM542 +V
+ *   24V GND          → DM542 GND
  */
 #ifndef STEPMOTOR_H
 #define STEPMOTOR_H
@@ -54,7 +53,7 @@ bool sm_is_busy(void);
 uint32_t sm_step_count(void);
 
 /* TIM2 中断处理 —— 在 stm32f10x_it.c 里调用。
- * 每次 UPDATE 溢出计一步（一个完整脉冲）。 */
+ * 每完成半个 PWM 周期计一步（PWM Mode 2：每比较事件跳变一次）。 */
 void sm_tim2_irq(void);
 
 #endif /* STEPMOTOR_H */
