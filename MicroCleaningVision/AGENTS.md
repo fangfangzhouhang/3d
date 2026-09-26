@@ -1,31 +1,17 @@
 # MicroCleaningVision 共同上下文
 
-> 人和 AI 开始任务时依次阅读：本文件 → `project_state.yaml` → [实时进度记录](说明文档/进度记录/实时进度记录.md) → [当前该做什么与项目日志](说明文档/总流程说明/当前该做什么与项目日志.md) → `说明文档/README.md`。作战总表和百科当准则/字典，不要当本周待办。进度记录只记已经发生的事，不代替 `project_state.yaml` 里的事实边界。
+> 人和 AI 开始任务时依次阅读：本文件 → `project_state.yaml` → [当前总流程](说明文档/总流程说明/团队总流程与输入输出.md) → [串口协议与参数](说明文档/硬件组/串口协议与参数.md)。进度记录只记已经发生的事，不代替 `project_state.yaml` 里的事实边界。
 
 ## 这个项目现在到底在做什么
 
-长期目标是研究机器怎样感知、处理并复检微观表面。当前软件主线仍是视觉和上位机软件。NUCLEO-F401RE 的 MCV1 **源码已在本仓**；同学机已报 **STM32F103** 受限短喷，**证据未入库**，不得把本机代码冻结为官方实喷。真机未验收 ≠ 软件未实现。正式板仍是 F401。
-
-当前软件主线：
-
-```text
-A真实图片/数据
-→ B污染mask、面积和中心
-→ C目标点、路线、动作申请
-→ Safety Governor → Human Gate
-→ FakeSerial 或 STM32SerialController（默认不发泵）
-→ 动作后视觉复检（真实后图仍缺）
-→ Episode
-```
-
-FakeSerial只模拟确认、超时和错误，不打开COM口。软件回放不是硬件闭环，更不证明真实清洗有效。`analyze` / 默认 `--live` 不发送 PUMP。`--live --mode arm-pump --confirm-pump --arm-pump` 时，空格在识别到目标后才发限时 PUMP。
+长期目标是研究机器怎样感知、处理并复检微观表面。当前接通的实验链是：一帧画面变成污渍路径，再变成 `MOVEXY`，由 STM32F103 的 Stage 2 固件驱动两台步进电机。喷水仍是另一份 Stage 1 固件，默认不发送。毫米是占位值，不能写成已经标定或已经清洗。
 
 ## 三个人的责任和目录
 
 - A 数据与模型：`microcleaning/data_learning/`、`test/data_learning/`。
 - B 视觉识别与测量：`microcleaning/vision/`、`test/vision/`。
 - C 目标规划与控制仿真：`microcleaning/control_system/`、`test/control_system/`。
-- 硬件组：`firmware/nucleo_f401re/`（正式目标）与 `firmware/stm32f103/`（走通实验）。源码在仓；可烧录工程与实机记录由硬件组留下，不提交 `.elf`。不要把 F103 走通写成 F401 已验收。
+- 硬件组：`firmware/stage2-stepmotor/`、`firmware/stm32f103/`、`firmware/keil/`。不提交 `.hex`。Stage 2 与 Stage 1 不能同时烧在一块芯片上。
 
 所有人理解整条链，但只直接修改自己的业务目录。上游未到位时使用合成fixture继续，不把fixture写成真实证据。
 
@@ -67,11 +53,11 @@ FakeSerial只模拟确认、超时和错误，不打开COM口。软件回放不�
 
 ## 当前最低硬件边界
 
-1. 默认不打开真实串口；`ping-only` / probe 必须使用人确认的 ST-LINK COM，禁止扫口。
+1. 默认不打开真实串口。端口必须是人确认的 USB-TTL 或调试口，禁止扫口。
 2. 没有有效标定不产生毫米动作（`work_mm` / `SPRAY_AT_POINT`）。`PUMP_IN_PLACE` 的 `nozzle_fixed (0,0)` 不是伪造工作台坐标。
 3. 自然语言、模型或 LLM 不能成为硬件命令。
 4. 第一次真实泵动作必须经过 Safety Governor（HUMAN）→ `--confirm-pump` → `--arm-pump`，并有人在场。缺一不可。
 5. 视觉模块不得 `serial.write`。未接 12V 的 PUMP 回执只能写逻辑脚/协议，不能写清洗有效。
-6. 固件源码在仓不等于已烧录、不等于已联调。
+6. 固件源码在仓不等于这次上电已经烧的是这份程序。
 
-完整任务、术语、Git、作战总表和长期阶段见 `说明文档/README.md`。
+术语、Git 和长期阶段见 `说明文档/总流程说明/` 与 `说明文档/未来计划/`。
