@@ -1,6 +1,6 @@
 # U500 USB 数码显微镜接入指南
 
-> 本周待办见 [当前该做什么与项目日志](../总流程说明/当前该做什么与项目日志.md)。**一条总命令：** `.\.venv\Scripts\python.exe scripts\probe_usb_camera.py --capture-test --device-index 0`
+> 当前链路见 [当前总流程](../总流程说明/团队总流程与输入输出.md)。**一条总命令：** `.\.venv\Scripts\python.exe scripts\probe_usb_camera.py --capture-test --device-index 0`
 
 > 当前事实：设备是 U500 USB 数码显微镜，不是工业相机。尚未在本仓库主机上成功执行实机 probe 证据入库，因此状态仍是 `integration_not_verified`，不能写“U500 已接入完成”。09-13 本机曾确认设备号 0 是显微镜，那不等于官方 probe 包已进仓。
 

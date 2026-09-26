@@ -1,5 +1,7 @@
 /* main.c — stage2 步进电机双轴测试入口
  *
+ * 句子和参数以 说明文档/硬件组/串口协议与参数.md 为准。
+ *
  * 串口命令 (USART2 @ 115200 8N1)：
  *   HELLO                                   → STEP_OK v0.3
  *   PULSE <N> [FWD|REV]                     → X 轴发 N 个脉冲（默认 FWD）

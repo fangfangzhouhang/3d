@@ -164,8 +164,8 @@ def build_path_preview(
     )
     narrative = format_path_narrative(plan, waypoints, config, motion)
     evidence = (
-        "路径规则+假设毫米+步进对照；feeds_action_request=false；"
-        "不发送MOVE/PUMP；不能写成已标定或清洗有效"
+        "路径规则+假设毫米+步进对照；本预览不打开串口、不发泵；"
+        "Stage 2 另按预算把相对步数写成 MOVEXY；不能写成已标定或清洗有效"
     )
     return PathPreview(plan, waypoints, config, motion, narrative, evidence)
 
@@ -179,7 +179,7 @@ def format_path_narrative(
     steps_x, source_x = placeholders.stepper.steps_per_mm("x")
     steps_y, source_y = placeholders.stepper.steps_per_mm("y")
     lines = [
-        "========== 路径预览（软件仿真，不发 MOVE / 不发泵） ==========",
+        "========== 路径预览（假设毫米；本段不打开串口、不发泵） ==========",
         f"1. 策略：{plan.strategy.value}；块顺序：{plan.visit_order}；坐标系：{plan.coordinate_frame}",
         f"2. 规则说明：{plan.reason}",
         (
@@ -219,7 +219,7 @@ def format_path_narrative(
     if len(waypoints) > 8:
         lines.append(f"   … 其余 {len(waypoints) - 8} 个点见 summary.json 的 path_preview.waypoints")
     if plan.strategy is CleaningStrategy.CENTER_POINT:
-        lines.append("   中心点策略：电机对照主要是空驶到点；到达后的短喷仍是 PUMP_IN_PLACE，本表不发 MOVE。")
+        lines.append("   中心点策略：电机对照主要是空驶到点。短喷仍是另一份 Stage 1 固件，这条链不发泵。")
 
     shown_legs = motion.legs[:6]
     for leg in shown_legs:
@@ -237,10 +237,10 @@ def format_path_narrative(
         f"|步| X={motion.total_abs_steps_x} Y={motion.total_abs_steps_y}"
     )
     if motion.out_of_travel:
-        lines.append("   警告：有点超出 travel_min/max 占位，仍不发 MOVE。")
+        lines.append("   警告：有点超出 travel_min/max 占位。")
     if not motion.homed:
-        lines.append("   未 HOME：上面的步数只是对照，禁止当真机指令。")
-    lines.append("8. feeds_action_request=false，send_to_controller=false。当前固件仍是 MCV1，没有 MOVE。")
+        lines.append("   未回零：步数是相对增量，不是台面绝对坐标。Stage 2 按每轴预算截断后再发 MOVEXY。")
+    lines.append("8. 本预览不写 ActionRequest，也不自己打开串口。")
     lines.append("==============================================================")
     return tuple(lines)
 

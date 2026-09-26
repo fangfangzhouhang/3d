@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -76,19 +77,21 @@ class Stage2SerialLink:
                 raise Stage2ProtocolError("NO_HELLO", hello.raw)
             for line in dispatch.lines:
                 parts = line.split()  # MOVEXY <nx> <dx> <ny> <dy>
-                payload = encode_move_xy(int(parts[1]), parts[2], int(parts[3]), parts[4])
+                x_steps = int(parts[1])
+                y_steps = int(parts[3])
+                payload = encode_move_xy(x_steps, parts[2], y_steps, parts[4])
                 start = self._exchange(payload)
                 replies.append(start.raw)
                 if (
                     start.kind != "STEP2_START"
-                    or start.x_steps != int(parts[1])
+                    or start.x_steps != x_steps
                     or start.x_direction != parts[2]
-                    or start.y_steps != int(parts[3])
+                    or start.y_steps != y_steps
                     or start.y_direction != parts[4]
                 ):
                     stopped = self._stop_into(replies)
                     raise Stage2ProtocolError("BAD_START", start.raw)
-                idle = self._wait_idle_xy()
+                idle = self._wait_idle_xy(max(x_steps, y_steps))
                 replies.append(idle.raw)
                 if idle.x_busy or idle.y_busy:
                     stopped = self._stop_into(replies)
@@ -110,12 +113,18 @@ class Stage2SerialLink:
             except Exception:
                 pass
 
-    def _wait_idle_xy(self) -> Stage2Reply:
+    def _wait_idle_xy(self, steps: int) -> Stage2Reply:
+        # 固件默认 500 Hz。按较长那一轴的步数等它走完，不要在脉冲结束前连续读满就判定失败。
+        deadline = time.monotonic() + (max(steps, 1) / 500.0) + 0.5
         last = Stage2Reply("STEP2", "", x_busy=True, y_busy=True)
-        for _ in range(self._read_limit):
+        while time.monotonic() < deadline:
             last = self._exchange(encode_read_xy())
             if last.kind == "STEP2" and not last.x_busy and not last.y_busy:
                 return last
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                break
+            time.sleep(min(0.05, remaining))
         return last
 
     def _stop_into(self, replies: list[str]) -> bool:
