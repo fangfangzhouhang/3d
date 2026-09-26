@@ -1,17 +1,20 @@
-/* main.c — stage2 步进电机独立测试入口
+/* main.c — stage2 步进电机双轴测试入口
  *
  * 串口命令 (USART2 @ 115200 8N1)：
- *   HELLO                → STEP_OK v0.2
- *   PULSE <N> [FWD|REV]  → 发 N 个脉冲（默认 FWD）
- *   MOVE <N>             → 等价 PULSE N（当前方向）
- *   SPEED <Hz>           → 设频率 10-20000Hz
- *   STOP                 → 立即停止
- *   READ                 → 返回 STEP_SENT=xx BUSY=0|1 FREQ=xxx
+ *   HELLO                                   → STEP_OK v0.3
+ *   PULSE <N> [FWD|REV]                     → X 轴发 N 个脉冲（默认 FWD）
+ *   MOVEXY <Nx> <FWD|REV> <Ny> <FWD|REV>    → X/Y 同时发脉冲，走直线
+ *   MOVE <N>                                → 等价 PULSE N
+ *   SPEED <Hz>                              → 两轴同设频率 10-20000Hz
+ *   STOP                                    → 两轴立即停止
+ *   READ                                    → X 状态 STEP_SENT=xx BUSY=0|1
+ *   READXY                                  → 两轴状态 STEP2 X=.. BX=.. Y=.. BY=..
  *
- * 接线（共阳极）：
- *   PUL+、DIR+ 接在一起，接到 STM32 的 3.3V，不要接 5V
- *   PA0 → PUL-，PA1 → DIR-（开漏）
- *   STM32 GND 与 DM542 GND、24V 地共地；ENA 不接
+ * 接线（共阳极，两台 DM542）：
+ *   每台 PUL+、DIR+ 接在一起，接到 STM32 的 3.3V，不要接 5V
+ *   X：PA6 → X PUL-，PA7 → X DIR-
+ *   Y：PA0 → Y PUL-，PA1 → Y DIR-
+ *   STM32 GND 与两台 DM542 GND、24V 地共地；ENA 不接
  *   24V+ → DM542 +V
  */
 #include <stdint.h>
@@ -38,7 +41,7 @@ static void parse_and_exec(const char *line) {
 
   /* HELLO */
   if (strncmp(line, "HELLO", 5) == 0) {
-    tx_response("STEP_OK v0.2");
+    tx_response("STEP_OK v0.3");
     return;
   }
 
@@ -46,6 +49,19 @@ static void parse_and_exec(const char *line) {
   if (strncmp(line, "STOP", 4) == 0) {
     sm_stop();
     tx_response("STEP_STOPPED");
+    return;
+  }
+
+  /* READXY —— 两轴状态 */
+  if (strncmp(line, "READXY", 6) == 0) {
+    char buf[64];
+    (void)snprintf(buf, sizeof(buf),
+                   "STEP2 X=%lu BX=%lu Y=%lu BY=%lu",
+                   (unsigned long)sm_step_count(),
+                   (unsigned long)(sm_is_busy() ? 1u : 0u),
+                   (unsigned long)sm_y_step_count(),
+                   (unsigned long)(sm_y_is_busy() ? 1u : 0u));
+    tx_response(buf);
     return;
   }
 
@@ -91,6 +107,35 @@ static void parse_and_exec(const char *line) {
     (void)snprintf(buf, sizeof(buf),
                    "STEP_START N=%lu %s",
                    (unsigned long)n, dir == SM_DIR_FWD ? "FWD" : "REV");
+    tx_response(buf);
+    return;
+  }
+
+  /* MOVEXY <Nx> <FWD|REV> <Ny> <FWD|REV> —— 双轴同时运动 */
+  if (strncmp(line, "MOVEXY ", 7) == 0) {
+    unsigned long nx = 0u;
+    unsigned long ny = 0u;
+    char dx[8] = {0};
+    char dy[8] = {0};
+    sm_dir_t dxd;
+    sm_dir_t dyd;
+    char buf[64];
+
+    if (sscanf(line + 7, "%lu %7s %lu %7s", &nx, dx, &ny, dy) != 4) {
+      tx_response("ERR: BAD_MOVEXY");
+      return;
+    }
+    if (nx > SM_MAX_PULSE_STEPS || ny > SM_MAX_PULSE_STEPS) {
+      tx_response("ERR: N>20000");
+      return;
+    }
+    dxd = (strcmp(dx, "REV") == 0) ? SM_DIR_REV : SM_DIR_FWD;
+    dyd = (strcmp(dy, "REV") == 0) ? SM_DIR_REV : SM_DIR_FWD;
+    sm_start_xy((uint32_t)nx, dxd, (uint32_t)ny, dyd);
+    (void)snprintf(buf, sizeof(buf),
+                   "STEP2_START X=%lu %s Y=%lu %s",
+                   nx, dxd == SM_DIR_FWD ? "FWD" : "REV",
+                   ny, dyd == SM_DIR_FWD ? "FWD" : "REV");
     tx_response(buf);
     return;
   }
@@ -141,9 +186,10 @@ int main(void) {
   sm_init();
 
   /* 启动 Banner —— 等 Python probe 脚本或串口助手 */
-  hal_uart_send_str("\r\n=== STAGE2 STEPMOTOR TEST ===\r\n");
-  hal_uart_send_str("DM542 + 57-56, X axis only\r\n");
-  hal_uart_send_str("HELLO / PULSE N / MOVE N / SPEED Hz / STOP / READ\r\n");
+  hal_uart_send_str("\r\n=== STAGE2 STEPMOTOR XY TEST ===\r\n");
+  hal_uart_send_str("2x DM542 + 2x 57-56, X+Y axes\r\n");
+  hal_uart_send_str("HELLO / PULSE N / MOVEXY Nx d Ny d / MOVE N / "
+                    "SPEED Hz / STOP / READ / READXY\r\n");
   hal_uart_send_str("Waiting...\r\n");
 
   while (1) {

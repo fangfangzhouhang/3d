@@ -1,19 +1,26 @@
-"""Stage 2 轴位。X 已接线可发送；Y 只保留同名接口，不进入串口字节。"""
+"""Stage 2 轴位。X/Y 均已接线，每段生成一条 MOVEXY 双轴同时出串口。"""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
-from microcleaning.control_system.planning.stepper_preview import MotionLeg, MotionPreview, StepperConfig
+from microcleaning.control_system.planning.stepper_preview import (
+    MotionLeg,
+    MotionPreview,
+    StepperConfig,
+)
 
 
 MAX_PULSE_STEPS = 20000
 DEFAULT_TRANSMIT_BUDGET = 1600
 
+_MOVEXY_LINE = re.compile(r"^MOVEXY \d+ (?:FWD|REV) \d+ (?:FWD|REV)$")
+
 
 @dataclass(frozen=True)
 class AxisSlot:
-    """一根轴的铭牌和是否允许出串口。Y 现在 wired/transmit 都是 false。"""
+    """一根轴的铭牌和是否允许出串口。"""
 
     name: str
     wired: bool
@@ -29,8 +36,6 @@ class AxisSlot:
             raise ValueError("步/圈、细分、导程必须为正")
         if self.transmit and not self.wired:
             raise ValueError(f"{self.name} 未接线，不能发送")
-        if self.name == "y" and self.transmit:
-            raise ValueError("Y 轴接口已预留，当前 Stage 2 固件只有 X，禁止发送")
 
     def steps_per_mm(self) -> float:
         self.validate()
@@ -40,16 +45,16 @@ class AxisSlot:
 def stage2_axis_slots() -> tuple[AxisSlot, AxisSlot]:
     return (
         AxisSlot("x", wired=True, transmit=True),
-        AxisSlot("y", wired=False, transmit=False),
+        AxisSlot("y", wired=True, transmit=True),
     )
 
 
 def stage2_stepper() -> StepperConfig:
-    """X 用 1600 脉冲/转、5 mm/转。Y 用同一铭牌只做对照，不发出去。"""
+    """X/Y 都用 1600 脉冲/转、5 mm/转，双轴均可发送。"""
 
     x_slot, y_slot = stage2_axis_slots()
     stepper = StepperConfig(
-        version="stage2-x-wired-y-reserved-v0",
+        version="stage2-xy-wired-v0",
         steps_per_rev=x_slot.steps_per_rev,
         microstep=x_slot.microstep,
         lead_mm_per_rev_x=x_slot.lead_mm_per_rev,
@@ -61,36 +66,28 @@ def stage2_stepper() -> StepperConfig:
 
 
 @dataclass(frozen=True)
-class HeldAxisMove:
-    axis: str
-    steps: int
-    direction: str
-
-    def to_dict(self) -> dict[str, object]:
-        return {"axis": self.axis, "steps": self.steps, "direction": self.direction, "transmitted": False}
-
-
-@dataclass(frozen=True)
 class Stage2Dispatch:
-    x_lines: tuple[str, ...]
-    y_held: tuple[HeldAxisMove, ...]
+    lines: tuple[str, ...]
     planned_abs_steps_x: int
+    planned_abs_steps_y: int
     transmit_abs_steps_x: int
+    transmit_abs_steps_y: int
     budget: int
     truncated: bool
 
     def wire_text(self) -> str:
-        return "".join(f"{line}\r\n" for line in self.x_lines)
+        return "".join(f"{line}\r\n" for line in self.lines)
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "x_lines": list(self.x_lines),
-            "y_held": [item.to_dict() for item in self.y_held],
+            "lines": list(self.lines),
             "planned_abs_steps_x": self.planned_abs_steps_x,
+            "planned_abs_steps_y": self.planned_abs_steps_y,
             "transmit_abs_steps_x": self.transmit_abs_steps_x,
+            "transmit_abs_steps_y": self.transmit_abs_steps_y,
             "budget": self.budget,
             "truncated": self.truncated,
-            "y_on_wire": False,
+            "y_on_wire": True,
         }
 
 
@@ -99,7 +96,7 @@ def dispatch_motion(
     *,
     budget: int = DEFAULT_TRANSMIT_BUDGET,
 ) -> Stage2Dispatch:
-    """XY 对照都保留。串口文本只含 X 的 PULSE，并且不超过预算。"""
+    """每个路径段一行 MOVEXY，双轴同时发送；两轴累计步数都不超过预算。"""
 
     slots = {slot.name: slot for slot in stage2_axis_slots()}
     for slot in slots.values():
@@ -107,46 +104,47 @@ def dispatch_motion(
     if budget < 0:
         raise ValueError("发送预算不能为负")
 
-    x_lines: list[str] = []
-    y_held: list[HeldAxisMove] = []
-    planned = 0
-    transmitted = 0
+    lines: list[str] = []
+    planned_x = 0
+    planned_y = 0
+    tx_x = 0
+    tx_y = 0
     truncated = False
     for leg in motion.legs:
-        planned += abs(leg.steps_x)
-        y_move = _held_move(slots["y"], leg.steps_y)
-        if y_move is not None:
-            y_held.append(y_move)
-        steps = abs(leg.steps_x)
-        if steps == 0:
+        ax = abs(leg.steps_x)
+        ay = abs(leg.steps_y)
+        planned_x += ax
+        planned_y += ay
+        if ax == 0 and ay == 0:
             continue
-        if steps > MAX_PULSE_STEPS or transmitted + steps > budget:
+        if ax > MAX_PULSE_STEPS or ay > MAX_PULSE_STEPS:
             truncated = True
             break
-        line = _x_line(slots["x"], leg)
-        if line is None:
-            continue
-        x_lines.append(line)
-        transmitted += steps
-    text = "".join(x_lines)
-    if "MCV1" in text or "\nY" in text or text.startswith("Y"):
-        raise RuntimeError("X 轴报文混入了禁止字段")
-    return Stage2Dispatch(tuple(x_lines), tuple(y_held), planned, transmitted, budget, truncated)
+        if tx_x + ax > budget or tx_y + ay > budget:
+            truncated = True
+            break
+        lines.append(_xy_line(leg))
+        tx_x += ax
+        tx_y += ay
+
+    text = "\n".join(lines)
+    if "MCV1" in text or "PUMP" in text:
+        raise RuntimeError("双轴报文混入了禁止字段")
+    for line in lines:
+        if not _MOVEXY_LINE.match(line):
+            raise RuntimeError(f"报文行格式非法：{line}")
+    return Stage2Dispatch(
+        tuple(lines),
+        planned_x,
+        planned_y,
+        tx_x,
+        tx_y,
+        budget,
+        truncated,
+    )
 
 
-def _x_line(slot: AxisSlot, leg: MotionLeg) -> str | None:
-    if not slot.transmit or slot.name != "x" or leg.steps_x == 0:
-        return None
-    direction = "FWD" if leg.steps_x > 0 else "REV"
-    steps = abs(leg.steps_x)
-    if steps > MAX_PULSE_STEPS:
-        return None
-    return f"PULSE {steps} {direction}"
-
-
-def _held_move(slot: AxisSlot, steps: int) -> HeldAxisMove | None:
-    if steps == 0:
-        return None
-    if slot.transmit:
-        slot.validate()
-    return HeldAxisMove(slot.name, abs(steps), "FWD" if steps > 0 else "REV")
+def _xy_line(leg: MotionLeg) -> str:
+    dir_x = "FWD" if leg.steps_x >= 0 else "REV"
+    dir_y = "FWD" if leg.steps_y >= 0 else "REV"
+    return f"MOVEXY {abs(leg.steps_x)} {dir_x} {abs(leg.steps_y)} {dir_y}"
