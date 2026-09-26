@@ -1,15 +1,14 @@
-/* stepmotor.c — DM542 步进电机驱动
+/* stepmotor.c — DM542 步进电机驱动（共阳极）
  *
  * 实现方式：TIM2 输出比较 + Toggle 模式
- *   TIM2_CH1 输出 → PA0 → DM542 PUL+
- *   每次比较事件：PA0 翻转（PWM 半个周期）
- *   两次翻转 = 一个完整脉冲 = 一步
- *   到达目标步数后关 TIM2 中断，PA0 停在高电平（DM542 默认不转）
+ *   TIM2_CH1 → PA0 → DM542 PUL-
+ *   每次比较事件 PA0 翻转一次，中断里计一步。正转距离已经按这个计数对准，不要改成“两次翻转才算一步”。
+ *   走完后把 PA0 拉回高电平。共阳极里高电平 = 光耦不导通 = 没有脉冲。
  *
- * 方向：PA1 推挽输出
- *   FWD = PA1 低电平
- *   REV = PA1 高电平
- *   （具体极性可实测后改 —— 先试低=正转）
+ * 方向：PA1 开漏，接到 DIR-
+ *   FWD = 拉低，光耦导通（正转已经对准，不要对调）
+ *   REV = 松开（开漏高阻）。阳极必须接 STM32 的 3.3V，不能接 5V：
+ *         PA0 不耐 5V，5V 灌进脉冲脚会让芯片反复复位，电机就会慢慢正转。
  *
  * TIM2 时钟：Stage2 用 HSI 8MHz，未锁 PLL
  *   PWM 频率 = TIM2_CLK / (PSC+1) / (ARR+1)
@@ -45,6 +44,8 @@ static uint32_t sm_freq_hz;
 static uint16_t sm_psc;
 static uint16_t sm_arr;
 
+static void sm_pulse_idle_high(void);
+
 static void sm_write_dir(sm_dir_t d) {
   sm_dir = d;
   if (d == SM_DIR_FWD) {
@@ -52,6 +53,16 @@ static void sm_write_dir(sm_dir_t d) {
   } else {
     GPIO_SetBits(SM_DIR_GPIO_PORT, SM_DIR_PIN);
   }
+}
+
+static void sm_pulse_idle_high(void) {
+  GPIO_InitTypeDef gpio;
+
+  gpio.GPIO_Pin = SM_PUL_PIN;
+  gpio.GPIO_Speed = GPIO_Speed_50MHz;
+  gpio.GPIO_Mode = GPIO_Mode_Out_PP;
+  GPIO_Init(SM_PUL_GPIO_PORT, &gpio);
+  GPIO_SetBits(SM_PUL_GPIO_PORT, SM_PUL_PIN);
 }
 
 static void sm_calc_psc_arr(uint32_t hz) {
@@ -82,19 +93,12 @@ void sm_init(void) {
   /* TIM2 时钟 (APB1) */
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 
-  /* PA0 = TIM2_CH1 复用推挽 */
-  gpio.GPIO_Pin = SM_PUL_PIN;
-  gpio.GPIO_Speed = GPIO_Speed_50MHz;
-  gpio.GPIO_Mode = GPIO_Mode_AF_PP;
-  GPIO_Init(SM_PUL_GPIO_PORT, &gpio);
-
-  /* PA1 = DIR 普通推挽 */
+  /* PA1 = DIR-，开漏。高电平必须放开引脚，不能用推挽顶到 3.3V。 */
   gpio.GPIO_Pin = SM_DIR_PIN;
-  gpio.GPIO_Mode = GPIO_Mode_Out_PP;
+  gpio.GPIO_Mode = GPIO_Mode_Out_OD;
   GPIO_Init(SM_DIR_GPIO_PORT, &gpio);
 
-  /* 默认 DIR = 正转，PUL 停在高（DM542 安全态） */
-  GPIO_SetBits(SM_PUL_GPIO_PORT, SM_PUL_PIN);
+  /* 默认方向为正转。脉冲脚先不要交给定时器。 */
   sm_write_dir(SM_DIR_FWD);
 
   /* TIM2 时基 —— 先算默认频率的 PSC/ARR */
@@ -108,11 +112,14 @@ void sm_init(void) {
 
   /* OC1 通道 —— Toggle 模式（每比较事件翻转 PA0） */
   oc.TIM_OCMode = TIM_OCMode_Toggle;
-  oc.TIM_OutputState = TIM_OutputState_Enable;
+  oc.TIM_OutputState = TIM_OutputState_Disable;
   oc.TIM_Pulse = 0u;  /* CCR = 0 → CNT==0 时翻转（ARR 溢出时也会翻转？实际上 Toggle 模式下比较事件每次都触发） */
   oc.TIM_OCPolarity = TIM_OCPolarity_High;
   TIM_OC1Init(TIM2, &oc);
   TIM_OC1PreloadConfig(TIM2, TIM_OCPreload_Enable);
+  /* 通道先关掉。不关的话定时器复位电平是低，PA0 一接上光耦就导通。 */
+  TIM_CCxCmd(TIM2, TIM_Channel_1, TIM_CCx_Disable);
+  TIM_Cmd(TIM2, DISABLE);
 
   /* TIM2 中断 —— CC1 比较事件 */
   TIM_ClearITPendingBit(TIM2, TIM_IT_CC1 | TIM_IT_Update);
@@ -126,6 +133,9 @@ void sm_init(void) {
   sm_step_sent = 0u;
   sm_step_target = 0u;
   sm_freq_hz = SM_DEFAULT_FREQ_HZ;
+
+  /* 共阳极空闲必须是高电平，光耦关断。定时器通道默认是低，不能在这时接到 PA0。 */
+  sm_pulse_idle_high();
 }
 
 void sm_set_freq(uint32_t hz) {
@@ -140,16 +150,6 @@ void sm_set_freq(uint32_t hz) {
     TIM2->PSC = sm_psc;
     TIM2->ARR = sm_arr;
   }
-}
-
-static void sm_pulse_idle_high(void) {
-  GPIO_InitTypeDef gpio;
-
-  gpio.GPIO_Pin = SM_PUL_PIN;
-  gpio.GPIO_Speed = GPIO_Speed_50MHz;
-  gpio.GPIO_Mode = GPIO_Mode_Out_PP;
-  GPIO_Init(SM_PUL_GPIO_PORT, &gpio);
-  GPIO_SetBits(SM_PUL_GPIO_PORT, SM_PUL_PIN);
 }
 
 static void sm_pulse_to_timer(void) {
@@ -174,7 +174,8 @@ void sm_start(uint32_t steps, sm_dir_t dir) {
   sm_stop();
   sm_pulse_idle_high();
   sm_write_dir(dir);
-  sm_delay_us(20);
+  /* DM542 要求方向至少比脉冲早 5us。留 200us，避免换向沿被计成一步。 */
+  sm_delay_us(200);
 
   sm_step_sent = 0u;
   sm_step_target = steps;
@@ -186,6 +187,7 @@ void sm_start(uint32_t steps, sm_dir_t dir) {
   TIM_ClearITPendingBit(TIM2, TIM_IT_CC1 | TIM_IT_Update);
 
   sm_pulse_to_timer();
+  TIM_CCxCmd(TIM2, TIM_Channel_1, TIM_CCx_Enable);
   TIM_ITConfig(TIM2, TIM_IT_CC1, ENABLE);
   TIM_Cmd(TIM2, ENABLE);
 
@@ -195,7 +197,9 @@ void sm_start(uint32_t steps, sm_dir_t dir) {
 void sm_stop(void) {
   TIM_Cmd(TIM2, DISABLE);
   TIM_ITConfig(TIM2, TIM_IT_CC1, DISABLE);
+  TIM_CCxCmd(TIM2, TIM_Channel_1, TIM_CCx_Disable);
   sm_busy = false;
+  sm_pulse_idle_high();
 }
 
 bool sm_is_busy(void) {
@@ -214,7 +218,6 @@ void sm_tim2_irq(void) {
 
     if (sm_step_sent >= sm_step_target) {
       sm_stop();
-      sm_pulse_idle_high();
     }
   }
 }
