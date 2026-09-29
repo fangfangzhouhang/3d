@@ -284,14 +284,19 @@ def run_live_station(
                 last_status = "algorithm=local"
                 continue
             if key == SPACE_KEY:
-                run_dir = analyze(frame, current_algorithm)
-                run_dirs.append(run_dir)
-                last_status = _status_after_analyze(run_dir, pump_on_analyze=pump_on_analyze)
-                result_path = run_dir / "path_overlay.png"
-                if result_path.is_file():
-                    result = cv2.imread(str(result_path), cv2.IMREAD_COLOR)
-                    if result is not None:
-                        show(RESULT_WINDOW, result)
+                try:
+                    run_dir = analyze(frame, current_algorithm)
+                    run_dirs.append(run_dir)
+                    last_status = _status_after_analyze(run_dir, pump_on_analyze=pump_on_analyze)
+                    result_path = run_dir / "path_overlay.png"
+                    if result_path.is_file():
+                        result = cv2.imread(str(result_path), cv2.IMREAD_COLOR)
+                        if result is not None:
+                            show(RESULT_WINDOW, result)
+                except Exception as exc:
+                    print(f"分析出错但继续预览：{exc}")
+                    last_status = f"analyze failed: {type(exc).__name__}"
+                continue
     finally:
         if algorithm_state is not None:
             algorithm_state[0] = current_algorithm
