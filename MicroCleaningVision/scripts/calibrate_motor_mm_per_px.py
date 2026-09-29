@@ -8,6 +8,8 @@
 步骤：抓帧f0 → 只走X → 抓帧f1 → 只走Y → 抓帧f2 → 模板匹配跟踪特征。
 结果写入 JSON 证据文件；feeds_action_request 始终为 false。
 这一步只标定尺度，不修改规划规则，也不写工作台绝对坐标。
+
+标定期间保持预览窗口打开，可以看到电机转动过程。
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -74,67 +77,34 @@ class Motor:
         if "STEP_OK v0.3" not in replies:
             raise RuntimeError(f"握手失败，期望 STEP_OK v0.3，实际 {replies}")
 
-    def move(self, nx: int, dx: str, ny: int, dy: str) -> None:
-        replies = self._cmd(f"MOVEXY {nx} {dx} {ny} {dy}")
-        if not any(r.startswith("STEP2_START") for r in replies):
-            raise RuntimeError(f"未收到 STEP2_START：{replies}")
-        steps = max(abs(nx), abs(ny))
-        deadline = time.monotonic() + (max(steps, 1) / max(self.speed_hz, 1)) + 2.0
-        last = ""
-        while time.monotonic() < deadline:
-            replies = self._cmd("READXY", wait=0.12)
-            last = replies[0] if replies else ""
-            parts = dict(tok.split("=") for tok in last.split()[1:] if "=" in tok)
-            if parts.get("BX") == "0" and parts.get("BY") == "0":
-                return
-            time.sleep(0.05)
-        raise TimeoutError(f"电机在时限内未空闲：{last}")
+    def move_async(self, nx: int, dx: str, ny: int, dy: str) -> threading.Thread:
+        """异步移动，返回线程对象"""
+        def _move():
+            replies = self._cmd(f"MOVEXY {nx} {dx} {ny} {dy}")
+            if not any(r.startswith("STEP2_START") for r in replies):
+                raise RuntimeError(f"未收到 STEP2_START：{replies}")
+            steps = max(abs(nx), abs(ny))
+            deadline = time.monotonic() + (max(steps, 1) / max(self.speed_hz, 1)) + 2.0
+            last = ""
+            while time.monotonic() < deadline:
+                replies = self._cmd("READXY", wait=0.12)
+                last = replies[0] if replies else ""
+                parts = dict(tok.split("=") for tok in last.split()[1:] if "=" in tok)
+                if parts.get("BX") == "0" and parts.get("BY") == "0":
+                    return
+                time.sleep(0.05)
+            raise TimeoutError(f"电机在时限内未空闲：{last}")
+
+        thread = threading.Thread(target=_move, daemon=True)
+        thread.start()
+        return thread
 
     def close(self) -> None:
         self.ser.close()
 
 
-def align_feature(cap, cv2, np, half: int):
-    """显示实时画面与中央跟踪框，空格确认对位，Q 退出。"""
-    print("对位：把一个清晰、高对比的小特征（如深色小点/细划痕交点）移到中央框内并对焦，按空格开始。")
-    while True:
-        ok, frame = cap.read()
-        if not ok:
-            time.sleep(0.02)
-            continue
-        h, w = frame.shape[:2]
-        cx, cy = w // 2, h // 2
-        view = frame.copy()
-        cv2.rectangle(view, (cx - half, cy - half), (cx + half, cy + half), (0, 255, 0), 2)
-        cv2.putText(view, "SPACE=start  move sharp mark into box", (8, 24),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 3, cv2.LINE_AA)
-        cv2.putText(view, "SPACE=start  move sharp mark into box", (8, 24),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1, cv2.LINE_AA)
-        cv2.imshow("calibration align", view)
-        key = cv2.waitKey(30) & 0xFF
-        if key == ord(" "):
-            break
-        if key == ord("q"):
-            raise RuntimeError("用户在对位窗口退出")
-    cv2.destroyWindow("calibration align")
-
-
-def grab(cap, cv2, np, frames: int = 6):
-    last = None
-    for _ in range(frames):
-        ok, frame = cap.read()
-        last = frame if ok else last
-    if last is None:
-        raise RuntimeError("抓帧失败")
-    return last
-
-
 def wait_live(cap, cv2, np, timeout_s: float = 8.0) -> bool:
-    """确认相机流是活的：连续两帧之间应有传感器噪声差异。
-
-    冻结的流（例如上一个进程刚被强杀、相机未释放干净时）会反复返回同一帧，
-    噪声差异恰好为 0；活的流即使对着静止场景也有噪声（经验上均值 >0.05）。
-    """
+    """确认相机流是活的：连续两帧之间应有传感器噪声差异。"""
     t0 = time.time()
     prev = None
     while time.time() - t0 < timeout_s:
@@ -167,7 +137,7 @@ def track(cv2, np, frame_from, frame_to, half: int):
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="电机已知位移标定真实 mm/px")
+    parser = argparse.ArgumentParser(description="电机已知位移标定真实 mm/px（保持预览窗口打开）")
     parser.add_argument("--serial-port", required=True, help="Stage2 COM 口，如 COM5")
     parser.add_argument("--baudrate", type=int, default=115200)
     parser.add_argument("--serial-timeout", type=float, default=2.0)
@@ -196,76 +166,188 @@ def main(argv: list[str] | None = None) -> int:
             "请等几秒后重试，或重新插拔摄像头 USB 线。"
         )
     print("相机流活性检测通过")
-    align_feature(cap, cv2, np, args.template_half + 8)
-    motor = Motor(serial_mod, args.serial_port, args.baudrate, args.serial_timeout)
+
+    # 状态机：0=对位, 1=标定X中, 2=标定Y中, 3=完成, 4=预览
+    state = 0
+    half = args.template_half + 8
+    f0 = f1 = f2 = None
+    motor_thread = None
+    motor = None
+    status_text = "SPACE=start  move sharp mark into box"
+
+    print("对位：把一个清晰、高对比的小特征（如深色小点/细划痕交点）移到中央框内并对焦，按空格开始。")
+    print("标定期间窗口保持打开，可以看到电机转动。")
+
     try:
-        motor.hello()
-        print("握手成功 STEP_OK v0.3")
-        motor.set_speed(args.speed)
-        print(f"标定频率 {args.speed} Hz")
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                time.sleep(0.02)
+                continue
 
-        f0 = grab(cap, cv2, np)
-        cv2.imwrite(str(out_dir / "f0.png"), f0)
-        print(f"f0 已抓：{out_dir/'f0.png'}")
+            h, w = frame.shape[:2]
+            cx, cy = w // 2, h // 2
+            view = frame.copy()
 
-        motor.move(args.steps, "FWD", 0, "FWD")
-        time.sleep(0.3)
-        f1 = grab(cap, cv2, np)
-        cv2.imwrite(str(out_dir / "f1_after_x.png"), f1)
+            # 画中央框
+            cv2.rectangle(view, (cx - half, cy - half), (cx + half, cy + half), (0, 255, 0), 2)
 
-        motor.move(0, "FWD", args.steps, "REV")
-        time.sleep(0.3)
-        f2 = grab(cap, cv2, np)
-        cv2.imwrite(str(out_dir / "f2_after_y.png"), f2)
+            # 根据状态显示不同文字
+            if state == 0:
+                cv2.putText(view, "SPACE=start  move sharp mark into box", (8, 24),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 3, cv2.LINE_AA)
+                cv2.putText(view, "SPACE=start  move sharp mark into box", (8, 24),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1, cv2.LINE_AA)
+            elif state == 1:
+                cv2.putText(view, "CALIBRATING X...  motor moving", (8, 24),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
+            elif state == 2:
+                cv2.putText(view, "CALIBRATING Y...  motor moving", (8, 24),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
+            elif state == 3:
+                cv2.putText(view, "CALIBRATION DONE  entering preview...", (8, 24),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
+            else:
+                cv2.putText(view, status_text, (8, 24),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1, cv2.LINE_AA)
+
+            cv2.imshow("calibration", view)
+            key = cv2.waitKey(1) & 0xFF
+
+            if key == ord("q"):
+                break
+
+            if state == 0 and key == ord(" "):
+                # 开始对位确认，抓 f0
+                f0 = frame.copy()
+                cv2.imwrite(str(out_dir / "f0.png"), f0)
+                print(f"f0 已抓：{out_dir/'f0.png'}")
+
+                # 启动电机 X 移动
+                motor = Motor(serial_mod, args.serial_port, args.baudrate, args.serial_timeout)
+                motor.hello()
+                print("握手成功 STEP_OK v0.3")
+                motor.set_speed(args.speed)
+                print(f"标定频率 {args.speed} Hz")
+
+                motor_thread = motor.move_async(args.steps, "FWD", 0, "FWD")
+                state = 1
+                status_text = "CALIBRATING X..."
+
+            elif state == 1:
+                # 等待 X 移动完成
+                if motor_thread and not motor_thread.is_alive():
+                    time.sleep(0.3)  # 稳定
+                    ok2, f1 = cap.read()
+                    if ok2:
+                        f1 = f1.copy()
+                        cv2.imwrite(str(out_dir / "f1_after_x.png"), f1)
+                        print(f"f1 已抓：{out_dir/'f1_after_x.png'}")
+
+                        # 启动 Y 移动
+                        motor_thread = motor.move_async(0, "FWD", args.steps, "REV")
+                        state = 2
+                        status_text = "CALIBRATING Y..."
+                    else:
+                        print("f1 抓帧失败，重试")
+
+            elif state == 2:
+                # 等待 Y 移动完成
+                if motor_thread and not motor_thread.is_alive():
+                    time.sleep(0.3)  # 稳定
+                    ok2, f2 = cap.read()
+                    if ok2:
+                        f2 = f2.copy()
+                        cv2.imwrite(str(out_dir / "f2_after_y.png"), f2)
+                        print(f"f2 已抓：{out_dir/'f2_after_y.png'}")
+
+                        # 计算结果
+                        motor.close()
+                        state = 3
+                        status_text = "CALIBRATION DONE"
+                    else:
+                        print("f2 抓帧失败，重试")
+
+            elif state == 3:
+                # 显示结果，进入预览
+                time.sleep(1)
+                state = 4
+                status_text = "calibration done  SPACE=analyze  Q=quit"
+
+            elif state == 4:
+                # 预览模式
+                if key == ord(" "):
+                    # 简单分析
+                    from demo.demo_pipeline import _draw_contamination, segment_demo_image
+                    seg = segment_demo_image(frame, "local")
+                    overlay = _draw_contamination(frame, seg.mask, seg.measurement.centroid_px, cv2)
+                    cv2.imshow("analysis result", overlay)
+                    status_text = f"analyzed area={seg.measurement.area_px:.0f}"
+                elif key == ord("h"):
+                    status_text = "algorithm=hsv"
+                elif key == ord("o"):
+                    status_text = "algorithm=otsu"
+                elif key == ord("g"):
+                    status_text = "algorithm=exg"
+                elif key == ord("e"):
+                    status_text = "algorithm=exr"
+                elif key == ord("l"):
+                    status_text = "algorithm=local"
+
     finally:
-        try:
-            motor.set_speed(500)
-        except Exception:
-            pass
-        motor.close()
+        if motor:
+            try:
+                motor.set_speed(500)
+            except Exception:
+                pass
+            motor.close()
         cap.release()
+        cv2.destroyAllWindows()
 
-    dxx, dxy, sx = track(cv2, np, f0, f1, args.template_half)
-    dyx, dyy, sy = track(cv2, np, f1, f2, args.template_half)
-    print(f"X移动后特征位移 dx={dxx:.1f}, dy={dxy:.1f}, score={sx:.3f}")
-    print(f"Y移动后特征位移 dx={dyx:.1f}, dy={dyy:.1f}, score={sy:.3f}")
+    # 计算并输出结果
+    if f0 is not None and f1 is not None and f2 is not None:
+        dxx, dxy, sx = track(cv2, np, f0, f1, args.template_half)
+        dyx, dyy, sy = track(cv2, np, f1, f2, args.template_half)
+        print(f"X移动后特征位移 dx={dxx:.1f}, dy={dxy:.1f}, score={sx:.3f}")
+        print(f"Y移动后特征位移 dx={dyx:.1f}, dy={dyy:.1f}, score={sy:.3f}")
 
-    known_mm = args.steps / STEPS_PER_MM
-    result: dict[str, object] = {
-        "calibration_id": f"motor_mm_per_px_{run_id}",
-        "method": "motor_known_displacement",
-        "steps_per_axis": args.steps,
-        "known_displacement_mm": known_mm,
-        "steps_per_mm_assumed": STEPS_PER_MM,
-        "x_axis": {"pixel_shift_along": dxx, "pixel_shift_cross": dxy, "match_score": sx},
-        "y_axis": {"pixel_shift_along": dyy, "pixel_shift_cross": dyx, "match_score": sy},
-        "feeds_action_request": False,
-        "evidence_boundary": "电机位移反推 mm/px；仅尺度，未标定原点/旋转/喷头偏移，不得直接当作验收坐标",
-    }
+        known_mm = args.steps / STEPS_PER_MM
+        result: dict[str, object] = {
+            "calibration_id": f"motor_mm_per_px_{run_id}",
+            "method": "motor_known_displacement",
+            "steps_per_axis": args.steps,
+            "known_displacement_mm": known_mm,
+            "steps_per_mm_assumed": STEPS_PER_MM,
+            "x_axis": {"pixel_shift_along": dxx, "pixel_shift_cross": dxy, "match_score": sx},
+            "y_axis": {"pixel_shift_along": dyy, "pixel_shift_cross": dyx, "match_score": sy},
+            "feeds_action_request": False,
+            "evidence_boundary": "电机位移反推 mm/px；仅尺度，未标定原点/旋转/喷头偏移，不得直接当作验收坐标",
+        }
 
-    warnings: list[str] = []
-    if sx < args.min_score or sy < args.min_score:
-        warnings.append(f"MATCH_SCORE_LOW (x={sx:.3f}, y={sy:.3f})")
-    if abs(dxx) < 10 or abs(dyy) < 10:
-        warnings.append("SHIFT_TOO_SMALL")
-    if abs(dxy) > 0.25 * max(abs(dxx), 1) or abs(dyx) > 0.25 * max(abs(dyy), 1):
-        warnings.append("AXIS_CROSSTALK_HIGH：电机轴与画面轴可能未对齐（旋转/装配）")
+        warnings: list[str] = []
+        if sx < args.min_score or sy < args.min_score:
+            warnings.append(f"MATCH_SCORE_LOW (x={sx:.3f}, y={sy:.3f})")
+        if abs(dxx) < 10 or abs(dyy) < 10:
+            warnings.append("SHIFT_TOO_SMALL")
+        if abs(dxy) > 0.25 * max(abs(dxx), 1) or abs(dyx) > 0.25 * max(abs(dyy), 1):
+            warnings.append("AXIS_CROSSTALK_HIGH：电机轴与画面轴可能未对齐（旋转/装配）")
 
-    mm_per_px_x = known_mm / abs(dxx) if dxx else None
-    mm_per_px_y = known_mm / abs(dyy) if dyy else None
-    result["mm_per_px_x"] = mm_per_px_x
-    result["mm_per_px_y"] = mm_per_px_y
-    result["warnings"] = warnings
+        mm_per_px_x = known_mm / abs(dxx) if dxx else None
+        mm_per_px_y = known_mm / abs(dyy) if dyy else None
+        result["mm_per_px_x"] = mm_per_px_x
+        result["mm_per_px_y"] = mm_per_px_y
+        result["warnings"] = warnings
 
-    out_file = out_dir / "mm_per_px.json"
-    out_file.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        out_file = out_dir / "mm_per_px.json"
+        out_file.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    print("---------- 标定结果 ----------")
-    print(f"X mm/px = {mm_per_px_x}")
-    print(f"Y mm/px = {mm_per_px_y}")
-    if warnings:
-        print("警告：" + "; ".join(warnings))
-    print(f"证据文件：{out_file}")
+        print("---------- 标定结果 ----------")
+        print(f"X mm/px = {mm_per_px_x}")
+        print(f"Y mm/px = {mm_per_px_y}")
+        if warnings:
+            print("警告：" + "; ".join(warnings))
+        print(f"证据文件：{out_file}")
+
     return 0
 
 
