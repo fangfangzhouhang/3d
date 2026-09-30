@@ -282,8 +282,7 @@ def run_live_station(
             if key in LOCAL_KEYS:
                 current_algorithm = "local"
                 last_status = "algorithm=local"
-                continue
-            if key == SPACE_KEY:
+                continue版            if key == SPACE_KEY:
                 try:
                     run_dir = analyze(frame, current_algorithm)
                     run_dirs.append(run_dir)
