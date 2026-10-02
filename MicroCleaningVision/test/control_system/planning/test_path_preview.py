@@ -15,7 +15,11 @@ from microcleaning.control_system.planning.path_preview import (
     plan_and_preview,
 )
 from microcleaning.control_system.planning.stepper_preview import StepperConfig, mm_delta_to_steps
-from microcleaning.control_system.planning.work_frame import WorkFrameConfig, pixel_to_assumed_mm
+from microcleaning.control_system.planning.work_frame import (
+    WorkFrameConfig,
+    load_motor_calibration,
+    pixel_to_assumed_mm,
+)
 
 
 HAS_PERCEPTION_DEPS = importlib.util.find_spec("cv2") is not None and importlib.util.find_spec("numpy") is not None
@@ -50,6 +54,39 @@ class WorkFrameTests(unittest.TestCase):
         self.assertAlmostEqual(0.0, right[1])
         self.assertAlmostEqual(0.0, down[0])
         self.assertAlmostEqual(-1.0, down[1])
+
+    def test_y_scale_can_differ_from_x(self):
+        frame = WorkFrameConfig(mm_per_px=0.0187, mm_per_px_y=0.0181, flip_y=True)
+        x_mm, y_mm = pixel_to_assumed_mm(100.0, 100.0, frame)
+        self.assertAlmostEqual(1.87, x_mm)
+        self.assertAlmostEqual(-1.81, y_mm)
+        same = WorkFrameConfig(mm_per_px=0.02)
+        self.assertAlmostEqual(0.02, same.effective_mm_per_px_y())
+
+    def test_motor_calibration_json_is_loaded_with_hash(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "mm_per_px.json"
+            path.write_text(
+                json.dumps({"mm_per_px_x": 0.0187, "mm_per_px_y": 0.0181, "warnings": [], "feeds_action_request": False}),
+                encoding="utf-8",
+            )
+            calibration = load_motor_calibration(path)
+            self.assertAlmostEqual(0.0181, calibration.mm_per_px_y)
+            self.assertEqual(64, len(calibration.sha256))
+            self.assertIsNone(calibration.nozzle_px)
+
+    def test_motor_calibration_rejects_bad_or_arming_json(self):
+        bad_payloads = (
+            {"mm_per_px_x": None, "mm_per_px_y": 0.02},
+            {"mm_per_px_x": 0.02, "mm_per_px_y": -1},
+            {"mm_per_px_x": 0.02, "mm_per_px_y": 0.02, "feeds_action_request": True},
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            for index, payload in enumerate(bad_payloads):
+                path = Path(folder) / f"bad_{index}.json"
+                path.write_text(json.dumps(payload), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    load_motor_calibration(path)
 
     def test_nozzle_offset_is_added_after_scale(self):
         frame = WorkFrameConfig(assumed_mm_per_px=0.01, nozzle_offset_mm=(0.5, -0.25))

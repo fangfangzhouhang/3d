@@ -1,5 +1,7 @@
 """把已经裁好的 MOVEXY 双轴命令发给 Stage 2 v0.3。两轴都停才进下一段。
 
+发送前必须持有运动关卡（``safety/motion_gate.py``）签发的一次性 ALLOW，
+并且 ``armed=True``：两把钥匙缺一不可。
 握手之后任何一步出错（读超时、串口异常、协议不符、Ctrl+C），都先发 STOP，
 再抛出 ``Stage2TransmitError``，并带上已完成的行、在途的行和全部回复。
 """
@@ -10,7 +12,9 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from microcleaning.contracts import SafetyDecision
 from microcleaning.control_system.planning.stage2_axes import Stage2Dispatch
+from microcleaning.control_system.safety.motion_gate import MotionRequest, require_motion_allow
 from microcleaning.control_system.serial.stage2_protocol import (
     Stage2ProtocolError,
     Stage2Reply,
@@ -118,11 +122,20 @@ class Stage2SerialLink:
         self._read_limit = read_limit
         self._connection: Any = None
 
-    def transmit(self, dispatch: Stage2Dispatch) -> Stage2TransmitResult:
+    def transmit(
+        self,
+        dispatch: Stage2Dispatch,
+        *,
+        request: MotionRequest,
+        decision: SafetyDecision,
+    ) -> Stage2TransmitResult:
+        """只发已获运动关卡 ALLOW 的行。核对不过时抛 PermissionError，不打开 COM。"""
+
         if not self.armed:
             raise PermissionError("Stage 2 未武装，拒绝打开发送")
         if not self.port and self._serial_factory is None:
             raise PermissionError("未指定串口，拒绝打开 COM")
+        require_motion_allow(request, decision, dispatch.lines)
         sent: list[str] = []
         replies: list[str] = []
         in_flight: str | None = None

@@ -11,6 +11,12 @@ from microcleaning.control_system.planning.stage2_axes import (
     stage2_stepper,
 )
 from microcleaning.control_system.planning.stepper_preview import preview_motion
+from microcleaning.control_system.safety.motion_gate import (
+    MotionRequest,
+    approve_motion_gate,
+    evaluate_motion,
+    new_motion_request_id,
+)
 from microcleaning.control_system.serial.stage2_link import (
     Stage2SerialLink,
     Stage2TransmitError,
@@ -68,6 +74,28 @@ def _motion():
     )
 
 
+def _approved(dispatch):
+    """走一遍真实关卡：评估得 HUMAN，人确认后得一次性 ALLOW。"""
+
+    request = MotionRequest(
+        request_id=new_motion_request_id(),
+        task_id="test-task",
+        lines=dispatch.lines,
+        position_before_steps=(0, 0),
+        start_reference="image_center",
+        calibration_ref="cal/mm_per_px.json",
+        calibration_sha256="0" * 64,
+    )
+    decision = approve_motion_gate(request, evaluate_motion(request), confirmed=True)
+    return request, decision
+
+
+def _send(link, dispatch=None):
+    dispatch = dispatch or dispatch_motion(_motion(), budget=1600)
+    request, decision = _approved(dispatch)
+    return link.transmit(dispatch, request=request, decision=decision)
+
+
 class Stage2DispatchTests(unittest.TestCase):
     def test_xy_both_planned_and_present_on_wire(self):
         dispatch = dispatch_motion(_motion(), budget=10000)
@@ -117,13 +145,13 @@ class Stage2LinkTests(unittest.TestCase):
 
         link = Stage2SerialLink(port="COM5", armed=False, serial_factory=factory)
         with self.assertRaises(PermissionError):
-            link.transmit(dispatch_motion(_motion(), budget=10000))
+            _send(link)
         self.assertEqual(0, opened["count"])
 
     def test_movexy_commands_are_written(self):
         port = ScriptedStage2(busy_once=True)
         link = Stage2SerialLink(port="COM5", armed=True, serial_factory=lambda: port)
-        result = link.transmit(dispatch_motion(_motion(), budget=10000))
+        result = _send(link)
         written = b"".join(port.writes)
         self.assertTrue(written.startswith(b"HELLO\r\n"))
         self.assertIn(b"MOVEXY 640 FWD 320 FWD\r\n", written)
@@ -137,7 +165,7 @@ class Stage2LinkTests(unittest.TestCase):
         port = ScriptedStage2(hello="STEP_OK v0.2")
         link = Stage2SerialLink(port="COM5", armed=True, serial_factory=lambda: port)
         with self.assertRaises(Stage2TransmitError) as caught:
-            link.transmit(dispatch_motion(_motion(), budget=10000))
+            _send(link)
         written = b"".join(port.writes)
         self.assertNotIn(b"MOVEXY", written)
         self.assertEqual("WRONG_VERSION", caught.exception.reason_code)
@@ -148,7 +176,7 @@ class Stage2LinkTests(unittest.TestCase):
         port = SilentReadXY()
         link = Stage2SerialLink(port="COM5", armed=True, serial_factory=lambda: port)
         with self.assertRaises(Stage2TransmitError) as caught:
-            link.transmit(dispatch_motion(_motion(), budget=10000))
+            _send(link)
         error = caught.exception
         self.assertEqual("TIMEOUT", error.reason_code)
         self.assertIn(b"STOP\r\n", port.writes)
@@ -162,7 +190,7 @@ class Stage2LinkTests(unittest.TestCase):
         port = InterruptOnReadXY()
         link = Stage2SerialLink(port="COM5", armed=True, serial_factory=lambda: port)
         with self.assertRaises(Stage2TransmitError) as caught:
-            link.transmit(dispatch_motion(_motion(), budget=10000))
+            _send(link)
         self.assertEqual("INTERRUPTED", caught.exception.reason_code)
         self.assertEqual(b"STOP\r\n", port.writes[-1])
         self.assertTrue(caught.exception.stopped)
@@ -170,9 +198,45 @@ class Stage2LinkTests(unittest.TestCase):
     def test_boot_banner_is_cleared_before_hello(self):
         port = BannerFirst()
         link = Stage2SerialLink(port="COM5", armed=True, serial_factory=lambda: port)
-        result = link.transmit(dispatch_motion(_motion(), budget=10000))
+        result = _send(link)
         self.assertEqual("STEP_OK v0.3", result.replies[0])
         self.assertEqual(2, len(result.sent_lines))
+
+    def test_armed_link_refuses_human_decision_before_opening_com(self):
+        opened = {"count": 0}
+
+        def factory():
+            opened["count"] += 1
+            return ScriptedStage2()
+
+        dispatch = dispatch_motion(_motion(), budget=1600)
+        request, _allow = _approved(dispatch)
+        human = evaluate_motion(request)
+        link = Stage2SerialLink(port="COM5", armed=True, serial_factory=factory)
+        with self.assertRaises(PermissionError):
+            link.transmit(dispatch, request=request, decision=human)
+        self.assertEqual(0, opened["count"])
+
+    def test_approval_token_cannot_be_replayed(self):
+        dispatch = dispatch_motion(_motion(), budget=1600)
+        request, decision = _approved(dispatch)
+        first = Stage2SerialLink(port="COM5", armed=True, serial_factory=ScriptedStage2)
+        first.transmit(dispatch, request=request, decision=decision)
+        port = ScriptedStage2()
+        second = Stage2SerialLink(port="COM5", armed=True, serial_factory=lambda: port)
+        with self.assertRaises(PermissionError):
+            second.transmit(dispatch, request=request, decision=decision)
+        self.assertEqual([], port.writes)
+
+    def test_lines_changed_after_approval_are_refused(self):
+        dispatch = dispatch_motion(_motion(), budget=1600)
+        request, decision = _approved(dispatch)
+        tampered = single_move_dispatch(1600, "FWD", 0, "FWD", budget=1600)
+        port = ScriptedStage2()
+        link = Stage2SerialLink(port="COM5", armed=True, serial_factory=lambda: port)
+        with self.assertRaises(PermissionError):
+            link.transmit(tampered, request=request, decision=decision)
+        self.assertEqual([], port.writes)
 
     def test_idle_wait_follows_firmware_speed(self):
         self.assertAlmostEqual(0.7, idle_wait_seconds(100, 500))
