@@ -51,4 +51,8 @@ bool     sm_y_is_busy(void);     /* Y 是否运动中 */
 void sm_tim2_irq(void);          /* Y 轴 */
 void sm_tim3_irq(void);          /* X 轴 */
 
+/* 水泵继电器控制（低电平触发，PB0）。 */
+void sm_pump_on(void);   /* 拉低 PB0，继电器吸合，泵开 */
+void sm_pump_off(void);  /* 拉高 PB0，继电器释放，泵关 */
+
 #endif /* STEPMOTOR_H */

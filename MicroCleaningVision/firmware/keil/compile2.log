@@ -1,0 +1,41 @@
+*** Using Compiler 'V5.06 update 5 (build 528)', folder: 'C:\Keil_v5\ARM\ARMCC\Bin'
+Rebuild target 'stage2-stepmotor'
+assembling startup_stm32f10x_md.s...
+startup_stm32f10x_md.s: error: A1023E: File "..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\Source\ARM\startup_stm32f10x_md.s" could not be opened: No such file or directory
+compiling stm32f10x_it.c...
+C:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\Include\stm32f10x.h(483): error:  #5: cannot open source input file "core_cm3.h": No such file or directory
+  #include "core_cm3.h"
+..\stage2-stepmotor\driver\stm32f10x_it.c: 0 warnings, 1 error
+compiling main.c...
+C:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\Include\stm32f10x.h(483): error:  #5: cannot open source input file "core_cm3.h": No such file or directory
+  #include "core_cm3.h"
+..\stage2-stepmotor\common\main.c: 0 warnings, 1 error
+compiling stepmotor.c...
+C:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\Include\stm32f10x.h(483): error:  #5: cannot open source input file "core_cm3.h": No such file or directory
+  #include "core_cm3.h"
+..\stage2-stepmotor\driver\stepmotor.c: 0 warnings, 1 error
+compiling stm32f10x_usart.c...
+"no source": Error:  #5: cannot open source input file "..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\stm32f10x_usart.c": No such file or directory
+..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\stm32f10x_usart.c: 0 warnings, 1 error
+compiling stm32f10x_rcc.c...
+"no source": Error:  #5: cannot open source input file "..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\stm32f10x_rcc.c": No such file or directory
+..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\stm32f10x_rcc.c: 0 warnings, 1 error
+compiling system_stm32f10x.c...
+"no source": Error:  #5: cannot open source input file "..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\Source\system_stm32f10x.c": No such file or directory
+..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\Source\system_stm32f10x.c: 0 warnings, 1 error
+compiling stm32f103_hal.c...
+C:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\Include\stm32f10x.h(483): error:  #5: cannot open source input file "core_cm3.h": No such file or directory
+  #include "core_cm3.h"
+..\stage2-stepmotor\driver\stm32f103_hal.c: 0 warnings, 1 error
+compiling stm32f10x_gpio.c...
+"no source": Error:  #5: cannot open source input file "..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\stm32f10x_gpio.c": No such file or directory
+..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\stm32f10x_gpio.c: 0 warnings, 1 error
+compiling stm32f10x_tim.c...
+"no source": Error:  #5: cannot open source input file "..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\stm32f10x_tim.c": No such file or directory
+..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\stm32f10x_tim.c: 0 warnings, 1 error
+compiling misc.c...
+"no source": Error:  #5: cannot open source input file "..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\misc.c": No such file or directory
+..\..\..\..\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\src\misc.c: 0 warnings, 1 error
+".\Objects\stage2-stepmotor\stage2-stepmotor.axf" - 5 Error(s), 0 Warning(s).
+Target not created.
+Build Time Elapsed:  00:00:02
