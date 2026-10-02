@@ -102,7 +102,7 @@ static void sm_axis_hw_setup(sm_axis_t *a, TIM_TypeDef *tim,
 
 void sm_init(void) {
   /* GPIOA 时钟已由 hal_gpio_init 使能，这里再确保一次 */
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB, ENABLE);
 
   /* Y 轴 → TIM2，X 轴 → TIM3 */
   sm_axis_hw_setup(&y_axis, TIM2,
@@ -113,6 +113,33 @@ void sm_init(void) {
                    SM_X_PUL_PORT, SM_X_PUL_PIN,
                    SM_X_DIR_PORT, SM_X_DIR_PIN,
                    RCC_APB1Periph_TIM3, TIM3_IRQn);
+
+  /* 水泵继电器 + 蜂鸣器 + 按钮 + 状态灯 */
+  {
+    GPIO_InitTypeDef gpio;
+    gpio.GPIO_Speed = GPIO_Speed_2MHz;
+
+    /* PB0=泵控制（低触发继电器，高=释放），PB1=蜂鸣器 */
+    gpio.GPIO_Mode  = GPIO_Mode_Out_PP;
+    gpio.GPIO_Pin   = GPIO_Pin_0 | GPIO_Pin_1;
+    GPIO_Init(GPIOB, &gpio);
+    GPIO_SetBits(GPIOB, GPIO_Pin_0);   /* 泵默认关闭 */
+    GPIO_ResetBits(GPIOB, GPIO_Pin_1); /* 蜂鸣器默认关 */
+
+    /* PB2=急停按钮（浮空输入），PB3=ARM 按钮（上拉输入） */
+    gpio.GPIO_Pin  = GPIO_Pin_2;
+    gpio.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_Init(GPIOB, &gpio);
+    gpio.GPIO_Pin  = GPIO_Pin_3;
+    gpio.GPIO_Mode = GPIO_Mode_IPU;
+    GPIO_Init(GPIOB, &gpio);
+
+    /* PA5=状态灯 */
+    gpio.GPIO_Pin  = GPIO_Pin_5;
+    gpio.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_Init(GPIOA, &gpio);
+    GPIO_ResetBits(GPIOA, GPIO_Pin_5);
+  }
 }
 
 void sm_set_freq(uint32_t freq) {
@@ -207,3 +234,6 @@ uint32_t sm_step_count(void)   { return x_axis.sent; }
 bool     sm_is_busy(void)      { return x_axis.busy; }
 uint32_t sm_y_step_count(void) { return y_axis.sent; }
 bool     sm_y_is_busy(void)    { return y_axis.busy; }
+
+void sm_pump_on(void)  { GPIO_ResetBits(GPIOB, GPIO_Pin_0); }
+void sm_pump_off(void) { GPIO_SetBits(GPIOB, GPIO_Pin_0); }
