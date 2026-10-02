@@ -144,6 +144,43 @@ def dispatch_motion(
     )
 
 
+def parse_movexy_line(line: str) -> tuple[int, int]:
+    """一行 MOVEXY → 有符号步数 (x, y)，FWD 记正、REV 记负。格式不对直接报错。"""
+
+    if not _MOVEXY_LINE.match(line):
+        raise ValueError(f"报文行格式非法：{line}")
+    _command, steps_x, dir_x, steps_y, dir_y = line.split()
+    x = int(steps_x) if dir_x == "FWD" else -int(steps_x)
+    y = int(steps_y) if dir_y == "FWD" else -int(steps_y)
+    return x, y
+
+
+def single_move_dispatch(
+    steps_x: int,
+    dir_x: str,
+    steps_y: int,
+    dir_y: str,
+    *,
+    budget: int = DEFAULT_TRANSMIT_BUDGET,
+) -> Stage2Dispatch:
+    """手动或居中用的一条 MOVEXY，和路径走同一套格式与预算检查。超预算时不出行。"""
+
+    for steps in (steps_x, steps_y):
+        if not isinstance(steps, int) or isinstance(steps, bool) or not 0 <= steps <= MAX_PULSE_STEPS:
+            raise ValueError(f"脉冲数必须是 0 到 {MAX_PULSE_STEPS} 的整数")
+    for direction in (dir_x, dir_y):
+        if direction not in {"FWD", "REV"}:
+            raise ValueError("方向只能是 FWD 或 REV")
+    if budget < 0:
+        raise ValueError("发送预算不能为负")
+    if steps_x == 0 and steps_y == 0:
+        return Stage2Dispatch((), 0, 0, 0, 0, budget, False)
+    if steps_x > budget or steps_y > budget:
+        return Stage2Dispatch((), steps_x, steps_y, 0, 0, budget, True)
+    line = f"MOVEXY {steps_x} {dir_x} {steps_y} {dir_y}"
+    return Stage2Dispatch((line,), steps_x, steps_y, steps_x, steps_y, budget, False)
+
+
 def _xy_line(leg: MotionLeg) -> str:
     dir_x = "FWD" if leg.steps_x >= 0 else "REV"
     dir_y = "FWD" if leg.steps_y >= 0 else "REV"
