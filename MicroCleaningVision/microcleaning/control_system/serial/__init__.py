@@ -8,7 +8,7 @@ from microcleaning.control_system.serial.stm32_protocol import (
     encode_stop,
     parse_response,
 )
-from microcleaning.control_system.serial.stage2_link import Stage2SerialLink
+from microcleaning.control_system.serial.stage2_link import Stage2SerialLink, Stage2TransmitError
 from microcleaning.control_system.serial.stage2_protocol import encode_hello, encode_pulse, parse_stage2_reply
 from microcleaning.control_system.serial.stm32_serial import STM32SerialController
 
@@ -21,6 +21,7 @@ __all__ = (
     "encode_stop",
     "parse_response",
     "Stage2SerialLink",
+    "Stage2TransmitError",
     "encode_hello",
     "encode_pulse",
     "parse_stage2_reply",

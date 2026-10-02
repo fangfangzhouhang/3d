@@ -184,7 +184,8 @@ def format_path_narrative(
         f"2. 规则说明：{plan.reason}",
         (
             "3. 尺度占位："
-            f"有效 mm/px={placeholders.work.effective_mm_per_px():.6f}（{placeholders.work.scale_source()}）；"
+            f"有效 mm/px X={placeholders.work.effective_mm_per_px():.6f} "
+            f"Y={placeholders.work.effective_mm_per_px_y():.6f}（{placeholders.work.scale_source()}）；"
             f"原点px={placeholders.work.origin_px}；旋转={placeholders.work.rotation_deg}°；"
             f"flip_y={placeholders.work.flip_y}"
         ),
@@ -266,7 +267,8 @@ def draw_path_overlay(image: Any, preview: PathPreview) -> Any:
         if index in label_indices:
             _put_label(overlay, f"{index + 1}", (point[0] + 6, point[1] - 6), cv2)
     _put_label(overlay, f"{plan.strategy.value}", (4, 16), cv2)
-    _put_label(overlay, "NO MOVE", (4, 32), cv2)
+    # 这张图只画计划路线；是否真的发过步进，以 summary.json 的 hardware_actions 为准。
+    _put_label(overlay, "PATH PREVIEW", (4, 32), cv2)
     return overlay
 
 

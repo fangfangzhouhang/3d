@@ -1,4 +1,10 @@
-"""把已经裁好的 MOVEXY 双轴命令发给 Stage 2 v0.3。两轴都停才进下一段。"""
+"""把已经裁好的 MOVEXY 双轴命令发给 Stage 2 v0.3。两轴都停才进下一段。
+
+发送前必须持有运动关卡（``safety/motion_gate.py``）签发的一次性 ALLOW，
+并且 ``armed=True``：两把钥匙缺一不可。
+握手之后任何一步出错（读超时、串口异常、协议不符、Ctrl+C），都先发 STOP，
+再抛出 ``Stage2TransmitError``，并带上已完成的行、在途的行和全部回复。
+"""
 
 from __future__ import annotations
 
@@ -6,7 +12,9 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from microcleaning.contracts import SafetyDecision
 from microcleaning.control_system.planning.stage2_axes import Stage2Dispatch
+from microcleaning.control_system.safety.motion_gate import MotionRequest, require_motion_allow
 from microcleaning.control_system.serial.stage2_protocol import (
     Stage2ProtocolError,
     Stage2Reply,
@@ -19,6 +27,16 @@ from microcleaning.control_system.serial.stage2_protocol import (
 
 
 SerialFactory = Callable[[], Any]
+
+DEFAULT_SPEED_HZ = 500
+MIN_SPEED_HZ = 10
+MAX_SPEED_HZ = 20000
+
+
+def idle_wait_seconds(steps: int, speed_hz: int) -> float:
+    """按较长那一轴的步数和固件脉冲频率估算走完要多久，再留 0.5 s 余量。"""
+
+    return max(steps, 1) / float(speed_hz) + 0.5
 
 
 @dataclass(frozen=True)
@@ -38,8 +56,47 @@ class Stage2TransmitResult:
         }
 
 
+class Stage2TransmitError(RuntimeError):
+    """发送中途失败。抛出前已经尝试过 STOP。
+
+    ``motion_attempted`` 为真表示至少写出过一条 MOVEXY，此时台面位置不再可信。
+    """
+
+    def __init__(
+        self,
+        reason_code: str,
+        detail: str,
+        *,
+        sent_lines: tuple[str, ...],
+        in_flight_line: str | None,
+        replies: tuple[str, ...],
+        stopped: bool,
+        motion_attempted: bool,
+    ) -> None:
+        super().__init__(f"{reason_code}: {detail}")
+        self.reason_code = reason_code
+        self.detail = detail
+        self.sent_lines = sent_lines
+        self.in_flight_line = in_flight_line
+        self.replies = replies
+        self.stopped = stopped
+        self.motion_attempted = motion_attempted
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "reason_code": self.reason_code,
+            "detail": self.detail,
+            "sent_lines": list(self.sent_lines),
+            "in_flight_line": self.in_flight_line,
+            "replies": list(self.replies),
+            "stopped": self.stopped,
+            "motion_attempted": self.motion_attempted,
+            "protocol": "stage2-movexy-v0.3",
+        }
+
+
 class Stage2SerialLink:
-    """HELLO v0.3 成功后才发 MOVEXY。失败时发 STOP。不发送 MCV1|PUMP。"""
+    """HELLO v0.3 成功后才发 MOVEXY。失败时先发 STOP。不发送 MCV1|PUMP。"""
 
     def __init__(
         self,
@@ -50,56 +107,83 @@ class Stage2SerialLink:
         armed: bool = False,
         serial_factory: SerialFactory | None = None,
         read_limit: int = 40,
+        speed_hz: int = DEFAULT_SPEED_HZ,
     ) -> None:
         if baudrate <= 0 or timeout <= 0:
             raise ValueError("波特率和超时必须为正")
+        if not MIN_SPEED_HZ <= speed_hz <= MAX_SPEED_HZ:
+            raise ValueError(f"speed_hz 必须在 {MIN_SPEED_HZ} 到 {MAX_SPEED_HZ} 之间，与固件 SPEED 范围一致")
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
         self.armed = armed
+        self.speed_hz = speed_hz
         self._serial_factory = serial_factory
         self._read_limit = read_limit
         self._connection: Any = None
 
-    def transmit(self, dispatch: Stage2Dispatch) -> Stage2TransmitResult:
+    def transmit(
+        self,
+        dispatch: Stage2Dispatch,
+        *,
+        request: MotionRequest,
+        decision: SafetyDecision,
+    ) -> Stage2TransmitResult:
+        """只发已获运动关卡 ALLOW 的行。核对不过时抛 PermissionError，不打开 COM。"""
+
         if not self.armed:
             raise PermissionError("Stage 2 未武装，拒绝打开发送")
         if not self.port and self._serial_factory is None:
             raise PermissionError("未指定串口，拒绝打开 COM")
+        require_motion_allow(request, decision, dispatch.lines)
         sent: list[str] = []
         replies: list[str] = []
-        stopped = False
+        in_flight: str | None = None
+        motion_attempted = False
         try:
-            hello = self._exchange(encode_hello())
-            replies.append(hello.raw)
-            if hello.kind != "STEP_OK":
+            try:
+                self._clear_input()
+                hello = self._exchange(encode_hello())
+                replies.append(hello.raw)
+                if hello.kind != "STEP_OK":
+                    raise Stage2ProtocolError("NO_HELLO", hello.raw)
+                for line in dispatch.lines:
+                    parts = line.split()  # MOVEXY <nx> <dx> <ny> <dy>
+                    x_steps = int(parts[1])
+                    y_steps = int(parts[3])
+                    payload = encode_move_xy(x_steps, parts[2], y_steps, parts[4])
+                    in_flight = line
+                    motion_attempted = True
+                    start = self._exchange(payload)
+                    replies.append(start.raw)
+                    if (
+                        start.kind != "STEP2_START"
+                        or start.x_steps != x_steps
+                        or start.x_direction != parts[2]
+                        or start.y_steps != y_steps
+                        or start.y_direction != parts[4]
+                    ):
+                        raise Stage2ProtocolError("BAD_START", start.raw)
+                    idle = self._wait_idle_xy(max(x_steps, y_steps))
+                    replies.append(idle.raw)
+                    if idle.x_busy or idle.y_busy:
+                        raise TimeoutError("电机在读取上限内仍有轴 BUSY")
+                    sent.append(line)
+                    in_flight = None
+            except (Exception, KeyboardInterrupt) as exc:
                 stopped = self._stop_into(replies)
-                raise Stage2ProtocolError("NO_HELLO", hello.raw)
-            for line in dispatch.lines:
-                parts = line.split()  # MOVEXY <nx> <dx> <ny> <dy>
-                x_steps = int(parts[1])
-                y_steps = int(parts[3])
-                payload = encode_move_xy(x_steps, parts[2], y_steps, parts[4])
-                start = self._exchange(payload)
-                replies.append(start.raw)
-                if (
-                    start.kind != "STEP2_START"
-                    or start.x_steps != x_steps
-                    or start.x_direction != parts[2]
-                    or start.y_steps != y_steps
-                    or start.y_direction != parts[4]
-                ):
-                    stopped = self._stop_into(replies)
-                    raise Stage2ProtocolError("BAD_START", start.raw)
-                idle = self._wait_idle_xy(max(x_steps, y_steps))
-                replies.append(idle.raw)
-                if idle.x_busy or idle.y_busy:
-                    stopped = self._stop_into(replies)
-                    raise TimeoutError("电机在读取上限内仍有轴 BUSY")
-                sent.append(line)
+                raise Stage2TransmitError(
+                    _reason_code(exc),
+                    str(exc),
+                    sent_lines=tuple(sent),
+                    in_flight_line=in_flight,
+                    replies=tuple(replies),
+                    stopped=stopped,
+                    motion_attempted=motion_attempted,
+                ) from exc
         finally:
             self.close()
-        return Stage2TransmitResult("STEP_OK v0.3", tuple(sent), tuple(replies), stopped)
+        return Stage2TransmitResult("STEP_OK v0.3", tuple(sent), tuple(replies), False)
 
     def close(self) -> None:
         connection = self._connection
@@ -113,9 +197,16 @@ class Stage2SerialLink:
             except Exception:
                 pass
 
+    def _clear_input(self) -> None:
+        # 板子刚上电时会先吐横幅；握手前清掉，避免把横幅当成 HELLO 的回复。
+        connection = self._ensure_connection()
+        reset = getattr(connection, "reset_input_buffer", None)
+        if callable(reset):
+            reset()
+
     def _wait_idle_xy(self, steps: int) -> Stage2Reply:
-        # 固件默认 500 Hz。按较长那一轴的步数等它走完，不要在脉冲结束前连续读满就判定失败。
-        deadline = time.monotonic() + (max(steps, 1) / 500.0) + 0.5
+        # 按较长那一轴的步数和当前脉冲频率等它走完，不要在脉冲结束前连续读满就判定失败。
+        deadline = time.monotonic() + idle_wait_seconds(steps, self.speed_hz)
         last = Stage2Reply("STEP2", "", x_busy=True, y_busy=True)
         while time.monotonic() < deadline:
             last = self._exchange(encode_read_xy())
@@ -131,7 +222,7 @@ class Stage2SerialLink:
         try:
             stopped = self._exchange(encode_stop())
             replies.append(stopped.raw)
-        except (OSError, TimeoutError, Stage2ProtocolError):
+        except Exception:
             return False
         return stopped.kind == "STEP_STOPPED"
 
@@ -171,3 +262,15 @@ class Stage2SerialLink:
             write_timeout=self.timeout,
         )
         return self._connection
+
+
+def _reason_code(exc: BaseException) -> str:
+    if isinstance(exc, Stage2ProtocolError):
+        return exc.reason_code
+    if isinstance(exc, KeyboardInterrupt):
+        return "INTERRUPTED"
+    if isinstance(exc, TimeoutError):
+        return "TIMEOUT"
+    if isinstance(exc, OSError):
+        return "SERIAL_IO_ERROR"
+    return type(exc).__name__.upper()

@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from dataclasses import dataclass
@@ -34,21 +35,30 @@ class WorkFrameConfig:
     homography_3x3: tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]] | None = None
     scale_json_ref: str | None = None
     feeds_action_request: bool = False
+    mm_per_px_y: float | None = None
 
     def validate(self) -> None:
         if self.feeds_action_request:
             raise ValueError("WorkFrameConfig 禁止 feeds_action_request=true；未验收标定不得写入动作申请")
         if self.mm_per_px is not None and self.mm_per_px <= 0:
             raise ValueError("mm_per_px必须大于0")
+        if self.mm_per_px_y is not None and self.mm_per_px_y <= 0:
+            raise ValueError("mm_per_px_y必须大于0")
         if self.assumed_mm_per_px <= 0:
             raise ValueError("assumed_mm_per_px必须大于0")
         if self.homography_3x3 is not None:
             _require_3x3(self.homography_3x3)
 
     def effective_mm_per_px(self) -> float:
+        """X 方向（也是未单独给 Y 时两轴共用）的 mm/px。"""
         if self.mm_per_px is not None:
             return float(self.mm_per_px)
         return float(self.assumed_mm_per_px)
+
+    def effective_mm_per_px_y(self) -> float:
+        if self.mm_per_px_y is not None:
+            return float(self.mm_per_px_y)
+        return self.effective_mm_per_px()
 
     def scale_source(self) -> str:
         if self.mm_per_px is not None:
@@ -59,8 +69,10 @@ class WorkFrameConfig:
         return {
             "version": self.version,
             "mm_per_px": self.mm_per_px,
+            "mm_per_px_y": self.mm_per_px_y,
             "assumed_mm_per_px": self.assumed_mm_per_px,
             "effective_mm_per_px": self.effective_mm_per_px(),
+            "effective_mm_per_px_y": self.effective_mm_per_px_y(),
             "scale_source": self.scale_source(),
             "origin_px": list(self.origin_px),
             "rotation_deg": self.rotation_deg,
@@ -83,13 +95,12 @@ def pixel_to_assumed_mm(x_px: float, y_px: float, frame: WorkFrameConfig) -> tup
     if frame.homography_3x3 is not None:
         x_mm, y_mm = _apply_homography(float(x_px), float(y_px), frame.homography_3x3)
     else:
-        scale = frame.effective_mm_per_px()
         dx = float(x_px) - float(frame.origin_px[0])
         dy = float(y_px) - float(frame.origin_px[1])
         if frame.flip_y:
             dy = -dy
-        x_mm = dx * scale
-        y_mm = dy * scale
+        x_mm = dx * frame.effective_mm_per_px()
+        y_mm = dy * frame.effective_mm_per_px_y()
         theta = math.radians(frame.rotation_deg)
         if theta != 0.0:
             cosine = math.cos(theta)
@@ -126,6 +137,7 @@ def work_frame_from_dict(payload: dict[str, Any]) -> WorkFrameConfig:
         homography_3x3=parsed_h,
         scale_json_ref=payload.get("scale_json_ref"),
         feeds_action_request=False,
+        mm_per_px_y=_optional_float(payload.get("mm_per_px_y")),
     )
     if payload.get("feeds_action_request"):
         raise ValueError("WorkFrame JSON 禁止 feeds_action_request=true")
@@ -142,6 +154,61 @@ def load_mm_per_px_from_scale_json(path: str | Path) -> tuple[float, str]:
     if value is None or float(value) <= 0:
         raise ValueError(f"尺度JSON缺少有效 mm_per_px：{source}")
     return float(value), source.as_posix()
+
+
+@dataclass(frozen=True)
+class MotorCalibration:
+    """``scripts/calibrate_motor_mm_per_px.py`` 写出的电机位移标定。
+
+    真正测到的是「步 / 像素」；mm 依赖 5 mm/圈 的铭牌假设，仍不是验收坐标。
+    """
+
+    ref: str
+    sha256: str
+    mm_per_px_x: float
+    mm_per_px_y: float
+    nozzle_px: tuple[float, float] | None
+    warnings: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "ref": self.ref,
+            "sha256": self.sha256,
+            "mm_per_px_x": self.mm_per_px_x,
+            "mm_per_px_y": self.mm_per_px_y,
+            "nozzle_px": None if self.nozzle_px is None else list(self.nozzle_px),
+            "warnings": list(self.warnings),
+        }
+
+
+def load_motor_calibration(path: str | Path) -> MotorCalibration:
+    """读取电机位移标定 JSON；缺字段、非正数或企图喂动作申请都直接报错。"""
+
+    source = Path(path)
+    raw = source.read_bytes()
+    payload = json.loads(raw.decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"标定文件不是 JSON 对象：{source}")
+    if payload.get("feeds_action_request"):
+        raise ValueError(f"标定文件禁止 feeds_action_request=true：{source}")
+    scales = []
+    for key in ("mm_per_px_x", "mm_per_px_y"):
+        value = payload.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+            raise ValueError(f"标定文件缺少有效 {key}：{source}")
+        scales.append(float(value))
+    warnings = payload.get("warnings") or []
+    if not isinstance(warnings, list):
+        raise ValueError(f"标定文件 warnings 必须是列表：{source}")
+    nozzle = payload.get("nozzle_px")
+    return MotorCalibration(
+        ref=source.as_posix(),
+        sha256=hashlib.sha256(raw).hexdigest(),
+        mm_per_px_x=scales[0],
+        mm_per_px_y=scales[1],
+        nozzle_px=None if nozzle is None else _pair(nozzle),
+        warnings=tuple(str(item) for item in warnings),
+    )
 
 
 def _apply_homography(

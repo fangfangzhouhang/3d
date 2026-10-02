@@ -9,8 +9,15 @@
     python -m demo.demo_pipeline --from-camera --mode camera-analyze
     python -m demo.demo_pipeline --generate-sample --mode ping-only
     python -m demo.demo_pipeline --generate-sample --mode arm-pump --confirm-pump --controller fake
+    python -m demo.demo_pipeline --from-camera --mode analyze --stage2-xy
+    python -m demo.demo_pipeline --stage2-set-zero
+    python -m demo.demo_pipeline --from-camera --mode stage2-move --stage2-calibration cal.json --arm-stage2-xy --serial-port COM5
 
-``analyze`` / ``camera-analyze`` 只输出像素测量和路线，默认不发送 PUMP。
+``analyze`` / ``camera-analyze`` 只输出像素测量和路线，不发送 PUMP，也不打开步进串口；
+加 ``--stage2-xy`` 只写出 ``stage2_xy_pulses.txt``。
+``stage2-move`` 是唯一会发 MOVEXY 的模式：运动关卡（DENY/HUMAN）→ 人输入 YES →
+``--arm-stage2-xy``，三者缺一不可。发送前写 ``stage2_intent.json``，发送后写
+``stage2_receipt.json``，位置账本记在 ``output/stage2/position.json``。
 ``--live`` 打开带 B 分割叠加的实时窗口，空格冻结当前帧；默认走 analyze。
 ``--live --mode arm-pump --confirm-pump --arm-pump --controller stm32 --serial-port COMx``
 时，空格在识别到目标后发送限时 PUMP。预览循环不会自动喷。
@@ -24,7 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import asdict, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -52,8 +59,21 @@ from microcleaning.control_system.planning.path_preview import (
     load_path_placeholders,
     resolve_plan_policy,
 )
-from microcleaning.control_system.planning.stage2_axes import dispatch_motion, stage2_stepper
-from microcleaning.control_system.serial.stage2_link import Stage2SerialLink
+from microcleaning.control_system.planning.stage2_axes import Stage2Dispatch, dispatch_motion, stage2_stepper
+from microcleaning.control_system.planning.stage2_position import (
+    DEFAULT_POSITION_PATH,
+    Stage2Position,
+    load_position,
+    mark_unknown,
+    record_completed,
+    set_zero,
+)
+from microcleaning.control_system.planning.work_frame import MotorCalibration, load_motor_calibration
+from microcleaning.control_system.serial.stage2_link import (
+    Stage2SerialLink,
+    Stage2TransmitError,
+    Stage2TransmitResult,
+)
 from microcleaning.control_system.replay.episode_store import write_episode
 from microcleaning.control_system.replay.replay_mcl import ReplayMCLRunner
 from microcleaning.control_system.safety.fixed_rule import (
@@ -64,6 +84,14 @@ from microcleaning.control_system.safety.fixed_rule import (
     propose_pump_in_place,
 )
 from microcleaning.control_system.safety.governor import approve_human_gate, evaluate_action
+from microcleaning.control_system.safety.motion_gate import (
+    STAGE2_RUN_STEP_CAP,
+    MotionRequest,
+    approve_motion_gate,
+    evaluate_motion,
+    new_motion_request_id,
+    summarize_motion,
+)
 from microcleaning.control_system.serial.fake_serial import FakeSerialController
 from microcleaning.control_system.serial.stm32_protocol import encode_ping, encode_status
 from microcleaning.control_system.serial.stm32_serial import STM32SerialController
@@ -80,10 +108,58 @@ from microcleaning.vision.state_estimator import estimate_state
 
 DEMO_VERSION = "microcleaning-demo-v0.2"
 SIMULATION_CALIBRATION_VERSION = "simulation-normalized-v0"
-DEMO_MODES = ("analyze", "simulate", "camera-analyze", "ping-only", "arm-pump")
+DEMO_MODES = ("analyze", "simulate", "camera-analyze", "ping-only", "arm-pump", "stage2-move")
 VISION_ALGORITHMS = ("hsv", "otsu", "exg", "exr", "local")
 CaptureFactory = Callable[..., Any]
 SerialFactory = Callable[[], Any]
+MotionConfirm = Callable[[MotionRequest, dict], bool]
+
+
+class Stage2MotionFailed(RuntimeError):
+    """步进发送中途失败。记录已经写完，``run_dir`` 指向本次输出目录。"""
+
+    def __init__(self, run_dir: Path, reason_code: str) -> None:
+        super().__init__(f"Stage 2 发送失败（{reason_code}），记录见 {run_dir}")
+        self.run_dir = run_dir
+        self.reason_code = reason_code
+
+
+@dataclass(frozen=True)
+class Stage2MotionOutcome:
+    status: str
+    request: MotionRequest
+    plan: dict
+    gate_decision: Any
+    final_decision: Any
+    human_confirmed: bool
+    position_before: Stage2Position
+    position_after: Stage2Position
+    transmit: Stage2TransmitResult | None = None
+    error: Stage2TransmitError | None = None
+    receipt_written: bool = False
+
+    def lines_sent(self) -> int:
+        if self.transmit is not None:
+            return len(self.transmit.sent_lines)
+        if self.error is not None:
+            return len(self.error.sent_lines)
+        return 0
+
+    def to_summary(self) -> dict[str, object]:
+        return {
+            "status": self.status,
+            "request_id": self.request.request_id,
+            "gate_decision": asdict(self.gate_decision),
+            "final_decision": asdict(self.final_decision),
+            "human_confirmed": self.human_confirmed,
+            "plan": self.plan,
+            "position_before": self.position_before.to_dict(),
+            "position_after": self.position_after.to_dict(),
+            "lines_sent": self.lines_sent(),
+            "error": None if self.error is None else self.error.to_dict(),
+            "intent_file": "stage2_intent.json",
+            "receipt_file": "stage2_receipt.json" if self.receipt_written else None,
+        }
 
 
 def run_demo(
@@ -115,9 +191,16 @@ def run_demo(
     path_placeholders: str | Path | None = None,
     stage2_xy: bool = False,
     arm_stage2_xy: bool = False,
-    stage2_max_steps: int = 1600,
+    stage2_max_steps: int = STAGE2_RUN_STEP_CAP,
+    stage2_calibration: str | Path | None = None,
+    stage2_position_path: str | Path | None = None,
+    motion_confirm: MotionConfirm | None = None,
 ) -> Path:
-    """运行一次Demo并返回本次不可覆盖的输出目录。"""
+    """运行一次Demo并返回本次不可覆盖的输出目录。
+
+    ``stage2-move`` 发送中途失败时，记录写完后抛 ``Stage2MotionFailed``。
+    ``motion_confirm`` 为空时运动停在 HUMAN，不打开步进串口。
+    """
 
     _validate_demo_args(
         input_path=input_path,
@@ -129,7 +212,13 @@ def run_demo(
         controller_kind=controller_kind,
         pump_duration_ms=pump_duration_ms,
         algorithm=algorithm,
+        arm_stage2_xy=arm_stage2_xy,
+        stage2_max_steps=stage2_max_steps,
     )
+    if mode == "stage2-move":
+        stage2_xy = True
+    calibration = load_motor_calibration(stage2_calibration) if stage2_calibration is not None else None
+    position_path = Path(stage2_position_path) if stage2_position_path is not None else DEFAULT_POSITION_PATH
 
     cv2, np = _load_dependencies()
     run_id = f"demo_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}_{uuid4().hex[:8]}"
@@ -179,13 +268,9 @@ def run_demo(
         raise OSError(f"无法写入mask：{mask_path}")
     measurement = replace(segmentation.measurement, mask_ref=mask_path.relative_to(run_dir).as_posix())
     placeholders = load_path_placeholders(path_placeholders)
+    start_reference = None
     if stage2_xy:
-        placeholders = PathPlaceholderConfig(
-            work=placeholders.work,
-            stepper=stage2_stepper(),
-            assumed_spray_width_mm=placeholders.assumed_spray_width_mm,
-            visit_start_px=placeholders.visit_start_px,
-        )
+        placeholders, start_reference = _stage2_placeholders(placeholders, image.shape, calibration)
     plan = plan_cleaning(segmentation.mask, policy=resolve_plan_policy(placeholders))
     path_preview = build_path_preview(plan, placeholders=placeholders)
 
@@ -195,25 +280,36 @@ def run_demo(
     cv2.imwrite(str(run_dir / "path_overlay.png"), path_overlay)
     (run_dir / "path_narrative.txt").write_text("\n".join(path_preview.narrative) + "\n", encoding="utf-8")
     stage2_dispatch = None
-    stage2_transmit = None
+    stage2_outcome: Stage2MotionOutcome | None = None
     if stage2_xy:
         stage2_dispatch = dispatch_motion(path_preview.motion, budget=stage2_max_steps)
         xy_text = "\n".join(stage2_dispatch.lines) + ("\n" if stage2_dispatch.lines else "")
         (run_dir / "stage2_xy_pulses.txt").write_text(xy_text, encoding="utf-8")
-        if arm_stage2_xy:
-            if arm_pump:
-                raise PermissionError("同一次运行不能既武装喷水又武装步进")
-            link = Stage2SerialLink(
-                port=serial_port,
-                baudrate=baudrate,
-                timeout=serial_timeout,
-                armed=True,
-                serial_factory=serial_factory,
-            )
-            stage2_transmit = link.transmit(stage2_dispatch)
 
     serial_probe: dict[str, object] | None = None
-    if mode == "simulate":
+    if mode == "stage2-move":
+        stage2_outcome = _stage2_move(
+            run_id=run_id,
+            run_dir=run_dir,
+            dispatch=stage2_dispatch,
+            start_reference=start_reference,
+            calibration=calibration,
+            position_path=position_path,
+            motion_confirm=motion_confirm,
+            arm_stage2_xy=arm_stage2_xy,
+            serial_port=serial_port,
+            baudrate=baudrate,
+            serial_timeout=serial_timeout,
+            serial_factory=serial_factory,
+        )
+        state = estimate_state(observation, measurement)
+        episode, evidence_boundary = _stage2_episode(
+            run_id=run_id,
+            observation=observation,
+            state=state,
+            outcome=stage2_outcome,
+        )
+    elif mode == "simulate":
         state, action_target_mm = _build_simulation_state(observation, measurement, plan)
         post_mask = simulate_first_action(segmentation.mask, plan)
         post_mask_path = run_dir / "post_mask.png"
@@ -332,7 +428,26 @@ def run_demo(
         "cleaning_plan": _plan_as_dict(plan),
         "path_preview": path_preview.to_dict(),
         "stage2_dispatch": None if stage2_dispatch is None else stage2_dispatch.to_dict(),
-        "stage2_transmit": None if stage2_transmit is None else stage2_transmit.to_dict(),
+        "stage2_transmit": (
+            None
+            if stage2_outcome is None or stage2_outcome.transmit is None
+            else stage2_outcome.transmit.to_dict()
+        ),
+        "stage2_motion": None if stage2_outcome is None else stage2_outcome.to_summary(),
+        "hardware_actions": {
+            "stm32_pump_attempted": (
+                mode == "arm-pump" and controller_kind == "stm32" and episode.execution_receipt is not None
+            ),
+            "stage2_transmit_attempted": stage2_outcome is not None and stage2_outcome.receipt_written,
+            "stage2_lines_sent": 0 if stage2_outcome is None else stage2_outcome.lines_sent(),
+            "stage2_in_flight_line": (
+                None if stage2_outcome is None or stage2_outcome.error is None else stage2_outcome.error.in_flight_line
+            ),
+            "stage2_stopped": (
+                None if stage2_outcome is None or stage2_outcome.error is None else stage2_outcome.error.stopped
+            ),
+            "note": "path_preview.send_to_controller 只描述预览对象本身；是否真的发过以本字段为准",
+        },
         "state": asdict(state),
         "action_request": asdict(episode.action_request) if episode.action_request else None,
         "safety_decision": asdict(episode.safety_decision) if episode.safety_decision else None,
@@ -346,6 +461,11 @@ def run_demo(
             "path_overlay": "path_overlay.png",
             "path_narrative": "path_narrative.txt",
             "post_mask": "post_mask.png" if mode == "simulate" else None,
+            "stage2_xy_pulses": "stage2_xy_pulses.txt" if stage2_dispatch is not None else None,
+            "stage2_intent": "stage2_intent.json" if stage2_outcome is not None else None,
+            "stage2_receipt": (
+                "stage2_receipt.json" if stage2_outcome is not None and stage2_outcome.receipt_written else None
+            ),
         },
     }
     (run_dir / "summary.json").write_text(
@@ -376,15 +496,24 @@ def run_demo(
             f"每轴预算={stage2_dispatch.budget}，超出预算已截住={stage2_dispatch.truncated}"
         )
         for line in stage2_dispatch.lines:
-            print(f"  发往 STM32：{line}")
+            print(f"  计划 MOVEXY：{line}")
         if not stage2_dispatch.lines:
             print("  没有可发脉冲。")
-        if stage2_transmit is None:
-            print("  未武装：没有打开 COM。要转动请加 --arm-stage2-xy --serial-port COMx")
+        if stage2_outcome is None:
+            print("  分析模式只写 stage2_xy_pulses.txt，不打开步进串口。要转动请用 --mode stage2-move。")
         else:
-            print(f"  已发送 {len(stage2_transmit.sent_lines)} 条 MOVEXY 命令。")
-            for reply in stage2_transmit.replies:
-                print(f"  STM32：{reply}")
+            reasons = "、".join(stage2_outcome.final_decision.reason_codes)
+            print(f"  运动关卡：{stage2_outcome.final_decision.outcome.value}（{reasons}）；状态：{stage2_outcome.status}")
+            if stage2_outcome.transmit is not None:
+                print(f"  已发送 {len(stage2_outcome.transmit.sent_lines)} 条 MOVEXY 命令。")
+                for reply in stage2_outcome.transmit.replies:
+                    print(f"  STM32：{reply}")
+            if stage2_outcome.error is not None:
+                stop_text = "已确认 STOP" if stage2_outcome.error.stopped else "STOP 未确认，请立即手断 24V"
+                print(f"  发送失败：{stage2_outcome.error.reason_code}；{stop_text}；位置账本已标记未知。")
+            print(f"  位置账本：{stage2_outcome.position_after.to_dict()}")
+    if stage2_outcome is not None and stage2_outcome.status == "failed":
+        raise Stage2MotionFailed(run_dir, stage2_outcome.error.reason_code)
     return run_dir
 
 
@@ -399,6 +528,8 @@ def _validate_demo_args(
     controller_kind: str,
     pump_duration_ms: int,
     algorithm: str,
+    arm_stage2_xy: bool = False,
+    stage2_max_steps: int = STAGE2_RUN_STEP_CAP,
 ) -> None:
     if mode not in DEMO_MODES:
         raise ValueError(f"mode必须是{'/'.join(DEMO_MODES)}")
@@ -419,6 +550,10 @@ def _validate_demo_args(
         raise ValueError("--confirm-pump 只能与 --mode arm-pump 一起使用")
     if not 100 <= pump_duration_ms <= MAX_IN_PLACE_DURATION_MS:
         raise ValueError(f"--pump-duration-ms 必须在 100 到 {MAX_IN_PLACE_DURATION_MS} 之间")
+    if arm_stage2_xy and mode != "stage2-move":
+        raise ValueError("只有 --mode stage2-move 能发步进；analyze/camera-analyze 只写 stage2_xy_pulses.txt")
+    if not 0 <= stage2_max_steps <= STAGE2_RUN_STEP_CAP:
+        raise ValueError(f"--stage2-max-steps 必须在 0 到 {STAGE2_RUN_STEP_CAP} 之间（代码常量，不能调大）")
 
 
 def _load_demo_image(
@@ -743,6 +878,275 @@ def _arm_pump_episode(
     return episode, evidence_boundary
 
 
+def _stage2_placeholders(
+    base: PathPlaceholderConfig,
+    image_shape: tuple[int, ...],
+    calibration: MotorCalibration | None,
+) -> tuple[PathPlaceholderConfig, str]:
+    """Stage 2 路径从工具当前所在的像素出发：默认图像中心，标定给了喷头像素就用它。"""
+
+    height, width = image_shape[:2]
+    start_px = (float(width // 2), float(height // 2))
+    reference = "image_center"
+    if calibration is not None and calibration.nozzle_px is not None:
+        start_px = calibration.nozzle_px
+        reference = "nozzle_px"
+    work = replace(base.work, origin_px=start_px)
+    if calibration is not None:
+        work = replace(
+            work,
+            version=f"{base.work.version}+motor-calibration",
+            mm_per_px=calibration.mm_per_px_x,
+            mm_per_px_y=calibration.mm_per_px_y,
+            scale_json_ref=calibration.ref,
+        )
+    config = PathPlaceholderConfig(
+        work=work,
+        stepper=stage2_stepper(),
+        assumed_spray_width_mm=base.assumed_spray_width_mm,
+        visit_start_px=start_px,
+    )
+    return config, reference
+
+
+def _stage2_move(
+    *,
+    run_id: str,
+    run_dir: Path,
+    dispatch: Stage2Dispatch,
+    start_reference: str,
+    calibration: MotorCalibration | None,
+    position_path: Path,
+    motion_confirm: MotionConfirm | None,
+    arm_stage2_xy: bool,
+    serial_port: str | None,
+    baudrate: int,
+    serial_timeout: float,
+    serial_factory: SerialFactory | None,
+) -> Stage2MotionOutcome:
+    """运动关卡 → 人确认 → 武装 → 发送。打开 COM 前先落盘意图，发送后无论成败都落盘回执。"""
+
+    position = load_position(position_path)
+    request = MotionRequest(
+        request_id=new_motion_request_id(),
+        task_id=run_id,
+        lines=dispatch.lines,
+        position_before_steps=position.xy(),
+        start_reference=start_reference,
+        calibration_ref=None if calibration is None else calibration.ref,
+        calibration_sha256=None if calibration is None else calibration.sha256,
+        calibration_warnings=() if calibration is None else calibration.warnings,
+        dispatch_truncated=dispatch.truncated,
+    )
+    plan = summarize_motion(request).to_dict()
+    plan["path_overlay"] = str(run_dir / "path_overlay.png")
+    gate_decision = evaluate_motion(request)
+    decision = gate_decision
+    human_confirmed = False
+    if gate_decision.outcome is SafetyOutcome.DENY:
+        status = "denied"
+    elif not arm_stage2_xy:
+        status = "not_armed"
+    elif motion_confirm is None:
+        status = "human_pending"
+    else:
+        human_confirmed = bool(motion_confirm(request, plan))
+        if human_confirmed:
+            decision = approve_motion_gate(request, gate_decision, confirmed=True)
+            status = "approved" if decision.outcome is SafetyOutcome.ALLOW else "denied"
+        else:
+            status = "human_declined"
+
+    _write_json(
+        run_dir / "stage2_intent.json",
+        {
+            "status": status,
+            "written_at": datetime.now(timezone.utc).isoformat(),
+            "request": asdict(request),
+            "plan": plan,
+            "gate_decision": asdict(gate_decision),
+            "final_decision": asdict(decision),
+            "human_confirmed": human_confirmed,
+            "armed": arm_stage2_xy,
+            "serial_port": serial_port,
+            "calibration": None if calibration is None else calibration.to_dict(),
+            "position_before": position.to_dict(),
+            "evidence_boundary": "发送意图；写于打开步进串口之前。不是执行回执",
+        },
+    )
+    if status != "approved":
+        return Stage2MotionOutcome(status, request, plan, gate_decision, decision, human_confirmed, position, position)
+
+    result: Stage2TransmitResult | None = None
+    error: Stage2TransmitError | None = None
+    position_after = position
+    link = Stage2SerialLink(
+        port=serial_port,
+        baudrate=baudrate,
+        timeout=serial_timeout,
+        armed=True,
+        serial_factory=serial_factory,
+    )
+    try:
+        result = link.transmit(dispatch, request=request, decision=decision)
+        position_after = record_completed(position_path, result.sent_lines, run_id=run_id)
+        status = "sent"
+    except Stage2TransmitError as exc:
+        error = exc
+        status = "failed"
+        if exc.motion_attempted:
+            position_after = mark_unknown(
+                position_path,
+                run_id=run_id,
+                reason=f"发送失败 {exc.reason_code}：位置不可信，人重新对位后执行 --stage2-set-zero",
+            )
+    except PermissionError:
+        # 链路在打开 COM 前拒绝了审批：没有发出任何东西，位置不变。
+        status = "refused_by_link"
+        raise
+    except BaseException:
+        status = "aborted"
+        try:
+            position_after = mark_unknown(position_path, run_id=run_id, reason="发送过程意外中断：位置不可信")
+        except Exception:
+            pass
+        raise
+    finally:
+        _write_json(
+            run_dir / "stage2_receipt.json",
+            {
+                "status": status,
+                "written_at": datetime.now(timezone.utc).isoformat(),
+                "request_id": request.request_id,
+                "transmit": None if result is None else result.to_dict(),
+                "error": None if error is None else error.to_dict(),
+                "position_before": position.to_dict(),
+                "position_after": position_after.to_dict(),
+                "evidence_boundary": "固件回执只证明计数与握手，不证明台面位移、对准或清洗",
+            },
+        )
+    return Stage2MotionOutcome(
+        status,
+        request,
+        plan,
+        gate_decision,
+        decision,
+        human_confirmed,
+        position,
+        position_after,
+        transmit=result,
+        error=error,
+        receipt_written=True,
+    )
+
+
+_STAGE2_EPISODE_ROUTES = {
+    "denied": ("stage2_motion_denied", NextRoute.STOP, "safety"),
+    "not_armed": ("stage2_motion_not_armed", NextRoute.HUMAN, "control"),
+    "human_pending": ("stage2_motion_human_pending", NextRoute.HUMAN, "safety"),
+    "human_declined": ("stage2_motion_human_declined", NextRoute.HUMAN, "safety"),
+    "sent": ("stage2_motion_sent", NextRoute.HUMAN, None),
+    "failed": ("stage2_motion_failed", NextRoute.STOP, "execution"),
+}
+
+_STAGE2_RECOVERY = {
+    "denied": "看 stage2_intent.json 的 reason_codes：位置未知先人工对位后 --stage2-set-zero；缺标定先跑 scripts/calibrate_motor_mm_per_px.py",
+    "not_armed": "人在电机旁、24V 已接时再加 --arm-stage2-xy --serial-port COMx",
+    "human_pending": "运动需要人确认；命令行会要求输入 YES",
+    "human_declined": "人没有确认，未打开步进串口",
+    "failed": "检查 stage2_receipt.json；STOP 未确认时立即手断 24V；位置已标记未知，需重新对位后 --stage2-set-zero",
+}
+
+
+def _stage2_episode(
+    *,
+    run_id: str,
+    observation: Observation,
+    state: StateEstimate,
+    outcome: Stage2MotionOutcome,
+) -> tuple[Episode, str]:
+    mode_name, route, failure_stage = _STAGE2_EPISODE_ROUTES[outcome.status]
+    if outcome.status == "sent":
+        reason_codes: tuple[str, ...] = (
+            "STAGE2_MOTION_SENT",
+            "NO_PUMP_SENT",
+            "RECEIPT_IS_NOT_POSITION_PROOF",
+            "POST_OBSERVATION_REQUIRED",
+        )
+        evidence = "人工确认后向 Stage 2 发送 MOVEXY；回执只证明固件计数，不证明台面位移、对准或清洗；未发 PUMP"
+    elif outcome.status == "failed":
+        stop_code = "STAGE2_STOP_CONFIRMED" if outcome.error.stopped else "STAGE2_STOP_UNCONFIRMED"
+        reason_codes = (outcome.error.reason_code, stop_code, "POSITION_UNKNOWN_AFTER_FAILURE", "NO_PUMP_SENT")
+        evidence = "Stage 2 发送中途失败，已尝试 STOP；位置不可信；未发 PUMP"
+    else:
+        reason_codes = outcome.final_decision.reason_codes + ("NO_MOTION_SENT", "NO_PUMP_SENT")
+        if outcome.status == "not_armed":
+            reason_codes = ("STAGE2_NOT_ARMED",) + reason_codes
+        evidence = f"Stage 2 运动未发送（{outcome.status}）；未打开步进串口；未发 PUMP"
+
+    failures = []
+    if failure_stage is not None:
+        failures.append(
+            FailureRecord(
+                f"failure_{uuid4().hex[:12]}",
+                run_id,
+                failure_stage,
+                "warning" if outcome.status == "failed" else "info",
+                reason_codes,
+                True,
+                _STAGE2_RECOVERY[outcome.status],
+            )
+        )
+    episode = Episode(
+        episode_id=f"episode_{uuid4().hex[:12]}",
+        task_id=run_id,
+        mode=mode_name,
+        protocol_version=DEMO_VERSION,
+        observation_pre=observation,
+        state=state,
+        action_request=None,
+        safety_decision=outcome.final_decision,
+        execution_receipt=None,
+        observation_post=None,
+        verification=VerificationResult(
+            run_id,
+            observation.observation_id,
+            None,
+            None,
+            None,
+            False,
+            route,
+            reason_codes,
+        ),
+        failures=failures,
+    )
+    return episode, evidence
+
+
+def _write_json(path: Path, payload: dict[str, object]) -> None:
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+
+
+def _cli_motion_confirm(request: MotionRequest, plan: dict) -> bool:
+    """命令行人工关卡：打印计划，要求人输入 YES。没有终端输入时视为未确认。"""
+
+    abs_x, abs_y = plan["abs_steps"]
+    print("========== Stage 2 运动确认 ==========")
+    print(f"将发送 {plan['line_count']} 条 MOVEXY；X 累计 |步|={abs_x}，Y 累计 |步|={abs_y}")
+    print(
+        f"位置账本（相对人工零点，不是绝对坐标）：{plan['position_before']} → {plan['position_after']}；"
+        f"软限位 {plan['soft_min_steps']}～{plan['soft_max_steps']}"
+    )
+    print(f"标定：{request.calibration_ref}；起点：{request.start_reference}")
+    print(f"路径叠加图：{plan['path_overlay']}")
+    print("人必须在电机旁，手能立刻断 24V。MOVEXY 两轴同频，不是直线插补。")
+    try:
+        answer = input("确认发送请输入 YES：")
+    except EOFError:
+        return False
+    return answer.strip() == "YES"
+
+
 def _controller_device_facts(
     *,
     controller_kind: str,
@@ -899,7 +1303,7 @@ def _load_dependencies():
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="MicroCleaningVision Demo v0.2")
-    source = parser.add_mutually_exclusive_group(required=True)
+    source = parser.add_mutually_exclusive_group()
     source.add_argument("--input", help="jpg/png真实图片路径")
     source.add_argument("--generate-sample", action="store_true", help="生成可复现的红色模拟污染图")
     source.add_argument("--from-camera", action="store_true", help="用 USBCamera 抓一帧；默认不发泵")
@@ -907,7 +1311,10 @@ def main(argv: list[str] | None = None) -> int:
         "--mode",
         choices=DEMO_MODES,
         default="analyze",
-        help="analyze/camera-analyze 只分析；ping-only 只探测通信；arm-pump 需人工确认才可能发泵；可与 --live 组合",
+        help=(
+            "analyze/camera-analyze 只分析；ping-only 只探测通信；arm-pump 需人工确认才可能发泵；"
+            "stage2-move 是唯一可能发步进的模式（关卡+YES+武装）；前三种可与 --live 组合"
+        ),
     )
     parser.add_argument("--output-root", default=str(Path("output") / "demo"))
     parser.add_argument("--camera-index", type=int, default=0, help="OpenCV VideoCapture 设备序号")
@@ -956,12 +1363,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--stage2-xy",
         action="store_true",
-        help="用 1600 步/转、5 mm/转规划 X/Y，每段生成 MOVEXY 双轴命令",
+        help="用 1600 步/转、5 mm/转规划 X/Y，只写 stage2_xy_pulses.txt，不打开串口",
     )
     parser.add_argument(
         "--arm-stage2-xy",
         action="store_true",
-        help="打开指定 COM，HELLO v0.3 成功后发送 MOVEXY 双轴命令",
+        help="仅限 --mode stage2-move：运动关卡通过且人输入 YES 后，打开指定 COM 发送 MOVEXY",
+    )
+    parser.add_argument(
+        "--stage2-calibration",
+        type=Path,
+        help="电机位移标定 JSON（scripts/calibrate_motor_mm_per_px.py 输出）；stage2-move 武装时必填",
+    )
+    parser.add_argument(
+        "--stage2-set-zero",
+        action="store_true",
+        help="人已把台面对到参考位置：把 output/stage2/position.json 记为 (0,0)。单独运行，不发脉冲",
     )
     parser.add_argument(
         "--stage2-x",
@@ -976,8 +1393,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--stage2-max-steps",
         type=int,
-        default=1600,
-        help="一次运行允许发给每个轴的脉冲上限，默认 1600（1 圈，5 mm）",
+        default=STAGE2_RUN_STEP_CAP,
+        help=f"一次运行每轴累计脉冲上限，只能调小；最大 {STAGE2_RUN_STEP_CAP}（1 圈，约 5 mm）",
     )
     parser.add_argument(
         "--wait-usb",
@@ -985,14 +1402,32 @@ def main(argv: list[str] | None = None) -> int:
         help="实时会话：先等待指定 camera-index 可读取再打开预览；Q暂停后按其他键重开",
     )
     args = parser.parse_args(argv)
+    has_source = bool(args.input or args.generate_sample or args.from_camera)
+    if args.stage2_set_zero:
+        if has_source or args.live:
+            parser.error("--stage2-set-zero 单独运行，不和抓图或分析放在一起")
+        position = set_zero(DEFAULT_POSITION_PATH)
+        print(f"位置账本已归零：{DEFAULT_POSITION_PATH}")
+        print(f"{position.to_dict()}")
+        print("这只是计数起点，不是回零；每次上电或发送失败后都要人重新对位再归零。")
+        return 0
+    if not has_source:
+        parser.error("必须选择 --input、--generate-sample 或 --from-camera 之一")
     stage2_armed = args.arm_stage2_x or args.arm_stage2_xy
-    stage2_any = stage2_armed or args.stage2_x or args.stage2_xy
+    stage2_any = stage2_armed or args.stage2_x or args.stage2_xy or args.mode == "stage2-move"
+    if stage2_armed and args.mode != "stage2-move":
+        parser.error(
+            "analyze 不再发步进。发送请用 --mode stage2-move --stage2-calibration <json> "
+            "--arm-stage2-xy --serial-port COMx"
+        )
     if stage2_armed and not args.serial_port:
         parser.error("发送步进必须指定 --serial-port，不扫描 COM")
+    if stage2_armed and args.stage2_calibration is None:
+        parser.error("发送步进必须指定 --stage2-calibration（电机位移标定 JSON）")
     if stage2_armed and (args.arm_pump or args.mode == "arm-pump"):
         parser.error("步进发送不能和喷水武装放在同一次运行")
-    if args.stage2_max_steps < 0:
-        parser.error("--stage2-max-steps 不能为负")
+    if not 0 <= args.stage2_max_steps <= STAGE2_RUN_STEP_CAP:
+        parser.error(f"--stage2-max-steps 必须在 0 到 {STAGE2_RUN_STEP_CAP} 之间（只能调小）")
     if args.live and stage2_any:
         parser.error("实时窗口不发送步进；请去掉 --live，用 --from-camera --stage2-xy")
     if args.live:
@@ -1068,7 +1503,12 @@ def main(argv: list[str] | None = None) -> int:
             stage2_xy=stage2_any,
             arm_stage2_xy=stage2_armed,
             stage2_max_steps=args.stage2_max_steps,
+            stage2_calibration=args.stage2_calibration,
+            motion_confirm=_cli_motion_confirm if stage2_armed else None,
         )
+    except Stage2MotionFailed as exc:
+        print(str(exc), file=sys.stderr)
+        return 3
     except Exception as exc:
         from microcleaning.data_learning.usb_camera import USBCameraError
 
