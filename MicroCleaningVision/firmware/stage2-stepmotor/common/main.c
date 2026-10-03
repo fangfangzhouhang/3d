@@ -8,9 +8,11 @@
  *   MOVEXY <Nx> <FWD|REV> <Ny> <FWD|REV>    → X/Y 同时发脉冲，走直线
  *   MOVE <N>                                → 等价 PULSE N
  *   SPEED <Hz>                              → 两轴同设频率 10-20000Hz
- *   STOP                                    → 两轴立即停止
+ *   STOP                                    → 两轴立即停止，泵关闭
  *   READ                                    → X 状态 STEP_SENT=xx BUSY=0|1
  *   READXY                                  → 两轴状态 STEP2 X=.. BX=.. Y=.. BY=..
+ *   PUMP ON                                 → 打开水泵（PB0 拉低）
+ *   PUMP OFF                                → 关闭水泵（PB0 拉高）
  *
  * 接线（共阳极，两台 DM542）：
  *   每台 PUL+、DIR+ 接在一起，接到 STM32 的 3.3V，不要接 5V
@@ -47,9 +49,24 @@ static void parse_and_exec(const char *line) {
     return;
   }
 
+  /* PUMP ON */
+  if (strncmp(line, "PUMP ON", 7) == 0) {
+    sm_pump_on();
+    tx_response("PUMP_ON");
+    return;
+  }
+
+  /* PUMP OFF */
+  if (strncmp(line, "PUMP OFF", 8) == 0) {
+    sm_pump_off();
+    tx_response("PUMP_OFF");
+    return;
+  }
+
   /* STOP */
   if (strncmp(line, "STOP", 4) == 0) {
     sm_stop();
+    sm_pump_off();
     tx_response("STEP_STOPPED");
     return;
   }
@@ -191,7 +208,7 @@ int main(void) {
   hal_uart_send_str("\r\n=== STAGE2 STEPMOTOR XY TEST ===\r\n");
   hal_uart_send_str("2x DM542 + 2x 57-56, X+Y axes\r\n");
   hal_uart_send_str("HELLO / PULSE N / MOVEXY Nx d Ny d / MOVE N / "
-                    "SPEED Hz / STOP / READ / READXY\r\n");
+                    "SPEED Hz / STOP / READ / READXY / PUMP ON / PUMP OFF\r\n");
   hal_uart_send_str("Waiting...\r\n");
 
   while (1) {

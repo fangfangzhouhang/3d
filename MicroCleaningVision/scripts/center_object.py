@@ -8,6 +8,7 @@
   4. 发 MOVEXY 命令，让载物台移动把物体拉回中央
 
 改进：电机移动在后台线程执行，预览窗口在移动过程中持续刷新。
+居中成功后自动喷水一次（300ms，符合 PC 安全上限）。
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ STEPS_PER_MM = 320.0
 MAX_STEPS_PER_MOVE = 1600  # 安全上限，1 圈 = 5mm
 ITERATIONS = 3  # 迭代居中次数，越多次越准
 CENTER_TOLERANCE_PX = 3.0  # 距中心小于此像素视为已居中
+PUMP_ON_MS = 300  # 单次喷水时长，PC 安全策略上限 300ms
 
 
 def main() -> int:
@@ -110,9 +112,26 @@ def main() -> int:
         print("电机超时未完成")
         return False
 
-    def center_iteration() -> None:
-        """后台线程：迭代居中，循环检测→移动直到居中或达到迭代上限"""
+    def pump_spray(ms: int) -> bool:
+        """喷水一次：PUMP ON → 延时 → PUMP OFF（finally 保证异常时也一定关泵）"""
+        replies = cmd("PUMP ON")
+        if not any("PUMP_ON" in r for r in replies):
+            print(f"开水泵失败：{replies}")
+            return False
         try:
+            time.sleep(ms / 1000.0)
+        finally:
+            replies = cmd("PUMP OFF")
+        if not any("PUMP_OFF" in r for r in replies):
+            print(f"关水泵失败：{replies}")
+            return False
+        return True
+
+    def center_iteration() -> None:
+        """后台线程：迭代居中，居中成功后自动喷水一次"""
+        try:
+            detected = False
+            spray = False
             for i in range(ITERATIONS):
                 # 抓一帧做分割
                 ok, frame = cap.read()
@@ -125,6 +144,7 @@ def main() -> int:
                     move_result["message"] = "no target"
                     print("未检测到物体")
                     return
+                detected = True
 
                 h, w = frame.shape[:2]
                 cx_img, cy_img = w // 2, h // 2
@@ -134,10 +154,10 @@ def main() -> int:
 
                 dist = (dx * dx + dy * dy) ** 0.5
                 if dist < CENTER_TOLERANCE_PX:
-                    move_result["message"] = f"centered (iter {i + 1}, dist={dist:.1f}px)"
                     print(f"已居中：第{i + 1}次迭代，距中心{dist:.1f}px")
                     move_result["success"] = True
-                    return
+                    spray = True
+                    break
 
                 mm_x = abs(dx) * MM_PER_PX_X
                 mm_y = abs(dy) * MM_PER_PX_Y
@@ -147,10 +167,10 @@ def main() -> int:
                 dir_y = "REV" if dy > 0 else "FWD"
 
                 if steps_x == 0 and steps_y == 0:
-                    move_result["message"] = "already centered"
                     print("物体已在中心")
                     move_result["success"] = True
-                    return
+                    spray = True
+                    break
 
                 print(f"迭代{i + 1}: 质心=({obj_x:.0f},{obj_y:.0f}) "
                       f"偏移=({dx:+.0f},{dy:+.0f})px → X={steps_x}{dir_x} Y={steps_y}{dir_y}")
@@ -159,10 +179,20 @@ def main() -> int:
                 if not move_xy(steps_x, dir_x, steps_y, dir_y):
                     move_result["message"] = "move failed"
                     return
+            else:
+                # 达到迭代上限，按已居中处理（前提是至少检测到过一次目标）
+                move_result["success"] = True
+                spray = detected
 
-            # 达到迭代上限
-            move_result["success"] = True
-            move_result["message"] = f"done {ITERATIONS} iters"
+            if spray:
+                move_result["message"] = "spraying..."
+                print("居中完成，喷水 300ms")
+                if pump_spray(PUMP_ON_MS):
+                    move_result["message"] = "done + sprayed"
+                    print("喷水完成")
+                else:
+                    move_result["message"] = "spray failed"
+                    print("喷水失败")
         finally:
             move_done.set()
 
@@ -174,9 +204,9 @@ def main() -> int:
         return 1
 
     current_algorithm = args.algorithm
-    last_status = "SPACE=center  H/O/G/E/L=algo  Q=quit"
+    last_status = "SPACE=center+spray  H/O/G/E/L=algo  Q=quit"
     move_thread: threading.Thread | None = None
-    print("预览已打开。按空格将物体移到中央，H/O/G/E/L 切换算法，Q 退出。")
+    print("预览已打开。按空格将物体移到中央并喷水一次，H/O/G/E/L 切换算法，Q 退出。")
 
     try:
         while True:
