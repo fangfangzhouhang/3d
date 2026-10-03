@@ -13,6 +13,8 @@
  *   READXY                                  → 两轴状态 STEP2 X=.. BX=.. Y=.. BY=..
  *   PUMP ON                                 → 打开水泵（PB0 拉低）
  *   PUMP OFF                                → 关闭水泵（PB0 拉高）
+ *   TO_NEEDLE                               → Y 轴正走 7680 步，到针管下方
+ *   TO_SCOPE                                → Y 轴反走 7680 步，回显微镜观测位
  *
  * 接线（共阳极，两台 DM542）：
  *   每台 PUL+、DIR+ 接在一起，接到 STM32 的 3.3V，不要接 5V
@@ -159,6 +161,28 @@ static void parse_and_exec(const char *line) {
     return;
   }
 
+  /* TO_NEEDLE —— 从显微镜观测位切到针管下方：Y 轴正走 7680 步（X 不动） */
+  if (strncmp(line, "TO_NEEDLE", 9) == 0) {
+    char buf[64];
+    sm_start_xy(0u, SM_DIR_FWD, SM_NEEDLE_OFFSET_STEPS, SM_DIR_FWD);
+    (void)snprintf(buf, sizeof(buf),
+                   "STEP2_START X=0 FWD Y=%lu FWD",
+                   (unsigned long)SM_NEEDLE_OFFSET_STEPS);
+    tx_response(buf);
+    return;
+  }
+
+  /* TO_SCOPE —— 从针管位回到显微镜观测位：Y 轴反走 7680 步（X 不动） */
+  if (strncmp(line, "TO_SCOPE", 8) == 0) {
+    char buf[64];
+    sm_start_xy(0u, SM_DIR_FWD, SM_NEEDLE_OFFSET_STEPS, SM_DIR_REV);
+    (void)snprintf(buf, sizeof(buf),
+                   "STEP2_START X=0 FWD Y=%lu REV",
+                   (unsigned long)SM_NEEDLE_OFFSET_STEPS);
+    tx_response(buf);
+    return;
+  }
+
   /* MOVE <N> — 当前方向 */
   if (strncmp(line, "MOVE ", 5) == 0) {
     n = (uint32_t)strtoul(line + 5, NULL, 10);
@@ -208,7 +232,8 @@ int main(void) {
   hal_uart_send_str("\r\n=== STAGE2 STEPMOTOR XY TEST ===\r\n");
   hal_uart_send_str("2x DM542 + 2x 57-56, X+Y axes\r\n");
   hal_uart_send_str("HELLO / PULSE N / MOVEXY Nx d Ny d / MOVE N / "
-                    "SPEED Hz / STOP / READ / READXY / PUMP ON / PUMP OFF\r\n");
+                    "SPEED Hz / STOP / READ / READXY / PUMP ON / PUMP OFF / "
+                    "TO_NEEDLE / TO_SCOPE\r\n");
   hal_uart_send_str("Waiting...\r\n");
 
   while (1) {
