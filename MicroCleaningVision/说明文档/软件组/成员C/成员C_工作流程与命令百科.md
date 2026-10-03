@@ -2,20 +2,18 @@
 
 > 成员 C 的目标：把 B 的算法 Mask 变成可解释的像素目标点和分段路径，并保留未来像素—毫米标定与 STM32 协议入口。
 
-## 0. 当前该做什么（2026-09-19）
+## 0. 当前该做什么（2026-10-02）
 
-当前链路见 [当前总流程](../总流程说明/团队总流程与输入输出.md)。下文是命令字典。
+当前链路和能不能发步进，以 [当前总流程](../总流程说明/团队总流程与输入输出.md) 为准。提交顺序见 [提交与拉取日志](../进度记录/提交与拉取日志.md)。下文第 1 节起若仍写「路径一律不能驱动电机」，那是 2026-09-19 之前的说法，不要照着做。
 
-路径只能预览，不能驱动 XY。`path_px` 禁止直连串口。假设毫米和步进对照表**不是**已验收标定，也**不是** MOVE 指令。
+`analyze` 只看 Mask 和路线，不开步进串口，也不发泵。真动电机用 `stage2-move`，必须同时有标定 JSON、运动关卡通过、人在旁边输入 YES、以及 `--arm-stage2-xy`。毫米仍是占位或铭牌假设，不是已验收标定。
 
-**一条总命令（看 Mask、路线编号和终端解说，不发泵）：**
+**一条总命令（不发泵、不动电机）：**
 
 ```powershell
 cd "D:\大创\3d\MicroCleaningVision"
-.\.venv\Scripts\python.exe -m demo.demo_pipeline --input "data\raw_images\public\public_001.jpg" --mode analyze
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --mode analyze --stage2-xy --camera-index 0
 ```
-
-看终端里的「路径预览」文字、`output/demo/demo_*/path_overlay.png` 和 `path_narrative.txt`。人认 COM 后才 ping，禁止扫口。
 
 可选：用 JSON 改占位参数（尺度、喷头偏移、丝杆导程），仍不能发 MOVE：
 
