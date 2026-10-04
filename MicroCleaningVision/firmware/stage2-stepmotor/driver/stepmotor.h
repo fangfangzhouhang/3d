@@ -26,6 +26,12 @@ typedef enum {
 #define SM_FREQ_MIN         10u
 #define SM_FREQ_MAX         20000u
 
+/* 显微镜 ↔ 针管切换参数（固定，针管在显微镜 Y 正方向 24mm）：
+ * 320 步/mm = 1600 步/圈 ÷ 5mm 导程；24mm × 320 = 7680 步 */
+#define SM_STEPS_PER_MM        320u
+#define SM_NEEDLE_OFFSET_MM    24u
+#define SM_NEEDLE_OFFSET_STEPS (SM_STEPS_PER_MM * SM_NEEDLE_OFFSET_MM)  /* 7680 */
+
 /* 初始化两轴 GPIO / TIM2（Y）/ TIM3（X）/ NVIC，脉冲空闲高电平。 */
 void sm_init(void);
 
