@@ -54,6 +54,8 @@ capture(task_id: str, phase: str) -> Observation
 - 面积单位是像素计数，不是 mm²。无目标时面积 0、中心 None；不能用 `(0,0)` 冒充一个检测目标。
 - C 规划读取算法 Mask，保留坐标系 `image_px`、原图尺寸和测量版本。
 - 图上总体中心可能落在多个区域之间；规划按连通块处理，不能只相信总体质心就是可喷的位置。
+- `target_instance.py` 的 `TargetInstance` 是视觉内部对象，不在 `contracts.py` 里。字段：`target_id`、`centroid_px`、`area_px`、`bbox`、`component_label`、`confidence`，可选 `mask_ref`。`extract_target_instances` 用 8 连通拆 Mask，编号从 T1 起。面积属于这一块，不是整幅前景。
+- `verify_single_target` 用搜索框（默认外扩 8 像素）、重叠比（默认 0.20）和质心距离（默认 16 像素）把后图的一块配回指定目标。唯一配上才把这一对面积交给 `verify_area_change`。配不上或配到多块时 `match_status` 为 `unmatched` 或 `ambiguous`，路由是 HUMAN。别的污渍变小不能把仍在的 T1 判成已洗净。
 - `mask_ref` 为文件引用时，读者必须知道它相对哪个运行目录。图片 ID、路径和版本在 summary 中对齐。
 
 ## 5. C → MCV1：固定喷头短喷
@@ -72,11 +74,15 @@ execute(request: ActionRequest, decision: SafetyDecision) -> ExecutionReceipt
 
 ## 6. C → Stage 2：受限双轴运动
 
-当前链：`CleaningPlan → PathPreview → Stage2Dispatch → MotionRequest → SafetyDecision → Stage2SerialLink`。
+像素路线仍是：`CleaningPlan → PathPreview → Stage2Dispatch → MotionRequest → SafetyDecision → Stage2SerialLink`。
+
+「下一块洗谁」是另一条入口：`plan_sequence(SequenceTarget 列表)`。`SequenceTarget` 在 `planning/sequence_planner.py`，字段是 `target_id`、`centroid_px`、`area_px`、`retry_count`、`difficulty`、`risk`，单位是像素。策略为 `nearest_neighbor`、`area_desc`、`weighted_score`。加权分是 `w_area*面积 - w_distance*到起点的距离 + w_retry*重试 + w_difficulty*难度 - w_risk*风险`，默认权重都是 1。分数越高越靠前；平局按 `target_id` 字符串较小者优先。它不导入视觉的 `TargetInstance`，也不生成 `MOVEXY`。集成测试自己抄字段。
+
+同一条 COM 上的顺序由 `F103Session.run_step_then_pump` 管理：步进句子仍只来自 `stage2_protocol`，喷水句子仍只来自 `stm32_protocol`。
 
 MotionRequest 是 C 的局部数据类，包含 request_id、task_id、lines、position_before_steps、start_reference、calibration_ref/sha256/warnings、dispatch_truncated、rule_version。审批摘要绑定这些内容，发送器核对同一 tuple of lines。
 
-线上是 `HELLO → STEP_OK v0.3`、`MOVEXY`、`READXY` 和 `STOP`。这份现有主机发送器仍拒绝PUMP/MCV1，不能向它的会话随意塞入喷水消息。固件同时支持两类协议，但电脑混合会话管理尚未实现。READXY 给的是 X/Y 已发脉冲与忙闲标记，没有绝对位置、清洗效果或喷液数据。
+线上是 `HELLO → STEP_OK v0.3`、`MOVEXY`、`READXY` 和 `STOP`。`Stage2SerialLink` 仍拒绝把 `PUMP` / `MCV1` 写进自己的载荷。固件可以听两类句子。电脑端从 2026-10-05 起用 `F103Session` 让它们顺序共用一条已打开的连接，而不是把两个解析器合成一个。Demo 还没有调用这个会话。READXY 给的是 X/Y 已发脉冲与忙闲标记，没有绝对位置、清洗效果或喷液数据。
 
 | 文件 | 写入时机 | 保存什么 |
 |---|---|---|

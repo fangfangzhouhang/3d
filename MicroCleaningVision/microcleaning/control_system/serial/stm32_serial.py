@@ -33,7 +33,11 @@ def _now() -> str:
 
 
 class STM32SerialController(ControllerPort):
-    """把已批准的定点短喷翻译为 MCV1 文本；未武装时拒绝 PUMP。"""
+    """把已批准的定点短喷翻译为 MCV1 文本；未武装时拒绝 PUMP。
+
+    可以改用已经打开的 ``connection``，或绑定 ``F103SerialSession``。PUMP 仍只从这里发出。
+    ``ACK`` 不是清洗成功，只有 ``DONE`` 表示输出流程结束。
+    """
 
     def __init__(
         self,
@@ -44,6 +48,8 @@ class STM32SerialController(ControllerPort):
         arm_pump: bool = False,
         max_pump_duration_ms: int = MAX_IN_PLACE_DURATION_MS,
         serial_factory: SerialFactory | None = None,
+        connection: Any = None,
+        session: Any = None,
         policy_version: str = ReplaySafetyLimits().version,
     ) -> None:
         if baudrate <= 0:
@@ -52,15 +58,37 @@ class STM32SerialController(ControllerPort):
             raise ValueError("timeout 必须大于 0")
         if max_pump_duration_ms < 1:
             raise ValueError("max_pump_duration_ms 必须是正整数")
+        if connection is not None and session is not None:
+            raise ValueError("connection 与 session 只能传一个")
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
         self.arm_pump = arm_pump
         self.max_pump_duration_ms = max_pump_duration_ms
         self._serial_factory = serial_factory
+        self._external_connection = connection
+        self._session = session
+        self._owns_connection = connection is None and session is None
+        self._lease = object()
         self._policy_version = policy_version
         self._used_tokens: set[str] = set()
         self._connection: Any = None
+
+    @property
+    def external_connection(self) -> Any:
+        return self._external_connection
+
+    @property
+    def bound_session(self) -> Any:
+        return self._session
+
+    def bind_session(self, session: Any) -> None:
+        """改走共享会话，不再为这次喷水另开串口。"""
+
+        if self._session is not None and self._session is not session:
+            raise RuntimeError("喷水控制器已绑定其他会话")
+        self._session = session
+        self._owns_connection = False
 
     def ping(self) -> STM32Response:
         return self._command(encode_ping(), expected_kind="PONG")
@@ -218,9 +246,13 @@ class STM32SerialController(ControllerPort):
         )
 
     def close(self) -> None:
+        session = self._session
+        owns = self._owns_connection
         connection = self._connection
         self._connection = None
-        if connection is None:
+        if session is not None:
+            session.release(self._lease)
+        if not owns or connection is None:
             return
         closer = getattr(connection, "close", None)
         if callable(closer):
@@ -281,6 +313,19 @@ class STM32SerialController(ControllerPort):
     def _ensure_connection(self) -> Any:
         if self._connection is not None:
             return self._connection
+        if self._session is not None:
+            self._owns_connection = False
+            self._connection = self._session.acquire("mcv1", self._lease)
+            return self._connection
+        if self._external_connection is not None:
+            self._owns_connection = False
+            self._connection = self._external_connection
+            return self._connection
+        from microcleaning.control_system.serial.f103_session import F103SessionBusy, com_occupied_by_session
+
+        if self.port and com_occupied_by_session(self.port):
+            raise F103SessionBusy(f"{self.port} 已由单串口会话占用，拒绝再打开")
+        self._owns_connection = True
         if self._serial_factory is not None:
             self._connection = self._serial_factory()
             return self._connection

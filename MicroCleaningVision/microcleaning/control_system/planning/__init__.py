@@ -1,4 +1,4 @@
-"""路径规划：Mask 走法、工作平面占位、步进对照。"""
+"""路径规划：目标顺序、Mask 走法、工作平面占位、步进对照。"""
 
 from microcleaning.control_system.planning.cleaning_plan import (
     CleaningPlan,
@@ -7,6 +7,13 @@ from microcleaning.control_system.planning.cleaning_plan import (
     cleaning_plan_to_dict,
     plan_cleaning,
     simulate_first_action,
+)
+from microcleaning.control_system.planning.sequence_planner import (
+    SequencePlan,
+    SequenceScoreBreakdown,
+    SequenceScoreWeights,
+    SequenceTarget,
+    plan_sequence,
 )
 from microcleaning.control_system.planning.path_preview import (
     PathPreview,
@@ -31,6 +38,10 @@ __all__ = (
     "CleaningPlanPolicy",
     "CleaningStrategy",
     "PathPreview",
+    "SequencePlan",
+    "SequenceScoreBreakdown",
+    "SequenceScoreWeights",
+    "SequenceTarget",
     "StepperConfig",
     "WorkFrameConfig",
     "build_path_preview",
@@ -41,6 +52,7 @@ __all__ = (
     "pixel_to_assumed_mm",
     "plan_and_preview",
     "plan_cleaning",
+    "plan_sequence",
     "preview_motion",
     "resolve_plan_policy",
     "simulate_first_action",

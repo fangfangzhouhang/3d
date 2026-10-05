@@ -96,7 +96,11 @@ class Stage2TransmitError(RuntimeError):
 
 
 class Stage2SerialLink:
-    """HELLO v0.3 成功后才发 MOVEXY。失败时先发 STOP。不发送 MCV1|PUMP。"""
+    """HELLO v0.3 成功后才发 MOVEXY。失败时先发 STOP。不发送 MCV1|PUMP。
+
+    可以改用已经打开的 ``connection``，或和喷水控制器一起绑定 ``F103SerialSession``。
+    占用期间不再打开第二口；这条链路自己仍然只编码、只解析步进句子。
+    """
 
     def __init__(
         self,
@@ -106,6 +110,8 @@ class Stage2SerialLink:
         timeout: float = 2.0,
         armed: bool = False,
         serial_factory: SerialFactory | None = None,
+        connection: Any = None,
+        session: Any = None,
         read_limit: int = 40,
         speed_hz: int = DEFAULT_SPEED_HZ,
     ) -> None:
@@ -113,14 +119,36 @@ class Stage2SerialLink:
             raise ValueError("波特率和超时必须为正")
         if not MIN_SPEED_HZ <= speed_hz <= MAX_SPEED_HZ:
             raise ValueError(f"speed_hz 必须在 {MIN_SPEED_HZ} 到 {MAX_SPEED_HZ} 之间，与固件 SPEED 范围一致")
+        if connection is not None and session is not None:
+            raise ValueError("connection 与 session 只能传一个")
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
         self.armed = armed
         self.speed_hz = speed_hz
         self._serial_factory = serial_factory
+        self._external_connection = connection
+        self._session = session
+        self._owns_connection = connection is None and session is None
+        self._lease = object()
         self._read_limit = read_limit
         self._connection: Any = None
+
+    @property
+    def external_connection(self) -> Any:
+        return self._external_connection
+
+    @property
+    def bound_session(self) -> Any:
+        return self._session
+
+    def bind_session(self, session: Any) -> None:
+        """改走共享会话。调用方已经打开的连接仍由会话持有，这里不再关闭它。"""
+
+        if self._session is not None and self._session is not session:
+            raise RuntimeError("运动链路已绑定其他会话")
+        self._session = session
+        self._owns_connection = False
 
     def transmit(
         self,
@@ -133,7 +161,12 @@ class Stage2SerialLink:
 
         if not self.armed:
             raise PermissionError("Stage 2 未武装，拒绝打开发送")
-        if not self.port and self._serial_factory is None:
+        if (
+            self._session is None
+            and self._external_connection is None
+            and not self.port
+            and self._serial_factory is None
+        ):
             raise PermissionError("未指定串口，拒绝打开 COM")
         require_motion_allow(request, decision, dispatch.lines)
         sent: list[str] = []
@@ -186,9 +219,13 @@ class Stage2SerialLink:
         return Stage2TransmitResult("STEP_OK v0.3", tuple(sent), tuple(replies), False)
 
     def close(self) -> None:
+        session = self._session
+        owns = self._owns_connection
         connection = self._connection
         self._connection = None
-        if connection is None:
+        if session is not None:
+            session.release(self._lease)
+        if not owns or connection is None:
             return
         closer = getattr(connection, "close", None)
         if callable(closer):
@@ -242,6 +279,19 @@ class Stage2SerialLink:
     def _ensure_connection(self) -> Any:
         if self._connection is not None:
             return self._connection
+        if self._session is not None:
+            self._owns_connection = False
+            self._connection = self._session.acquire("stage2", self._lease)
+            return self._connection
+        if self._external_connection is not None:
+            self._owns_connection = False
+            self._connection = self._external_connection
+            return self._connection
+        from microcleaning.control_system.serial.f103_session import F103SessionBusy, com_occupied_by_session
+
+        if self.port and com_occupied_by_session(self.port):
+            raise F103SessionBusy(f"{self.port} 已由单串口会话占用，拒绝再打开")
+        self._owns_connection = True
         if self._serial_factory is not None:
             self._connection = self._serial_factory()
             return self._connection
