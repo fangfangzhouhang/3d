@@ -108,11 +108,13 @@ class DualProtocolSerial:
             self._queue.append(self.hello)
         elif text.startswith("MOVEXY "):
             _cmd, nx, dx, ny, dy = text.split()
+            old_x, old_y = getattr(self, "_counts", (0, 0))
+            self._counts = (int(nx) or old_x, int(ny) or old_y)
             self._queue.append(f"STEP2_START X={nx} {dx} Y={ny} {dy}\r\n".encode("ascii"))
         elif text == "READXY":
             self.readxy_count += 1
             if not self.timeout_readxy:
-                self._queue.append(b"STEP2 X=1 BX=0 Y=1 BY=0\r\n")
+                self._queue.append(f"STEP2 X={self._counts[0]} BX=0 Y={self._counts[1]} BY=0\r\n".encode("ascii"))
                 if self.readxy_count == self.tail_on_readxy:
                     self._queue.append(b"MCV1|ERR|tail|STOPPED\n")
                     self._queue.append(b"ERR: TAIL\r\n")
@@ -188,6 +190,82 @@ class ProtocolBoundaryTests(unittest.TestCase):
 
 
 class F103SessionTests(unittest.TestCase):
+    def test_drain_io_failure_releases_registry_and_closes_owned_port(self):
+        from unittest.mock import patch
+        port = DualProtocolSerial()
+        session, _, _, _ = self._owned_session("COM-drain-failure", port)
+        lease = object()
+        guard = session.acquire("mcv1", lease)
+        with patch.object(guard, "finish", side_effect=OSError("rx buffer lost")):
+            with self.assertRaises(F103SessionBusy):
+                session.release(lease)
+        self.assertFalse(session.is_open)
+        self.assertTrue(session.failed)
+        self.assertFalse(com_occupied_by_session("COM-drain-failure"))
+        self.assertEqual(1, port.close_count)
+        with self.assertRaises(F103SessionBusy):
+            session.acquire("stage2", object())
+    def test_persistent_success_keeps_one_connection_for_next_cycle(self):
+        port = DualProtocolSerial()
+        session, link, controller, opens = self._owned_session("COM-persistent", port)
+        for _ in range(2):
+            dispatch, request, decision = self._motion_parts()
+            pump_request, pump_decision = self._pump_parts()
+            result = session.run_step_then_pump(link, controller, dispatch=dispatch,
+                motion_request=request, motion_decision=decision,
+                pump_request=pump_request, pump_decision=pump_decision, close_after=False)
+            self.assertTrue(result.output_finished)
+            self.assertEqual(dispatch.lines, result.motion_result.sent_lines)
+            self.assertTrue(session.is_open)
+        self.assertEqual(1, opens["n"])
+        self.assertEqual(0, port.close_count)
+        session.close()
+        self.assertEqual(1, port.close_count)
+
+    def test_wrong_pump_request_is_rejected_before_motion(self):
+        from dataclasses import replace
+        port = DualProtocolSerial()
+        session, link, controller, opens = self._owned_session("COM-preflight", port)
+        request, decision = self._pump_parts()
+        result = self._run(session, link, controller, self._motion_parts(),
+                           (replace(request, duration_ms=request.duration_ms + 1), decision))
+        self.assertEqual(0, opens["n"])
+        self.assertEqual([], port.writes)
+        self.assertFalse(result.pump_called)
+        self.assertTrue(session.failed)
+
+    def test_pump_failure_retains_completed_motion_and_latches_session(self):
+        port = DualProtocolSerial(timeout_pump=True)
+        session, link, controller, _ = self._owned_session("COM-latch", port)
+        motion = self._motion_parts()
+        result = self._run(session, link, controller, motion, self._pump_parts())
+        self.assertEqual(motion[0].lines, result.motion_result.sent_lines)
+        self.assertFalse(result.output_finished)
+        self.assertTrue(session.failed)
+        with self.assertRaises(F103SessionBusy):
+            self._run(session, link, controller, self._motion_parts(), self._pump_parts())
+
+    def test_truncated_dispatch_never_opens_or_calls_pump(self):
+        from dataclasses import replace
+        port = DualProtocolSerial()
+        session, link, controller, opens = self._owned_session("COM-truncated", port)
+        dispatch, request, decision = self._motion_parts()
+        result = self._run(session, link, controller, (replace(dispatch, truncated=True), request, decision), self._pump_parts())
+        self.assertEqual(0, opens["n"])
+        self.assertFalse(result.pump_called)
+        self.assertEqual("INCOMPLETE_DISPATCH", result.motion_reason)
+
+    def test_keyboard_interrupt_during_pump_stops_and_retains_motion(self):
+        port = DualProtocolSerial()
+        session, link, controller, _ = self._owned_session("COM-interrupt", port)
+        def interrupt(*_args, **_kwargs):
+            raise KeyboardInterrupt()
+        controller.execute = interrupt
+        result = self._run(session, link, controller, self._motion_parts(), self._pump_parts())
+        self.assertIsNotNone(result.motion_result)
+        self.assertTrue(result.stopped)
+        self.assertEqual("INTERRUPTED", result.pump_reason)
+        self.assertFalse(session.is_open)
     def setUp(self):
         quality = ImageQuality(0.95, 0.95, 0.95)
         pre = build_observation(

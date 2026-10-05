@@ -1,12 +1,34 @@
 # EXPERIMENTS｜做过什么，结果怎样
 
-核对日期：2026-10-05；本轮源码为f31e445加未提交修改。10-03的17bf617等历史实验保留各自日期与版本，下面区分本轮运行、历史文件、现场报告和待做实验。测试通过、提交标题、实物转动与清洗效果分别记录。
+核对日期：2026-10-05；基线 main `341224f`（PR #24 后），`feat/single-entry-cleaning-v1` worktree 的主机代码/说明改动尚未提交。固件未在此轮修改或重建，真实设备未操作。 各历史实验保留当时日期、版本及证据边界。
 
 ## 1. 证据能带到另一台电脑吗
 
 当前 `.gitignore` 忽略 output/；本机历史评价、Demo 和调参 JSON **没有进入 Git**。原图、Labelme、Mask、metadata 当前部分已被 Git 跟踪，但 ignore 规则会影响新增数据文件。不要为了本轮记忆自动放行全部数据和输出。
 
 本文件保存重要数值、文件位置和哈希，能随 Git 携带结论索引；它不是原始实验包的替代。另一台电脑缺文件时标记“原始证据未共享”，不能伪造重建同一实验。后续只共享经成员确认的小型证据包或有版本/哈希的存储索引。
+
+## EXP-SW-SINGLEENTRY-20261005｜新 CLI 与失败边界（本轮实际运行）
+
+源码：main `341224f` 加 `feat/single-entry-cleaning-v1` 未提交改动。目录 `D:\大创\wt-single-entry-cleaning\MicroCleaningVision`，复用原 `.venv\Scripts\python.exe`；无真实相机/COM/固件重建/烧录/泵或电机操作，未提交/推送。
+
+- 全量：`python -m unittest discover -s test -v`，**346 项，16.594 秒，OK**；原 Demo API/模式兼容、现有算法回归与新闭环均通过。日志 `D:\大创\tmp\single-entry-final-tests.log`。
+- 新增边界：满计数、零轴旧计数、泵移动前预检、授权过期、回程预留/失败、STOP 全链、串口排空失败、后图中断保留 Episode、同策略、新帧、目标重编号/合并/分裂/重现、有限重试。数量不是清洗效果指标。
+- CLI 默认命令：`python -m demo.closed_loop_station --mock`（已有 local 算法）；重试命令另加 `--mock-scenario retry --max-retries-per-target 1 --max-cycles 4`；故障命令另加 `--mock-scenario motion-short`。
+
+| CLI 场景 | 任务结果 | 轮数 | PUMP 条数 | 含回程累计 X/Y 步 | 本机运行目录名 |
+|---|---|---|---|---|---|
+| success | SUCCESS | 3 | 3 | [768, 640] | `station_20261005_224118_9a020a8a` |
+| retry | SUCCESS | 4 | 4 | [1152, 704] | `station_20261005_224117_884adfc9` |
+| motion-short | ERROR | 1 | 0 | [0, 0] | `station_20261005_224118_25ef2d54` |
+
+目录均在本 worktree `output/closed_loop/`，Git 忽略。success/retry 结束账本均回 `(0,0)`；motion-short 位置信息变未知，PUMP=0。serial.json 保存原文，summary、每轮文件及 Episode 保存证据。
+
+- success summary SHA256：`ff1c99210b8b068d651cafade3b36c901e9c3b5fa3fe25a1201383373d86b805`。
+- retry summary SHA256：`3fa6a5a96cb9064a23eda46ff42511fe9689ea9c59b19489759a4b98ed494284`。
+- motion-short summary SHA256：`acf7a59a975b75077632586341bb36b6f1b32add9ac8d982263551f23d1d32af`。
+
+支持软件集成 E2。Mock 后图污染变化由替身产生；实际回程精度、偏移、清洗率、配准与无损伤均未证明。原 EXP-FW 的 C/Keil 结果是历史证据，未在本次主机改动中重新运行。旧 center_object/标定脚本未改。
 
 ## EXP-SW-20261005｜单串口顺序、单目标复检与序列规划的合成干跑
 
@@ -26,7 +48,7 @@ python -m unittest discover -s test/integration -v
 
 还不能说：真实前后图已经配准、清洗率已验收、电机按这些步数走过、喷头偏移已标定。
 
-## EXP-FW-20261005｜固件结构整理、安全连接与协议对接（本轮实际运行）
+## EXP-FW-20261005｜固件结构整理、安全连接与协议对接（此前固件阶段实际运行）
 
 源码：fix/stage2-motion-gate@f31e445 + 本轮未提交工作区修改；没有fetch、提交、推送、烧录、真实COM或电机/泵操作。保留此前未提交修改，A/B/C Python业务及其测试未改。证据级别仍是组件/软件连接，不升硬件E3。
 
@@ -50,7 +72,7 @@ python -m unittest discover -s test/integration -v
 
 复跑命令和完整审查见 [硬件验收记录](../硬件组/结构整理与验收记录_2026-10-05.md)。不依赖本机快照的默认C测试仍能在别的电脑运行，需本地编译器；Keil依赖显式路径。
 
-未证明：PB2常闭接线实际匹配、真实电气停止、输出时长/液量、位移/偏移标定、真实前后图和清洗效果。电脑端顺序会话是后来的软件干跑，见上面的 EXP-SW-20261005，当时还没有，也还没接到 Demo。默认按钮非强制；轮询不是独立硬件急停。center_object.py 等直接入口仍未整改。尚无第二位成员独立签字。
+未证明：PB2常闭接线实际匹配、真实电气停止、输出时长/液量、位移/偏移标定、真实前后图和清洗效果。电脑端顺序会话是后来的软件干跑，见上面的 EXP-SW-20261005，当时还没有；后续 Demo 接入见 EXP-SW-SINGLEENTRY-20261005。默认按钮非强制；轮询不是独立硬件急停。center_object.py 等直接入口仍未整改。尚无第二位成员独立签字。
 
 ## EXP-SW-01｜本次软件回归（2026-10-03，实际运行）
 

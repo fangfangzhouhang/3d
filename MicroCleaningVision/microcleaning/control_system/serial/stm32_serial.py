@@ -73,6 +73,7 @@ class STM32SerialController(ControllerPort):
         self._policy_version = policy_version
         self._used_tokens: set[str] = set()
         self._connection: Any = None
+        self.stop_replies: list[str] = []
 
     @property
     def external_connection(self) -> Any:
@@ -99,7 +100,17 @@ class STM32SerialController(ControllerPort):
     def stop(self) -> STM32Response:
         """发送 MCV1|STOP。不要求 --arm-pump，也不发送 PUMP。"""
 
+        self.stop_replies = []
         ack = self._command(encode_stop(), expected_kind=None, reset_buffer=True)
+        self.stop_replies.append(ack.raw)
+        # 正在喷水时，固件先终止旧动作，再回复 STOP。仅跳过有限个旧动作 ERR。
+        for _ in range(8):
+            if ack.kind != "ERR" or ack.action_id == "STOP":
+                break
+            if ack.error_code not in {"STOPPED", "ESTOP"}:
+                break
+            ack = self._read_response()
+            self.stop_replies.append(ack.raw)
         if ack.kind == "ERR":
             return ack
         if ack.kind != "ACK" or ack.action_id != "STOP":
@@ -108,6 +119,7 @@ class STM32SerialController(ControllerPort):
                 f"STOP 期望 ACK|STOP，收到 {ack.kind}",
             )
         done = self._read_response()
+        self.stop_replies.append(done.raw)
         if done.kind != "DONE" or done.action_id != "STOP":
             raise STM32ProtocolError(
                 "UNEXPECTED_RESPONSE",
@@ -261,7 +273,11 @@ class STM32SerialController(ControllerPort):
             except Exception:
                 pass
 
-    def _require_allow(self, request: ActionRequest, decision: SafetyDecision) -> None:
+    def validate_allow(self, request: ActionRequest, decision: SafetyDecision) -> None:
+        """执行前预检，不开串口、不消耗令牌。真正 execute 时仍会再次校验并消费。"""
+        if not self.arm_pump or request.primitive != PUMP_IN_PLACE:
+            raise PermissionError("只允许已武装的 PUMP_IN_PLACE")
+        encode_pump(request.action_id, request.duration_ms, max_duration_ms=self.max_pump_duration_ms)
         if decision.outcome is not SafetyOutcome.ALLOW or not decision.approval_token:
             raise PermissionError("STM32SerialController 只接受 ALLOW 审批")
         if decision.action_id != request.action_id or decision.state_id != request.state_id:
@@ -270,10 +286,17 @@ class STM32SerialController(ControllerPort):
             raise PermissionError("动作在审批后被修改")
         if decision.policy_version != self._policy_version:
             raise PermissionError("无法识别安全策略版本")
-        if not decision.expires_at or datetime.fromisoformat(decision.expires_at) <= datetime.now(timezone.utc):
+        try:
+            expires = datetime.fromisoformat(decision.expires_at or "")
+        except ValueError as exc:
+            raise PermissionError("审批过期时间非法") from exc
+        if expires.tzinfo is None or expires <= datetime.now(timezone.utc):
             raise PermissionError("审批已经过期")
         if decision.approval_token in self._used_tokens:
             raise PermissionError("审批令牌不能重复使用")
+
+    def _require_allow(self, request: ActionRequest, decision: SafetyDecision) -> None:
+        self.validate_allow(request, decision)
         self._used_tokens.add(decision.approval_token)
 
     def _command(
