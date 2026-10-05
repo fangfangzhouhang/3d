@@ -1,0 +1,23 @@
+---
+description: 行动前先读进度与流程文档；改完核对说明和进度记录是否落后
+alwaysApply: true
+---
+
+# 开工先读，改完核对文档
+
+工作区是 `D:\大创\3d`，项目在 `MicroCleaningVision/`。回答或改文件之前，先读完这些文件，再动手：
+
+1. `MicroCleaningVision/AGENTS.md`
+2. `MicroCleaningVision/说明文档/进度记录/提交与拉取日志.md`
+3. `MicroCleaningVision/说明文档/进度记录/实时进度记录.md`
+4. `MicroCleaningVision/说明文档/总流程说明/团队总流程与输入输出.md`
+5. `MicroCleaningVision/说明文档/硬件组/串口协议与参数.md`
+
+`project_state.yaml` 只作边界备忘。它和上面几份冲突时，以提交日志和当前总流程为准。不要用本机落后的 `main` 判断进度。
+
+每次改完代码、固件或说明之后，在同一次改动里检查 `MicroCleaningVision/说明文档/` 和 `MicroCleaningVision/project_state.yaml`：
+
+- 说明仍指向已删除文件、已不存在的板子或旧命令时，改成现在的路径和命令。
+- 进度记录没写上这次已经发生的事时，在 `实时进度记录.md` 最上面补一条（做了什么、结果、还没证明什么）。
+- 本机有新提交，或从远端 `main` 拉取/合并之后，更新 `提交与拉取日志.md` 的快照和对应表格。不要凭聊天补同学还没进当前历史的提交。
+- 电机转了、测试通过了，不要写成标定完成或清洗有效。

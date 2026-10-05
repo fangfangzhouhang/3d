@@ -4,14 +4,15 @@
 
 先读：
 
-1. [`MicroCleaningVision/说明文档/总流程说明/团队总流程与输入输出.md`](MicroCleaningVision/说明文档/总流程说明/团队总流程与输入输出.md)
-2. [`MicroCleaningVision/说明文档/硬件组/串口协议与参数.md`](MicroCleaningVision/说明文档/硬件组/串口协议与参数.md)
-3. [`MicroCleaningVision/AGENTS.md`](MicroCleaningVision/AGENTS.md)
+1. [项目长期记忆总入口](MicroCleaningVision/说明文档/项目记忆/PROJECT.md)（六份中文内容的共同上下文）
+2. [Agent 开工与更新规则](MicroCleaningVision/AGENTS.md)
+3. [当前总流程](MicroCleaningVision/说明文档/总流程说明/团队总流程与输入输出.md)
+4. [串口协议与参数](MicroCleaningVision/说明文档/硬件组/串口协议与参数.md)
 
-在 `MicroCleaningVision` 目录下，用笔记本摄像头走通到电机（把 `COMx` 换成设备管理器里的 USB 转 TTL）：
+在 `MicroCleaningVision` 目录下，只抓图、分析和保存双轴路径预览：
 
 ```powershell
-.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --mode analyze --stage2-xy --arm-stage2-xy --serial-port COMx --camera-index 0
+.\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --mode analyze --stage2-xy --camera-index 0
 ```
 
-只分析和出路径、不转电机时，去掉 `--arm-stage2-xy` 和 `--serial-port`。毫米还是 0.01 mm/像素的占位值。
+`analyze` 不打开运动串口；不能与 `--arm-stage2-xy` 组合。真实运动使用 `stage2-move`，须具备尺度 JSON、人工零点、运动关卡、现场确认和显式武装，步骤见当前总流程。普通分析预览的毫米仍是 0.01 mm/像素占位，不能写成已标定。

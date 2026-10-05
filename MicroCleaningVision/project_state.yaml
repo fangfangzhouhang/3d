@@ -1,7 +1,7 @@
-# 全团队唯一的当前事实。计划、愿景和代码文件不能自动成为事实。
-# 近场执行与阶段表以 说明文档/总流程说明/项目作战总表.md 为准。
-updated_at: 2026-09-15
-current_phase: "喷水走通后不冻结本机代码：同学机已报 F103 短喷，证据未入库；近场先做 U500 识别与路径预览，正式 F401 仍待 PONG 入库"
+# 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
+# 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
+updated_at: 2026-10-05
+current_phase: "固件已按 pump/motion/common 整理；当前单一入口接入已有联锁、限时泵协议和名义针头偏移，离线测试及两套Keil编译通过。主机联动、接线/烧录/偏移标定和真实闭环未验收。"
 
 current_evidence_level:
   overall_hardware: E0
@@ -20,7 +20,10 @@ team_scope:
     - 未经人工关卡的真实泵、电机、喷头和平台控制
 
 validated_capabilities:
-  - "项目.venv中150项测试全部执行并通过，无跳过：含 metadata、数据审计、标注转换、Mask评价（IoU/P/R/FP/FN、labeled 与 develop/holdout 分表）、USBCamera/live 无硬件测试、HSV/Otsu/ExG/ExR/邻域差异 local、离线 mm/px、分段路径、Demo v0.2、PUMP_IN_PLACE、STM32 协议与 STM32SerialController（含 stop/ESTOP/超时）。"
+  - "2026-10-05在HEAD f31e445加本轮工作区修改运行Python全量233项，2.513秒，OK；A/B/C业务和测试未修改。"
+  - "当前固件5个C测试程序、旧兼容7个程序(648项断言)、迁移前现场快照3个程序通过；两套Keil完整重建均0错误0警告。实际主入口连接旧安全核心/MCV1，GPIO/时钟用替身，未操作实物。"
+  - "结构迁移阶段65个非生成固件文件SHA256保持一致；旧工程/测试/供应商引用保留。本机备份和编译原始证据在output及common/.tools，Git忽略，详见验收记录。"
+  - "2026-10-03在HEAD 17bf617与项目.venv运行全量233项测试，25.324秒，全部通过无跳过；含数据、分割、Live/Demo、MCV1、Stage 2运动关卡、异常STOP与位置账本。这是软件证据，不是实机验收。"
   - "真实文件入口测试会由OpenCV解码程序生成PNG、计算SHA-256和基础质量指标；图片仍不是团队相机采集证据。"
   - "Mock和软件回放不会打开真实COM口；main.py只运行纯合成Mock。"
   - "无标定状态不会产生毫米目标；模拟审批令牌绑定、超时和失败路由有回归测试。"
@@ -34,15 +37,16 @@ validated_capabilities:
   - "metadata_builder默认dry-run，可自动填写文件名和分辨率并保留人工行；已执行apply生成13条记录，13张均标记为labeled。"
   - "USBCamera实现CameraPort，使用OpenCV VideoCapture、预热帧、无损PNG、现有质量检查和build_observation；7项FakeVideoCapture测试覆盖正常抓帧、驱动异常及四类失败并确认release。"
   - "MCV1电脑端协议可编码PING/STATUS/STOP/受限PUMP并解析PONG/STATUS/ACK/DONE/ERR；STM32SerialController 实现 ControllerPort，默认拒泵，可 stop 且不发泵；探测脚本默认不打开COM、不发PUMP。"
+  - "本次核对原图目录有14张图：13张旧标注图和1张已跟踪USB probe PNG；本机另有2026-09-26 camera模式Demo summary。存在USB像素链文件证据，但相机身份与采集条件仍缺正式确认。"
 
 unvalidated_claims:
-  - U500实机能否被本机OpenCV VideoCapture打开、真实分辨率/FPS和质量阈值
+  - U500设备身份、真实分辨率/FPS、固定条件采集重复性和质量阈值正式验收
   - PLA彩色水溶性标记物的适用性
   - HSV / Otsu / local 在 13 张 labeled 图上的过关效果（须看冻结留出集）
   - 人工mask、前后图配准和真实复检准确性
   - mask路线在真实污染形状、真实喷头覆盖范围和运动约束下的有效性
   - 像素到工作台毫米坐标的标定
-  - NUCLEO固件源码是否已烧录，以及实机 PONG/STATUS/PB5/12V 喷液
+  - 当前F103固件的当次烧录身份、MCV1/STEP实机回执及处理效果
   - 同学电脑上的 F103 抓帧-识别-发泵-喷水（人报；本仓无 Episode/PONG 原文，不能冻结为本机官方实喷）
   - 真实清洗效果、损伤和硬件闭环
 
@@ -65,6 +69,17 @@ module_ownership:
     role: 目标规划与控制仿真
     source: microcleaning/control_system/
     tests: test/control_system/
+  hardware_h1:
+    role: 喷洗
+    source: firmware/pump/
+    tests: firmware/pump/tests/
+  hardware_h2:
+    role: 托盘运动
+    source: firmware/motion/
+    tests: firmware/motion/tests/
+  hardware_common:
+    source: firmware/common/
+    ownership: "默认H1主改公共集成、H2复核，一次一位主改；协议须C参与确认。"
 
 software_loop:
   status: first_source_unverified_real_pixel_evaluation_complete
@@ -76,9 +91,12 @@ software_loop:
   note: "public_001真实像素已穿过A质量、人工Mask、B分割、状态和C路线，但来源尚未核实；无真实标定、无实机执行和动作后复检。泵路径软件已接线，真机未通。"
 
 current_dataset:
-  status: raw_images_staged_13_source_unverified_registered
+  status: legacy13_labeled_plus_usb_probe1_identity_unverified
   root: data
-  raw_images_count: 13
+  raw_images_count: 14
+  legacy_labeled_image_count: 13
+  usb_probe_image_count: 1
+  unregistered_image_count: 1
   classified_record_count: 0
   decodable_count: 13
   corrupt_count: 0
@@ -89,7 +107,7 @@ current_dataset:
   metadata_labeled_count: 13
   evaluated_prediction_count: 39
   gate1_flagged_count: 12
-  evidence_note: "13张已人工复核为labeled；开发9张、留出public_002/public_011/M9/M12冻结。文件夹名public不等于来源证据；Gate 1 flag来自暂定阈值，不能写成科学质量结论。"
+  evidence_note: "旧13张已labeled，来源unknown；开发9张、留出public_002/public_011/M9/M12。另1张USB probe尚未登记在13行metadata；decodable/corrupt/duplicate统计仍是历史旧13图审计，不代表本轮重新检查14图。Gate 1阈值未科学验收。"
   planned_primary_source: U500_USB显微镜
   auxiliary_source: 手机链路图片
   planned_baseline: "PLA平面试片 + 经过可行性检查的水溶性彩色标记物 + 固定俯视成像"
@@ -103,18 +121,25 @@ hardware_boundary:
   camera_probe_entry: scripts/probe_usb_camera.py
   camera_integration_status: integration_not_verified
   physical_capture_verified: false
+  capture_evidence_note: "formal acceptance未完成；并非完全没有抓帧文件。本机有USB probe PNG与历史camera Demo，设备身份/条件与重复性仍需补证。"
   controller_port: microcleaning/ports.py
   real_hardware_armed: false
-  stm32_board: NUCLEO-F401RE
-  stm32_pump_pin_plan: "PB5 / D4 -> MOSFET / 泵控制；未验证"
-  stm32_estop_pin_plan: "PB12 -> E-stop状态检测；未验证有效电平和固件行为"
-  stm32_pc_connection_plan: "USB / ST-LINK VCP；电脑端MCV1暂定115200 8N1，等待固件实机确认"
-  stm32_firmware_status: source_in_repo_unburned_no_pong
-  stm32_firmware_path: firmware/nucleo_f401re/f401re-stage1/
+  stm32_board: STM32F103C8T6
+  stm32_pump_pin_plan: "联合入口与旧兼容均PB0，低开高关；当前联合入口PUMP ON固定300ms，由共享状态机到时关闭；实物极性未验收。"
+  stm32_estop_pin_plan: "当前联合入口PB2上拉，假设常闭触点接地，断开高锁存急停；接线尚未确认。不是F401 PB12；旧兼容入口配置保留原样。"
+  stm32_pc_connection_plan: "人确认的 USB 转 TTL 或调试口；禁止扫口。Stage 2 步进协议见串口协议与参数.md"
+  stm32_firmware_status: unified_xy_timed_pump_interlocks_offline_verified_not_flashed
+  stm32_firmware_path: firmware/common/
+  stm32_legacy_firmware_path: firmware/common/compat/stage1/
+  keil_projects_path: firmware/common/keil/
+  pump_module_path: firmware/pump/
+  motion_module_path: firmware/motion/
+  scope_to_nozzle_offset_status: nominal_y_7680_steps_not_calibrated_not_enabled_in_formal_host
+  stage2_firmware_path: firmware/common/
   stm32_host_protocol: microcleaning/control_system/serial/stm32_protocol.py
   stm32_controller: microcleaning/control_system/serial/stm32_serial.py
   stm32_probe_entry: scripts/probe_stm32_link.py
-  serial_protocol_status: mcv1_host_and_controller_tested_hardware_unverified
+  serial_protocol_status: step_and_mcv1_in_same_firmware_offline_tested_host_sessions_separate_hardware_unverified
 
 development_environment:
   recommended_python: "CPython 3.12 + 项目本地.venv"
@@ -124,6 +149,10 @@ development_environment:
   serial_profile: "requirements/control-serial.txt；仅获得真实协议并批准后使用"
 
 major_risks:
+  - "本轮PB2改为常闭接地/上拉，断线阻止动作；必须先核对现场接线。默认ARM按钮非强制，轮询联锁不替代独立断电。"
+  - "名义针头偏移7680步超过正式主机1600步预算，未标定；TO_SCOPE是相对反向而非回零，主机/固件不得重复补偿。"
+  - "固件限时不能修复center_object尝试耗尽后喷水、补关缺口、相机/标定硬编码；本轮未改这些主机文件。"
+  - "Demo运动关卡只覆盖当前主发送器；center_object和calibrate_motor_mm_per_px脚本直接发串口运动，不能宣称所有运动入口都统一授权。"
   - "三人尚无稳定投入时间，采用核心/扩展/备用任务和实际专注时段回填。"
   - "用户持有相机和GPU经验，A阶段负担可能在标注/训练期上升，需要按两轮真实记录再平衡。"
   - "旧原型目录 legacy 已删除；不要把 YOLO、双目或 3D 空实现重新放回主入口。"
@@ -132,32 +161,41 @@ major_risks:
   - "Demo路线只考虑mask几何，不包含喷头直径、速度、平台动力学和真实障碍物。"
 
 blockers:
-  - "U500尚未在本机执行probe和capture-test；适配器通过FakeVideoCapture测试不能写成实机接入完成。"
-  - "A尚未提供结构化USB显微镜原图和采集批次；现有13张已labeled并冻结开发/留出，但来源仍unknown，不能写成U500数据。"
+  - "已有USB probe图片和本机camera Demo，但U500身份、条件、驱动信息和重复采集证据包未完成正式验收。"
+  - "同条件可追溯U500批次数据集仍缺；旧13图已labeled且冻结开发/留出，来源unknown，不能写成U500过关集。"
   - "真实标记物、样本状态和固定成像条件尚未形成证据。"
-  - "MCV1电脑端与STM32SerialController已实现，固件源码在仓，但无.elf/烧录/实机PONG；不得把host C测试或FakeSerial写成联调完成。"
-  - "NUCLEO 可烧录目标尚未生成；CubeMX 需在本仓 .ioc 上 Keep User Code 生成工程。"
+  - "当前单一联合固件源码已支持XY和MCV1限时泵；主机混合会话/偏移未统一，实际PB2接线、烧录版本和通电测试未验收。离线测试不等于联调完成。"
+  - "步进方向和双轴试验已有提交，步距、限位开关、像素到毫米仍未验收。电机转了不是清洗。"
 
 next_actions:
   - "TEAM-POST-01：从同学机拷回成功 Episode、PONG 原文和命令；不要在无 diff 时覆盖本机 demo/ 当官方实喷。"
   - "A-P1-U500-01：插入U500后运行scripts/probe_usb_camera.py，再运行--capture-test；保存index、分辨率、FPS、PNG、SHA256和质量结果。"
   - "B-U500-01：只在 U500 开发集一次改 LocalContrastPolicy 一个字段；升降看新留出，不碰 public_002/011/M9/M12。"
-  - "C-PATH-01：path_overlay 可读（编号/分段）；path_px 不发送 STM32；无标定不申请 SPRAY_AT_POINT。"
-  - "HW-SPOT-01：量一次定点喷湿斑和托盘外廓；行程数字写入前不采购 XY。"
+  - "C-PATH-01：analyze 不发步进。stage2-move 必须有标定 JSON、运动关卡、人确认和 --arm-stage2-xy。无实测标定不把毫米写成已验收。"
+  - "H1-PUMP-01：核对已有定时/停止通路及PB0/PB2/PB3接线；批准后现场测输出与短喷覆盖；不要重做计时状态机。"
+  - "H2-MOTION-01：测方向/步距/行程和显微镜到针头的有符号偏移；先短距离验收，不能直接试名义7680步。"
+  - "HW-COMMON-01：H1主改、H2复核当前联合固件的构建/烧录身份和停止证据；旧Stage1只作兼容对照。"
+  - "C-ENTRY-01（未实施）：统一center_object/标定入口授权、失败不喷、异常补关、一份有符号偏移和返回复检；先提文件级方案，不静默抬高1600步预算。"
   - "A-P1-DATA-01：13张已登记；继续核实来源、设备、倍率和日期，无法核实的字段保持unknown。"
   - "A-P1-LABEL-01：13张已labeled；开发9张、留出public_002/public_011/M9/M12已冻结。不要为刷分改留出标注。"
   - "A-P1-CAPTURE-01：补采至少12张、两个批次的USB显微镜图片；先导入1张运行analyze，再扩展到50张。"
-  - "说明：每天先看 说明文档/总流程说明/当前该做什么与项目日志.md。正式 F401 烧录/PONG 仍待入库。"
+  - "说明：Agent每次改代码或制定改进计划先完整读六份项目记忆，再核对Git与提交/进度日志。本机main停在2026-09-13，不要用它判断进度。"
 
 documentation:
-  weekly_hub: 说明文档/总流程说明/当前该做什么与项目日志.md
-  navigation: 说明文档/README.md
-  battle_plan: 说明文档/总流程说明/项目作战总表.md
-  roadmap: 说明文档/未来计划/长期分阶段研发规划.md
-  team_index: 说明文档/README.md
-  task_board: 说明文档/总流程说明/团队任务看板.md
+  project_memory: 说明文档/项目记忆/PROJECT.md
+  architecture_memory: 说明文档/项目记忆/ARCHITECTURE.md
+  interfaces_memory: 说明文档/项目记忆/INTERFACES.md
+  decisions_memory: 说明文档/项目记忆/DECISIONS.md
+  experiments_memory: 说明文档/项目记忆/EXPERIMENTS.md
+  roadmap_memory: 说明文档/项目记忆/ROADMAP.md
+  commit_log: 说明文档/进度记录/提交与拉取日志.md
+  progress_log: 说明文档/进度记录/实时进度记录.md
+  current_flow: 说明文档/总流程说明/团队总流程与输入输出.md
+  roadmap: 说明文档/项目记忆/ROADMAP.md
+  legacy_stage_guide: 说明文档/未来计划/长期分阶段研发规划.md
   glossary: 说明文档/总流程说明/项目术语与概念词典.md
   git_tutorial: 说明文档/总流程说明/Git与GitHub协作教程.md
-  u500_guide: 说明文档/成员A/U500_USB数码显微镜接入指南.md
+  u500_guide: 说明文档/软件组/成员A/U500_USB数码显微镜接入指南.md
   hardware_group_index: 说明文档/硬件组/README.md
-  stm32_contract: 说明文档/硬件组/STM32最小串口协议_v0.1.md
+  stm32_contract: 说明文档/硬件组/串口协议与参数.md
+  # 结构整理证据入口为说明文档/硬件组/结构整理与验收记录_2026-10-05.md；未提交、未推送、未烧录。
