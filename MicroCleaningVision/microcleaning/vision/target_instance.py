@@ -133,6 +133,61 @@ class _Component:
     bbox: tuple[int, int, int, int]
 
 
+@dataclass(frozen=True)
+class TargetMatch:
+    """现有匹配规则的结果；post_label=None 且 matched 表示搜索区内无前景。"""
+
+    status: str
+    reason: str | None
+    pre_area_px: float | None
+    post_area_px: float | None
+    post_label: int | None
+    quality: float
+
+
+def extract_target_mask(mask: Any, target: TargetInstance) -> Any:
+    """保留原图坐标和尺寸，仅保留选中连通域；拒绝来自另一帧的过时实例。"""
+    target.validate()
+    labels, components = _connected_components(mask)
+    component = _find_component(components, target.component_label)
+    if component is None or (
+        component.area_px != target.area_px
+        or component.bbox != target.bbox
+        or component.centroid_px != target.centroid_px
+    ):
+        raise ValueError("TARGET_NOT_IN_MASK_OR_STALE")
+    np = _numpy()
+    return np.where(labels == target.component_label, np.uint8(255), np.uint8(0))
+
+
+def match_target_instance(
+    *, pre_target: TargetInstance, pre_mask: Any, post_mask: Any,
+    policy: TargetMatchPolicy = TargetMatchPolicy(),
+) -> TargetMatch:
+    """抽出原 verify_single_target 的规则，供复检与任务内身份映射共用。"""
+    pre_target.validate()
+    policy.validate()
+    pre_binary = _as_mask(pre_mask, name="pre_mask")
+    post_binary = _as_mask(post_mask, name="post_mask")
+    if pre_binary.shape != post_binary.shape:
+        return TargetMatch("unmatched", "TARGET_MASK_MISMATCH", _area_if_present(pre_binary, pre_target.component_label), None, None, 0.0)
+    pre_labels, pre_components = _connected_components(pre_binary)
+    pre_component = _find_component(pre_components, pre_target.component_label)
+    if pre_component is None:
+        return TargetMatch("unmatched", "TARGET_NOT_IN_MASK", None, None, None, 0.0)
+    post_labels, post_components = _connected_components(post_binary)
+    qualified, roi_has_foreground = _qualify_post_components(pre_labels, pre_component, post_labels, post_components, policy)
+    pre_area = float(pre_component.area_px)
+    if len(qualified) > 1:
+        return TargetMatch("ambiguous", "TARGET_MATCH_AMBIGUOUS", pre_area, None, None, 0.0)
+    if len(qualified) == 1:
+        component, overlap_ratio, distance = qualified[0]
+        return TargetMatch("matched", None, pre_area, float(component.area_px), component.label, _match_quality(overlap_ratio, distance, policy.max_centroid_distance_px))
+    if not roi_has_foreground:
+        return TargetMatch("matched", None, pre_area, 0.0, None, 1.0)
+    return TargetMatch("unmatched", "TARGET_UNMATCHED", pre_area, None, None, 0.0)
+
+
 def extract_target_instances(
     mask: Any,
     *,
@@ -183,82 +238,15 @@ def verify_single_target(
     或同时有多块都满足重叠和质心距离时，不硬配，结论交给人工。
     """
 
-    pre_target.validate()
-    match_policy.validate()
-    pre_binary = _as_mask(pre_mask, name="pre_mask")
-    post_binary = _as_mask(post_mask, name="post_mask")
-    if pre_binary.shape != post_binary.shape:
-        return _unmatched(
-            task_id,
-            pre,
-            post,
-            pre_target,
-            "TARGET_MASK_MISMATCH",
-            pre_area_px=_area_if_present(pre_binary, pre_target.component_label),
-        )
-
-    pre_labels, pre_components = _connected_components(pre_binary)
-    pre_component = _find_component(pre_components, pre_target.component_label)
-    if pre_component is None:
-        return _unmatched(task_id, pre, post, pre_target, "TARGET_NOT_IN_MASK", pre_area_px=None)
-
-    post_labels, post_components = _connected_components(post_binary)
-    qualified, roi_has_foreground = _qualify_post_components(
-        pre_labels,
-        pre_component,
-        post_labels,
-        post_components,
-        match_policy,
-    )
-    pre_area = float(pre_component.area_px)
-    if len(qualified) > 1:
-        return _unmatched(
-            task_id,
-            pre,
-            post,
-            pre_target,
-            "TARGET_MATCH_AMBIGUOUS",
-            pre_area_px=pre_area,
-            match_status="ambiguous",
-        )
-    if len(qualified) == 1:
-        component, overlap_ratio, distance = qualified[0]
-        post_area = float(component.area_px)
-        quality = _match_quality(overlap_ratio, distance, match_policy.max_centroid_distance_px)
-        return _verified_pair(
-            task_id=task_id,
-            pre=pre,
-            post=post,
-            pre_target=pre_target,
-            pre_area=pre_area,
-            post_area=post_area,
-            match_quality=quality,
-            receipt=receipt,
-            images_comparable=images_comparable,
-            damage_flag=damage_flag,
-            policy=policy,
-        )
-    if not roi_has_foreground:
-        return _verified_pair(
-            task_id=task_id,
-            pre=pre,
-            post=post,
-            pre_target=pre_target,
-            pre_area=pre_area,
-            post_area=0.0,
-            match_quality=1.0,
-            receipt=receipt,
-            images_comparable=images_comparable,
-            damage_flag=damage_flag,
-            policy=policy,
-        )
-    return _unmatched(
-        task_id,
-        pre,
-        post,
-        pre_target,
-        "TARGET_UNMATCHED",
-        pre_area_px=pre_area,
+    match = match_target_instance(pre_target=pre_target, pre_mask=pre_mask, post_mask=post_mask, policy=match_policy)
+    if match.status != "matched":
+        return _unmatched(task_id, pre, post, pre_target, match.reason,
+                          pre_area_px=match.pre_area_px, match_status=match.status)
+    return _verified_pair(
+        task_id=task_id, pre=pre, post=post, pre_target=pre_target,
+        pre_area=match.pre_area_px, post_area=match.post_area_px,
+        match_quality=match.quality, receipt=receipt,
+        images_comparable=images_comparable, damage_flag=damage_flag, policy=policy,
     )
 
 

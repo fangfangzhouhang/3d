@@ -1,7 +1,7 @@
 # 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
 # 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
 updated_at: 2026-10-05
-current_phase: "固件句子未改。电脑端已有 F103Session（先步进后喷水）、单目标复检和序列规划，并用合成干跑验证。Demo 未接入。接线、烧录、偏移标定和真实闭环未验收。"
+current_phase: "基线 main 341224f + feat/single-entry-cleaning-v1 未提交主机改动。新单入口 Mock 闭环、有限重试和失败停止已验证；346 项测试通过。固件未改；实物接线/烧录/偏移/回程和真实复检未验收。"
 
 current_evidence_level:
   overall_hardware: E0
@@ -20,6 +20,7 @@ team_scope:
     - 未经人工关卡的真实泵、电机、喷头和平台控制
 
 validated_capabilities:
+  - "2026-10-05本 worktree 主机全量346项，16.594秒OK；新 demo.closed_loop_station 默认Mock三目标成功，有限一次重试四轮成功，计数不足ERROR且PUMP=0；未操作实物。"
   - "2026-10-05在feat/closed-loop-cleaning-v1用合成Mask和脚本串口跑通干跑：serial 47、safety 25、vision 48、planning 41、integration 12。运动失败不喷；单目标复检不看整图面积；序列规划可重复。不是实机，不是清洗有效。"
   - "2026-10-05在HEAD f31e445加本轮工作区修改运行Python全量233项，2.513秒，OK；A/B/C业务和测试未修改。"
   - "当前固件5个C测试程序、旧兼容7个程序(648项断言)、迁移前现场快照3个程序通过；两套Keil完整重建均0错误0警告。实际主入口连接旧安全核心/MCV1，GPIO/时钟用替身，未操作实物。"
@@ -83,13 +84,19 @@ module_ownership:
     ownership: "默认H1主改公共集成、H2复核，一次一位主改；协议须C参与确认。"
 
 software_loop:
-  status: first_source_unverified_real_pixel_evaluation_complete
+  status: single_entry_mock_closed_loop_validated_real_unverified
+  closed_loop_entry: demo/closed_loop_station.py
+  orchestrator: microcleaning/control_system/orchestration/cleaning_loop.py
+  hardware_executor: microcleaning/control_system/orchestration/hardware_executor.py
+  geometry: microcleaning/control_system/planning/stage2_geometry.py
   demo_entry: demo/demo_pipeline.py
   mock_entry: microcleaning/control_system/replay/mock_mcl.py
   replay_entry: microcleaning/control_system/replay/replay_mcl.py
   controller: microcleaning/control_system/serial/stm32_serial.py
   fake_controller: microcleaning/control_system/serial/fake_serial.py
-  note: "public_001真实像素已穿过A质量、人工Mask、B分割、状态和C路线，但来源尚未核实；无真实标定、无实机执行和动作后复检。泵路径软件已接线，真机未通。"
+  note: "新入口持续同相机/串口、逐轮YES、单目标原尺寸Mask、唯一有符号偏移、回原观察位、新后图及稳定目标；仅CENTER_POINT，扫描HUMAN。原public_001评价仍是历史来源待核实证据；真机闭环未验收。"
+  budget_rule: "整任务每轴最多1600绝对步，含所有去程/回程，去程前预留本轮回程；不拆段绕过。"
+  nozzle_offset_rule: "scope_to_nozzle_delta_steps实物须实测/方向确认/来源/不确定性/电机标定SHA256绑定；null不等于0；拒绝重复补偿。"
 
 current_dataset:
   status: legacy13_labeled_plus_usb_probe1_identity_unverified
@@ -135,12 +142,12 @@ hardware_boundary:
   keil_projects_path: firmware/common/keil/
   pump_module_path: firmware/pump/
   motion_module_path: firmware/motion/
-  scope_to_nozzle_offset_status: nominal_y_7680_steps_not_calibrated_not_enabled_in_formal_host
+  scope_to_nozzle_offset_status: signed_host_interface_implemented_real_value_unverified_nominal_7680_rejected
   stage2_firmware_path: firmware/common/
   stm32_host_protocol: microcleaning/control_system/serial/stm32_protocol.py
   stm32_controller: microcleaning/control_system/serial/stm32_serial.py
   stm32_probe_entry: scripts/probe_stm32_link.py
-  serial_protocol_status: step_and_mcv1_in_same_firmware_offline_tested_host_sessions_separate_hardware_unverified
+  serial_protocol_status: step_and_mcv1_persistent_host_session_mock_validated_hardware_unverified
 
 development_environment:
   recommended_python: "CPython 3.12 + 项目本地.venv"
@@ -165,10 +172,11 @@ blockers:
   - "已有USB probe图片和本机camera Demo，但U500身份、条件、驱动信息和重复采集证据包未完成正式验收。"
   - "同条件可追溯U500批次数据集仍缺；旧13图已labeled且冻结开发/留出，来源unknown，不能写成U500过关集。"
   - "真实标记物、样本状态和固定成像条件尚未形成证据。"
-  - "当前单一联合固件源码已支持XY和MCV1限时泵；主机混合会话/偏移未统一，实际PB2接线、烧录版本和通电测试未验收。离线测试不等于联调完成。"
+  - "当前单一联合固件源码已支持XY和MCV1限时泵；新主机已接持续会话/单一偏移接口，真实方向/偏移/回程误差未验收，实际PB2接线、烧录版本和通电测试未验收。离线测试不等于联调完成。"
   - "步进方向和双轴试验已有提交，步距、限位开关、像素到毫米仍未验收。电机转了不是清洗。"
 
 next_actions:
+  - "C-LOOP-FIELD-01：H2交三份实测配置、H1交同次固件/接线/停止证据、A/B交可比图后，C仅做新单入口--real --max-cycles 1、默认不重试，逐轮YES并保存完整运行目录；未实物运行。"
   - "TEAM-POST-01：从同学机拷回成功 Episode、PONG 原文和命令；不要在无 diff 时覆盖本机 demo/ 当官方实喷。"
   - "A-P1-U500-01：插入U500后运行scripts/probe_usb_camera.py，再运行--capture-test；保存index、分辨率、FPS、PNG、SHA256和质量结果。"
   - "B-U500-01：只在 U500 开发集一次改 LocalContrastPolicy 一个字段；升降看新留出，不碰 public_002/011/M9/M12。"
@@ -176,7 +184,7 @@ next_actions:
   - "H1-PUMP-01：核对已有定时/停止通路及PB0/PB2/PB3接线；批准后现场测输出与短喷覆盖；不要重做计时状态机。"
   - "H2-MOTION-01：测方向/步距/行程和显微镜到针头的有符号偏移；先短距离验收，不能直接试名义7680步。"
   - "HW-COMMON-01：H1主改、H2复核当前联合固件的构建/烧录身份和停止证据；旧Stage1只作兼容对照。"
-  - "C-ENTRY-01（未实施）：统一center_object/标定入口授权、失败不喷、异常补关、一份有符号偏移和返回复检；先提文件级方案，不静默抬高1600步预算。"
+  - "C-ENTRY-01（旧独立脚本未实施）：center_object/标定入口授权、耗尽判失败、异常补关另给文件级方案；新闭环入口已接单一偏移与回原视野复检，不能因此宣称旧工具已安全整改。"
   - "A-P1-DATA-01：13张已登记；继续核实来源、设备、倍率和日期，无法核实的字段保持unknown。"
   - "A-P1-LABEL-01：13张已labeled；开发9张、留出public_002/public_011/M9/M12已冻结。不要为刷分改留出标注。"
   - "A-P1-CAPTURE-01：补采至少12张、两个批次的USB显微镜图片；先导入1张运行analyze，再扩展到50张。"
@@ -192,6 +200,9 @@ documentation:
   commit_log: 说明文档/进度记录/提交与拉取日志.md
   progress_log: 说明文档/进度记录/实时进度记录.md
   current_flow: 说明文档/总流程说明/团队总流程与输入输出.md
+  field_entry: 说明文档/硬件组/现场可测入口.md
+  field_gaps: 说明文档/总流程说明/一条启动命令的实物联调差距.md
+  implementation_checkpoint: 说明文档/进度记录/单入口闭环续做记录.md
   roadmap: 说明文档/项目记忆/ROADMAP.md
   legacy_stage_guide: 说明文档/未来计划/长期分阶段研发规划.md
   glossary: 说明文档/总流程说明/项目术语与概念词典.md

@@ -1,6 +1,6 @@
 # MicroCleaningVision
 
-显微表面的视觉、路径和 STM32 步进实验。一帧画面经过识别和路径规划，变成 `MOVEXY`，由 F103 的 Stage 2 固件驱动两台电机。当前联合固件包含限时喷水；正式电脑运动入口仍不发泵，默认不发送。
+显微表面的视觉、路径和 STM32 步进实验。新入口 `demo.closed_loop_station` 将抓图、选污渍、人工确认、移动、定点短喷、回原观察位、单目标复检接在同一进程里。默认 Mock，实物闭环尚未验收；旧 `demo.demo_pipeline` 的单帧模式继续保留。
 
 协议和参数：[说明文档/硬件组/串口协议与参数.md](说明文档/硬件组/串口协议与参数.md)。流程：[说明文档/总流程说明/团队总流程与输入输出.md](说明文档/总流程说明/团队总流程与输入输出.md)。提交与远端 main 的拉取记录：[说明文档/进度记录/提交与拉取日志.md](说明文档/进度记录/提交与拉取日志.md)。
 
@@ -19,6 +19,23 @@ python -m venv .venv
 
 测试通过只说明软件回归正常，不说明已经标定或已经清洗。
 
+## 单入口闭环
+
+在本次隔离 worktree 复跑，无须另装依赖：
+
+```powershell
+cd D:\大创\wt-single-entry-cleaning\MicroCleaningVision
+& 'D:\大创\3d\MicroCleaningVision\.venv\Scripts\python.exe' -m demo.closed_loop_station --mock
+```
+
+默认使用已有 local 算法，处理三块合成污渍；只替换帧来源和物理串口，排序、单目标路径、安全关卡、F103SerialSession、协议解析和复检均调用生产模块。Mock 自动确认只在软件替身中生效，不打开实物 COM。输出在 `output/closed_loop/station_*/`。
+
+`--mock-scenario retry --max-retries-per-target 1 --max-cycles 4` 可验证新帧、新动作和新审批；`motion-short`、`pump-timeout`、`return-timeout` 等失败样例应停在 ERROR，`decline`/`noncomparable` 应停在 HUMAN。退出码：SUCCESS=0、HUMAN=2、ERROR=3。
+
+V1 只执行单块 CENTER_POINT；扫描路径保存预览后交人工。偏移只来自 `scope_to_nozzle_delta_steps=[dx,dy]`，真实未知为 null；总预算每轴 1600 步包含所有去程和回程。RETURN 回到第一帧的原观察位，不能只反转喷头偏移。旧直接串口脚本尚未统一整改。
+
+实物参数、偏移格式、每轮大写 YES 和各组验收材料见 [现场可测入口](说明文档/硬件组/现场可测入口.md)，剩余实物阻塞见 [联调差距](说明文档/总流程说明/一条启动命令的实物联调差距.md)，实现/续做记录见 [续做记录](说明文档/进度记录/单入口闭环续做记录.md)。本轮未操作真实相机、COM、电机或泵，未提交/推送。
+
 ## 从一帧到电机
 
 不打开串口，只保存路径：
@@ -27,7 +44,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --mode analyze --stage2-xy --camera-index 0
 ```
 
-`analyze` 不会打开步进串口。真要转电机，只能用 `--mode stage2-move`，而且要依次满足：人对好位置后归零、有电机位移标定 JSON、运动关卡通过、人在电机旁输入 `YES`、加 `--arm-stage2-xy`。`COMx` 用设备管理器里的 USB 转 TTL，不要扫描端口。24V 接在 DM542 上时，手要能立刻断电。
+`analyze` 不会打开步进串口。旧单帧入口转电机使用 `--mode stage2-move`，而且要依次满足：人对好位置后归零、有电机位移标定 JSON、运动关卡通过、人在电机旁输入 `YES`、加 `--arm-stage2-xy`。`COMx` 用设备管理器里的 USB 转 TTL，不要扫描端口。24V 接在 DM542 上时，手要能立刻断电。
 
 ```powershell
 .\.venv\Scripts\python.exe -m demo.demo_pipeline --stage2-set-zero

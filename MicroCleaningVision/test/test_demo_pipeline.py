@@ -63,6 +63,23 @@ class ScriptedNucleoSerial:
 
 @unittest.skipUnless(HAS_PERCEPTION_DEPS, "需要 requirements/perception-opencv.txt")
 class DemoPipelineTests(unittest.TestCase):
+    def test_closed_loop_policy_is_parsed_once_even_if_file_changes(self):
+        from pathlib import Path
+        from demo.image_ops import FrozenSegmenter
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "policy.json"
+            path.write_text('{"min_residual": 8.0}', encoding="utf-8")
+            segmenter = FrozenSegmenter("local", policy_path=path)
+            image = np.full((80, 100, 3), 140, dtype=np.uint8)
+            cv2.circle(image, (30, 25), 7, (18, 18, 200), -1)
+            before, digest = segmenter(image), segmenter.sha256
+            path.write_text('{"min_residual": 9999.0}', encoding="utf-8")
+            after = segmenter(image)
+            self.assertEqual(digest, segmenter.sha256)
+            self.assertTrue(np.array_equal(before.mask, after.mask))
+            self.assertGreater(after.measurement.area_px, 0)
     def test_simulation_mode_produces_visible_artifacts_and_action_evidence(self):
         from demo.demo_pipeline import run_demo
 
@@ -263,9 +280,11 @@ class ScriptedStage2Port:
             self._queue.append(b"STEP_OK v0.3\r\n")
         elif text.startswith("MOVEXY "):
             _cmd, nx, dx, ny, dy = text.split()
+            old_x, old_y = getattr(self, "_counts", (0, 0))
+            self._counts = (int(nx) or old_x, int(ny) or old_y)
             self._queue.append(f"STEP2_START X={nx} {dx} Y={ny} {dy}\r\n".encode("ascii"))
         elif text == "READXY" and not self.silent_readxy:
-            self._queue.append(b"STEP2 X=1 BX=0 Y=1 BY=0\r\n")
+            self._queue.append(f"STEP2 X={self._counts[0]} BX=0 Y={self._counts[1]} BY=0\r\n".encode("ascii"))
         elif text == "STOP":
             self._queue.append(b"STEP_STOPPED\r\n")
         return len(data)

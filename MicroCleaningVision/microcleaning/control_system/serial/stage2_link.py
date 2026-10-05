@@ -201,6 +201,9 @@ class Stage2SerialLink:
                     replies.append(idle.raw)
                     if idle.x_busy or idle.y_busy:
                         raise TimeoutError("电机在读取上限内仍有轴 BUSY")
+                    # 固件对零步轴可能保留旧计数；只核对本次确实运动的轴。
+                    if (x_steps and idle.x_sent != x_steps) or (y_steps and idle.y_sent != y_steps):
+                        raise Stage2ProtocolError("INCOMPLETE_MOTION", idle.raw)
                     sent.append(line)
                     in_flight = None
             except (Exception, KeyboardInterrupt) as exc:

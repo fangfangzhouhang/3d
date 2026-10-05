@@ -13,6 +13,50 @@ from microcleaning.data_learning.usb_camera import USBCameraError
 HAS_PERCEPTION_DEPS = importlib.util.find_spec("cv2") is not None and importlib.util.find_spec("numpy") is not None
 
 
+@unittest.skipUnless(HAS_PERCEPTION_DEPS, "需要感知依赖")
+class ClosedLoopPreviewTests(unittest.TestCase):
+    def preview(self, fake, keys):
+        from demo.camera_preview import CameraPreview
+        from demo.image_ops import FrozenSegmenter
+        opened = []
+        def factory(index):
+            opened.append(index)
+            return fake
+        source = CameraPreview(camera_index=1, segmenter=FrozenSegmenter("hsv"), warmup_frames=1,
+            capture_factory=factory, show=lambda *_: None,
+            wait_key=lambda delay: keys.pop(0), destroy_windows=lambda: None)
+        self.addCleanup(source.close)
+        return source, opened
+
+    def test_same_camera_captures_fresh_pre_post_with_buffer_discard(self):
+        import numpy as np
+        from datetime import datetime, timezone
+        stale = np.full((20, 20, 3), 10, dtype=np.uint8)
+        pre = np.full((20, 20, 3), 100, dtype=np.uint8)
+        post = np.full((20, 20, 3), 150, dtype=np.uint8)
+        fake = FakeVideoCapture(reads=[(True, stale), (True, pre), (True, stale), (True, post)])
+        source, opened = self.preview(fake, [32, 32, 32, 32])
+        first = source.capture("pre")
+        returned_at = datetime.now(timezone.utc).isoformat()
+        second = source.capture("post", after=returned_at)
+        self.assertEqual([1], opened)
+        self.assertEqual(100, first.image[0, 0, 0])
+        self.assertEqual(150, second.image[0, 0, 0])
+        self.assertNotEqual(first.frame_id, second.frame_id)
+        self.assertGreater(second.captured_at, returned_at)
+        self.assertFalse(fake.released)
+        source.close()
+        self.assertTrue(fake.released)
+
+    def test_cancellation_does_not_reuse_a_previous_frame(self):
+        import numpy as np
+        fake = FakeVideoCapture(reads=[(True, np.full((20, 20, 3), 100, dtype=np.uint8))])
+        source, _ = self.preview(fake, [-1, ord("q")])
+        with self.assertRaises(USBCameraError):
+            source.capture("post")
+        self.assertEqual(0, source.sequence)
+
+
 class _ScriptedNucleoSerial:
     def __init__(self) -> None:
         self.writes: list[bytes] = []

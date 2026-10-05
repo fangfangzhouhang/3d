@@ -41,13 +41,15 @@ class ScriptedStage2:
             self._queue.append((self.hello + "\r\n").encode("ascii"))
         elif text.startswith("MOVEXY "):
             _cmd, nx, dx, ny, dy = text.split()
+            old_x, old_y = getattr(self, "_counts", (0, 0))
+            self._counts = (int(nx) or old_x, int(ny) or old_y)
             self._queue.append(
                 f"STEP2_START X={nx} {dx} Y={ny} {dy}\r\n".encode("ascii")
             )
         elif text == "READXY":
             busy = "1" if self.busy_once else "0"
             self.busy_once = False
-            self._queue.append(f"STEP2 X=1 BX={busy} Y=1 BY={busy}\r\n".encode("ascii"))
+            self._queue.append(f"STEP2 X={self._counts[0]} BX={busy} Y={self._counts[1]} BY={busy}\r\n".encode("ascii"))
         elif text == "STOP":
             self._queue.append(b"STEP_STOPPED\r\n")
         else:
@@ -136,6 +138,26 @@ class Stage2DispatchTests(unittest.TestCase):
 
 
 class Stage2LinkTests(unittest.TestCase):
+    def test_idle_with_short_count_is_not_completed_motion(self):
+        class ShortCount(ScriptedStage2):
+            def write(self, data):
+                count = super().write(data)
+                if data.strip() == b"READXY":
+                    self._queue[-1] = b"STEP2 X=1 BX=0 Y=1 BY=0\r\n"
+                return count
+        port = ShortCount()
+        with self.assertRaises(Stage2TransmitError) as caught:
+            _send(Stage2SerialLink(armed=True, serial_factory=lambda: port))
+        self.assertEqual("INCOMPLETE_MOTION", caught.exception.reason_code)
+        self.assertEqual((), caught.exception.sent_lines)
+        self.assertTrue(caught.exception.stopped)
+
+    def test_zero_axis_may_retain_previous_count(self):
+        port = ScriptedStage2()
+        port._counts = (11, 999)
+        dispatch = single_move_dispatch(20, "FWD", 0, "FWD")
+        result = _send(Stage2SerialLink(armed=True, serial_factory=lambda: port), dispatch)
+        self.assertEqual(dispatch.lines, result.sent_lines)
     def test_unarmed_does_not_construct_serial(self):
         opened = {"count": 0}
 

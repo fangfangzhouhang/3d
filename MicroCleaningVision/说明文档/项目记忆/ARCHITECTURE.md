@@ -1,6 +1,6 @@
 # ARCHITECTURE｜整个系统怎么工作
 
-核对日期：2026-10-05；源码基线 `f31e445` + 本轮未提交固件迁移/集成修改。目标和真实进度见 [PROJECT](PROJECT.md)，交接字段见 [INTERFACES](INTERFACES.md)。
+核对日期：2026-10-05；基线 main `341224f`（PR #24 后），`feat/single-entry-cleaning-v1` worktree 的主机代码/说明改动尚未提交。固件未在此轮修改或重建，真实设备未操作。 目标见 [PROJECT](PROJECT.md)，接口见 [INTERFACES](INTERFACES.md)。
 
 ## 1. 目标系统与当前实现
 
@@ -15,7 +15,7 @@
 → STOP / RETRY / HUMAN → Episode（全过程档案）
 ```
 
-当前有三条不同的运行链，不能因为共享一个入口就把它们当成同一个真实闭环：
+旧单帧 Demo 保留以下三条运行链；新闭环入口另列在本节后半部分：
 
 ```text
 图像分析链：文件 / USB → 质量 → local 等分割 → 测量 → 像素路径 → 保存
@@ -25,17 +25,34 @@
              → HELLO/MOVEXY/READXY → 计数回执 + 位置账本
 ```
 
-Stage 2 目前使用 C 模块内的 MotionRequest，不走共享 ActionRequest/ExecutionReceipt。运动证据在 `stage2_intent.json`、`stage2_receipt.json`，Episode 中 `execution_receipt` 仍为空。完整合同化尚未实现，见 GAP-CTRL-02。
+旧 stage2-move 使用 C 模块内的 MotionRequest，不走共享 ActionRequest/ExecutionReceipt。运动证据在 `stage2_intent.json`、`stage2_receipt.json`，Episode 中 `execution_receipt` 仍为空。完整合同化尚未实现，见 GAP-CTRL-02。
 
-2026-10-05 另有一条软件干跑链，入口是 `test/integration/test_closed_loop_dry_run.py`，不是 Demo：
+PR #24 最初的合成干跑入口是 `test/integration/test_closed_loop_dry_run.py`，不是 Demo：
 
 ```text
 合成 Mask → TargetInstance 列表 → 测试里抄成 SequenceTarget
-→ plan_sequence → F103Session（先 MOVEXY，成功才 MCV1|PUMP）
+→ plan_sequence → F103SerialSession（先 MOVEXY，成功才 MCV1|PUMP）
 → verify_single_target → verify_area_change
 ```
 
 `sequence_planner` 不导入 `TargetInstance`。Demo 的 `analyze` / `stage2-move` / `arm-pump` 仍各自独立。
+
+### 新单入口闭环（本轮主机软件已接入）
+
+```text
+closed_loop_station CLI
+→ CameraPreview/MockFrames：同一相机生命周期、空格只冻结新帧
+→ FrozenSegmenter：锁定已有算法/参数/哈希 → B 提取和匹配工具
+→ TargetLedger：稳定 S 编号 → 原 plan_sequence 选择下一块
+→ 同原图尺寸单目标 Mask → 原 plan_cleaning/path_preview/Stage2Dispatch
+→ CycleGeometry：q_obs + d_target + 一次有符号偏移、整任务含回程预算
+→ HardwareExecutor：逐轮 YES、独立去程/泵/回程令牌
+→ 同一 F103SerialSession：只读探测、足量 MOVEXY、MCV1 短喷、RETURN
+→ 原观察位新后图 → 相同分割策略 → 原 verify_single_target
+→ SUCCESS 后重新抓图选下一块 / 有限新帧 RETRY / HUMAN / ERROR
+```
+
+V1 只执行 CENTER_POINT，RASTER_SCAN 交 HUMAN。新入口不更改共享 contracts/ports、固件或算法；运动仍在局部请求/回执侧文件中，Episode 存真实泵回执及前后观测。STATUS/READXY/DONE 都不能替代电气、绝对位置或清洗效果验收。
 
 ## 2. 实际目录及责任
 
@@ -51,7 +68,8 @@ Stage 2 目前使用 C 模块内的 MotionRequest，不走共享 ActionRequest/E
 | C | `control_system/safety/` | 固定规则动作申请、泵治理器、运动关卡 |
 | C | `control_system/serial/` | FakeSerial、MCV1 泵适配器、Stage 2 双轴协议与发送器；`f103_session.py` 让两者顺序共用一条串口 |
 | C | `control_system/replay/` | Mock、软件回放、Episode 持久化 |
-| 集成 | `demo/demo_pipeline.py`、`demo/live_station.py` | 编排各模块、模式选择、预览、保存结果；变更前协调消费者 |
+| 集成 | `demo/demo_pipeline.py` 兼容导出；cli/single_frame/image_ops/motion_mode/pump_mode/reporting/camera_preview | 原大文件机械拆分，旧单帧 API/命令保留 |
+| 集成 / C | `demo/closed_loop_station.py`、`control_system/orchestration/`、`planning/stage2_geometry.py` | 薄入口 + CleaningLoop + HardwareExecutor + TargetLedger；接入已有视觉、规划、安全和串口 |
 | H1 | `firmware/pump/` | 泵输出及测试 |
 | H2 | `firmware/motion/` | XY脉冲、名义针头偏移及测试 |
 | 公共 | `firmware/common/main.c`、`board/` | 唯一联合入口、读按钮、时钟/中断、输出 |
@@ -65,12 +83,14 @@ Stage 2 目前使用 C 模块内的 MotionRequest，不走共享 ActionRequest/E
 | 入口 / 模式 | 输入 | 输出 | 真实动作 |
 |---|---|---|---|
 | `main.py` | 内置合成数据 | Mock Episode | 无 |
+| `demo.closed_loop_station --mock`（默认） | 合成原图/串口替身 | 多轮复检、执行回执、完整运行目录 | 无；Mock 独立位置账本 |
+| `demo.closed_loop_station --real` | 人指定相机/COM/电机标定/工作坐标/偏移 | 同进程抓图、YES、去程/短喷/回程/后图 | 全部武装及每轮 YES 后可执行；本轮未实物验证 |
 | Demo `analyze` / `camera-analyze` | 文件或 USB 图 | Mask、测量、路径、summary/Episode | 无；加 `--stage2-xy` 也只保存命令预览 |
 | Demo `simulate` | 图像 + 模拟条件 | FakeSerial 回执与模拟后状态 | 无；后图变化由模拟产生 |
 | Demo `ping-only` | 图像来源 + 人指定的泵协议端口 | PING/STATUS | 不发 PUMP/MOVEXY；探测须与匹配固件配套 |
 | Demo `arm-pump` | 图像、固定喷头申请、人工确认 | ActionRequest、审批、泵回执 | controller=stm32 且确认/武装条件满足时可发 PUMP |
 | Demo `stage2-move` | 图像、尺度 JSON、已知位置、人指定端口 | 运动申请、审批、意图和发送回执 | 人确认 + `--arm-stage2-xy` 后可发 MOVEXY |
-| `--live` 预览 | 指定 USB 视频设备 | 冻结帧分析、可视化 | 默认无；显式武装泵模式有受限短喷；不发 Stage 2 |
+| 旧 Demo `--live` 预览 | 指定 USB 视频设备 | 冻结帧分析、可视化 | 默认无；显式武装泵模式有受限短喷；不发 Stage 2 |
 
 正常分析程序可立即跑，不需要硬件组先把泵装好：
 
@@ -96,7 +116,7 @@ cd "D:\大创\3d\MicroCleaningVision"
 
 Demo 先规划、检查每轴累计最多 1600 步和相对人工零点 ±3200 步软限位，缺标定/有警告/位置未知时拒发。全部满足仍先给 HUMAN；人在场输入 YES 后才获得短时一次性 ALLOW，发送器核对内容摘要与武装状态再打开 COM。
 
-协议先确认 `STEP_OK v0.3`，按段发送 MOVEXY，轮询 READXY，两轴都停才发下一段。两轴频率相同、步数不同，较短轴先停；**没有按比例插补斜线**。对角路线的图上预览和真实轨迹可能不同，应实测。
+协议先确认 `STEP_OK v0.3`，按段发送 MOVEXY，轮询 READXY，两轴都停且每个非零轴已发计数等于申请才发下一段。两轴频率相同、步数不同，较短轴先停；**没有按比例插补斜线**。对角路线的图上预览和真实轨迹可能不同，应实测。
 
 发送中途异常会尝试 STOP，并记录已完成、在途指令和回复；位置账本变为未知。STOP 回复也只是协议证据，不代表独立物理断电或位置反馈。
 
@@ -107,12 +127,12 @@ Demo 先规划、检查每轴累计最多 1600 步和相对人工零点 ±3200 �
 | GAP-CTRL-01 | `scripts/center_object.py` 默认 COM5，直接 serial 写 MOVEXY；标定脚本也直接发运动。二者不经过 Demo motion_gate | ROADMAP：先说明调试入口，再由 C/硬件组提统一关卡方案 |
 | GAP-CTRL-02 | Stage 2 运动是局部合同和侧文件；共享 Episode 不能独立容纳完整运动回执 | INTERFACES：合同债务；变更需提案，不能塞成喷射 ActionRequest |
 | GAP-VERIFY-01 | 面积复检依赖调用者给 `images_comparable`；没有真实配准验收和自动损伤检测 | B 用真实前后图验证可比性 |
-| GAP-INTEGRATION-01 | 统一固件源码已实现并离线验收；主机运动/喷水会话、偏移、后图与现场版本仍未统一 | C提主机编排方案，H1/H2提供接线及偏移实测，不宣称E3 |
+| GAP-INTEGRATION-01 | 新入口已接持续会话、单一偏移、回原观察位、后图与多目标；实物装配/烧录/坐标/效果未验收 | H1/H2 实测接线/偏移，A/B 可比图，C 一轮现场证据；不宣称 E3 |
 | GAP-DATA-01 | 旧样本来源未知，正式同条件 U500 数据及现场证据未完整共享 | A 建采集批次与证据包 |
 
 本系统当前是确定性软件流程，不是多 Agent 自动控制机器人。研发 Agent 可审计、实现和评审；本次没有增加 Agent Graph 运行代码，也没有授予物理执行权。
 
-## 7. 本轮固件连接及其边界
+## 7. 此前固件连接及其边界（历史离线阶段）
 
 ~~~text
 common/main.c
@@ -126,6 +146,6 @@ common/main.c
 
 PUMP ON 固定 300 ms，重复不延期；MCV1有限时ACK/DONE。PB2 改为常闭接地/上拉假设，断线高锁存停止；实物未核对，未插触点会阻止动作。PB3 释放 JTAG 保留 SWD，默认 ARM 按钮非强制。
 
-名义TO偏移继承24mm/7680Y脉冲，不是标定或回零；PC正式Stage2发送器仍不调用它，且现有1600步预算不能直接容纳。偏移未来必须来自单一有符号标定，不能主机与固件各加一次。
+名义TO偏移继承24mm/7680Y脉冲，不是标定或回零；PC正式Stage2发送器仍不调用它，且现有1600步预算不能直接容纳。新入口已采用单一有符号标定接口；实测值仍缺，不让主机与固件各加一次。
 
-五组当前C、七组旧兼容、工程路径和两套Keil编译证明代码能连接。主机旧独立脚本授权/尝试耗尽/补关等债务仍保留，A/B/C源码未在本轮修改。详见 [本次验收](../硬件组/结构整理与验收记录_2026-10-05.md)。
+五组当前C、七组旧兼容、工程路径和两套Keil编译证明代码能连接。主机旧独立脚本授权/尝试耗尽/补关等债务仍保留，A/B/C 源码未在该固件整理阶段修改；本次主机集成的新增/修改见上文。详见 [本次验收](../硬件组/结构整理与验收记录_2026-10-05.md)。

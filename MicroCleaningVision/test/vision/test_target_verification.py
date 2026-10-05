@@ -34,6 +34,38 @@ def _three_targets():
 
 @unittest.skipUnless(HAS_PERCEPTION_DEPS, "需要 requirements/perception-opencv.txt")
 class TargetInstanceTests(unittest.TestCase):
+    def test_extract_one_mask_keeps_original_coordinates_and_excludes_neighbors(self):
+        import numpy as np
+        from microcleaning.vision.target_instance import extract_target_instances, extract_target_mask
+        mask = _three_targets()
+        target = extract_target_instances(mask)[1]
+        selected = extract_target_mask(mask, target)
+        self.assertEqual(mask.shape, selected.shape)
+        self.assertEqual(target.area_px, np.count_nonzero(selected))
+        self.assertEqual(target.centroid_px, extract_target_instances(selected)[0].centroid_px)
+        self.assertFalse(selected[4, 4])
+
+    def test_stale_instance_cannot_select_a_relabelled_target(self):
+        from microcleaning.vision.target_instance import extract_target_instances, extract_target_mask
+        mask = _three_targets()
+        old = extract_target_instances(mask)[0]
+        mask[4:14, 4:14] = 0
+        with self.assertRaises(ValueError):
+            extract_target_mask(mask, old)
+
+    def test_public_match_reports_existing_label_or_disappearance(self):
+        from microcleaning.vision.target_instance import extract_target_instances, match_target_instance
+        mask = _three_targets()
+        target = extract_target_instances(mask)[1]
+        post = mask.copy()
+        post[4:14, 4:14] = 0
+        match = match_target_instance(pre_target=target, pre_mask=mask, post_mask=post)
+        self.assertEqual("matched", match.status)
+        self.assertEqual(1, match.post_label)
+        post[4:29, 60:80] = 0
+        vanished = match_target_instance(pre_target=target, pre_mask=mask, post_mask=post)
+        self.assertIsNone(vanished.post_label)
+        self.assertEqual(0.0, vanished.post_area_px)
     def test_empty_mask_has_no_targets(self):
         from microcleaning.vision.target_instance import extract_target_instances
 

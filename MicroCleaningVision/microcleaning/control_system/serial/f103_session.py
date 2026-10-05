@@ -16,7 +16,7 @@ from typing import Any, Callable
 from microcleaning.contracts import ExecutionReceipt, SafetyDecision, SafetyOutcome
 from microcleaning.control_system.planning.stage2_axes import Stage2Dispatch
 from microcleaning.control_system.safety.motion_gate import MotionRequest
-from microcleaning.control_system.serial.stage2_link import Stage2SerialLink, Stage2TransmitError
+from microcleaning.control_system.serial.stage2_link import Stage2SerialLink, Stage2TransmitError, Stage2TransmitResult
 from microcleaning.control_system.serial.stm32_serial import STM32SerialController
 
 
@@ -41,6 +41,9 @@ class F103StepThenPumpResult:
     stopped: bool
     motion_reason: str | None = None
     receipt: ExecutionReceipt | None = None
+    motion_result: Stage2TransmitResult | None = None
+    motion_error: Stage2TransmitError | None = None
+    pump_reason: str | None = None
 
 
 def com_occupied_by_session(port: str | None) -> bool:
@@ -80,10 +83,12 @@ class _GuardedConnection:
         self.preserved: list[bytes] = []
         self.finished: list[bytes] = []
         self.pump_bytes = 0
+        self.events: list[dict[str, str]] = []
         self._partial = b""
 
     def write(self, data: bytes) -> int:
         payload = bytes(data)
+        self.events.append({"at": datetime.now(timezone.utc).isoformat(), "direction": "tx", "line": payload.decode("ascii", errors="replace").strip()})
         if payload.startswith(b"MCV1|PUMP|"):
             self.pump_bytes += len(payload)
         written = self.raw.write(data)
@@ -95,7 +100,10 @@ class _GuardedConnection:
             flush()
 
     def readline(self) -> bytes:
-        return self.raw.readline()
+        line = self.raw.readline()
+        if line:
+            self.events.append({"at": datetime.now(timezone.utc).isoformat(), "direction": "rx", "line": _as_bytes(line).decode("ascii", errors="replace").strip()})
+        return line
 
     def reset_input_buffer(self) -> None:
         # 先把已经在缓冲区里的协议回复拿出来，再让底层丢掉剩余横幅。
@@ -182,6 +190,7 @@ class F103SerialSession:
         self._opened = False
         self._ever_opened = False
         self._closed = False
+        self.failed = False
         self._owner: str | None = None
         self._lease: object | None = None
         self._running = False
@@ -209,6 +218,10 @@ class F103SerialSession:
             return ()
         return tuple(self._guard.finished)
 
+    @property
+    def serial_events(self) -> tuple[dict[str, str], ...]:
+        return () if self._guard is None else tuple(self._guard.events)
+
     def acquire(self, owner: str, lease: object) -> _GuardedConnection:
         """让一个命令流独占这条串口。同一个租约可以重入，另一个租约不行。"""
 
@@ -227,15 +240,24 @@ class F103SerialSession:
                 raise
 
     def release(self, lease: object) -> None:
+        drain_error = None
         with self._lock:
             if self._lease is not lease:
                 return
             protocol = "step" if self._owner == "stage2" else "mcv1"
             guard = self._guard
-            if guard is not None:
-                guard.finish(protocol)
-            self._owner = None
-            self._lease = None
+            try:
+                if guard is not None:
+                    guard.finish(protocol)
+            except Exception as exc:
+                drain_error = exc
+            finally:
+                self._owner = None
+                self._lease = None
+        if drain_error is not None:
+            self.failed = True
+            self.close()
+            raise F103SessionBusy("REPLY_DRAIN_FAILED; session closed") from drain_error
 
     def close(self) -> None:
         with self._lock:
@@ -264,6 +286,8 @@ class F103SerialSession:
         motion_decision: SafetyDecision,
         pump_request: Any,
         pump_decision: SafetyDecision,
+        close_after: bool = True,
+        before_pump: Callable[[Stage2TransmitResult], None] | None = None,
     ) -> F103StepThenPumpResult:
         """两边都已武装且为 ALLOW 才打开串口。步进失败或未批准时不调用喷水。"""
 
@@ -274,13 +298,22 @@ class F103SerialSession:
             if self._running:
                 raise F103SessionBusy("会话正在执行，拒绝并发进入")
             self._running = True
+        succeeded = False
+        motion_result = None
         try:
             if not _step_then_pump_authorized(link, controller, motion_decision, pump_decision):
-                return _empty_result()
+                return _empty_result(serial_opened=self._ever_opened, pump_bytes=self.pump_bytes, motion_reason="AUTHORIZATION_NOT_CURRENT_OR_ARMED")
+            if dispatch.truncated or tuple(dispatch.lines) != tuple(motion_request.lines):
+                return F103StepThenPumpResult(False, False, self.pump_bytes, False, False, "INCOMPLETE_DISPATCH")
+            # 坏的喷水令牌必须在第一次运动之前被发现，不能先移动后才发现令牌不匹配。
             try:
-                link.transmit(dispatch, request=motion_request, decision=motion_decision)
-            except PermissionError:
-                return _empty_result(serial_opened=self._ever_opened, pump_bytes=self.pump_bytes)
+                controller.validate_allow(pump_request, pump_decision)
+            except (PermissionError, ValueError) as exc:
+                return F103StepThenPumpResult(self._ever_opened, False, self.pump_bytes, False, False, pump_reason=str(exc))
+            try:
+                motion_result = link.transmit(dispatch, request=motion_request, decision=motion_decision)
+            except PermissionError as exc:
+                return _empty_result(serial_opened=self._ever_opened, pump_bytes=self.pump_bytes, motion_reason=str(exc))
             except Stage2TransmitError as exc:
                 return F103StepThenPumpResult(
                     serial_opened=self._ever_opened,
@@ -289,26 +322,38 @@ class F103SerialSession:
                     output_finished=False,
                     stopped=exc.stopped,
                     motion_reason=exc.reason_code,
+                    motion_error=exc,
                 )
+            if tuple(motion_result.sent_lines) != tuple(dispatch.lines):
+                return F103StepThenPumpResult(self._ever_opened, False, self.pump_bytes, False, False, "INCOMPLETE_DISPATCH", motion_result=motion_result)
+            pump_called = False
             try:
+                if before_pump is not None:
+                    before_pump(motion_result)
+                pump_called = True
                 receipt = controller.execute(pump_request, pump_decision)
-            except PermissionError:
+            except PermissionError as exc:
                 return F103StepThenPumpResult(
                     serial_opened=self._ever_opened,
-                    pump_called=True,
+                    pump_called=pump_called,
                     pump_bytes=self.pump_bytes,
                     output_finished=False,
                     stopped=False,
+                    motion_result=motion_result,
+                    pump_reason=str(exc),
                 )
-            except Exception:
+            except (Exception, KeyboardInterrupt) as exc:
                 return F103StepThenPumpResult(
                     serial_opened=self._ever_opened,
-                    pump_called=True,
+                    pump_called=pump_called,
                     pump_bytes=self.pump_bytes,
                     output_finished=False,
                     stopped=self._stop_pump(controller),
+                    motion_result=motion_result,
+                    pump_reason="INTERRUPTED" if isinstance(exc, KeyboardInterrupt) else type(exc).__name__,
                 )
             output_finished = bool(receipt.success and receipt.controller_state == "DONE")
+            succeeded = output_finished
             stopped = False if output_finished else self._stop_pump(controller)
             return F103StepThenPumpResult(
                 serial_opened=self._ever_opened,
@@ -317,6 +362,7 @@ class F103SerialSession:
                 output_finished=output_finished,
                 stopped=stopped,
                 receipt=receipt,
+                motion_result=motion_result,
             )
         finally:
             with self._lock:
@@ -324,7 +370,9 @@ class F103SerialSession:
             try:
                 controller.close()
             finally:
-                self.close()
+                self.failed = not succeeded
+                if close_after or self.failed:
+                    self.close()
 
     def _bind(self, link: Stage2SerialLink, controller: STM32SerialController) -> None:
         self._adopt_raw(link.external_connection)
@@ -422,13 +470,14 @@ def _decision_currently_allows(decision: SafetyDecision) -> bool:
     return datetime.now(timezone.utc) < expires
 
 
-def _empty_result(*, serial_opened: bool = False, pump_bytes: int = 0) -> F103StepThenPumpResult:
+def _empty_result(*, serial_opened: bool = False, pump_bytes: int = 0, motion_reason: str | None = None) -> F103StepThenPumpResult:
     return F103StepThenPumpResult(
         serial_opened=serial_opened,
         pump_called=False,
         pump_bytes=pump_bytes,
         output_finished=False,
         stopped=False,
+        motion_reason=motion_reason,
     )
 
 

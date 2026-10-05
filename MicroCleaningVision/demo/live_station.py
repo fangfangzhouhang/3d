@@ -17,6 +17,26 @@ from typing import Any, Callable
 
 from microcleaning.data_learning.usb_camera import CAMERA_OPEN_FAILED, FRAME_READ_FAILED, USBCameraError
 
+from demo.camera_preview import (
+    _wait_until_camera_readable,
+    _idle_pause,
+    _compose_preview,
+    _put_hud,
+    _apply_resolution,
+    LIVE_WINDOW,
+    LIVE_WINDOW_PUMP,
+    RESULT_WINDOW,
+    IDLE_WINDOW,
+    QUIT_KEYS,
+    HSV_KEYS,
+    OTSU_KEYS,
+    EXG_KEYS,
+    EXR_KEYS,
+    LOCAL_KEYS,
+    SPACE_KEY,
+    VISION_ALGORITHMS,
+)
+
 CaptureFactory = Callable[..., Any]
 SerialFactory = Callable[[], Any]
 ShowFrame = Callable[[str, Any], None]
@@ -25,18 +45,6 @@ DestroyWindows = Callable[[], None]
 AnalyzeFrame = Callable[..., Path]
 SleepFn = Callable[[float], None]
 
-LIVE_WINDOW = "MicroCleaningVision live  SPACE=analyze  H/O/G/E/L=algo  Q=pause"
-LIVE_WINDOW_PUMP = "MicroCleaningVision live  SPACE=analyze+pump if target  Q=pause"
-RESULT_WINDOW = "Last Demo analysis (path overlay)"
-IDLE_WINDOW = "Paused  any key=reopen  Q=exit program"
-QUIT_KEYS = {ord("q"), ord("Q"), 27}
-HSV_KEYS = {ord("h"), ord("H")}
-OTSU_KEYS = {ord("o"), ord("O")}
-EXG_KEYS = {ord("g"), ord("G")}
-EXR_KEYS = {ord("e"), ord("E")}
-LOCAL_KEYS = {ord("l"), ord("L")}
-SPACE_KEY = 32
-VISION_ALGORITHMS = ("hsv", "otsu", "exg", "exr", "local")
 
 
 def run_live_session(
@@ -71,7 +79,7 @@ def run_live_session(
 ) -> list[Path]:
     """实时预览会话：Q 暂停，其他键重开；默认不发泵。"""
 
-    from demo.demo_pipeline import _load_dependencies
+    from demo.image_ops import _load_dependencies
 
     if algorithm not in VISION_ALGORITHMS:
         raise ValueError(f"algorithm必须是{'/'.join(VISION_ALGORITHMS)}")
@@ -181,7 +189,8 @@ def run_live_station(
 ) -> list[Path]:
     """打开相机循环显示 B 叠加；空格把当前帧交给 ``run_demo``。"""
 
-    from demo.demo_pipeline import _draw_contamination, _load_dependencies, run_demo, segment_demo_image
+    from demo.image_ops import _draw_contamination, _load_dependencies, segment_demo_image
+    from demo.single_frame import run_demo
 
     if algorithm not in VISION_ALGORITHMS:
         raise ValueError(f"algorithm必须是{'/'.join(VISION_ALGORITHMS)}")
@@ -374,101 +383,3 @@ def _status_after_analyze(run_dir: Path, *, pump_on_analyze: bool) -> str:
         return f"ESTOP blocked pump  {run_dir.name}"
     outcome = ((summary.get("safety_decision") or {}).get("outcome")) or "none"
     return f"pump blocked ({outcome})  {run_dir.name}"
-
-
-def _wait_until_camera_readable(
-    *,
-    camera_index: int,
-    camera_backend: int | None,
-    factory: CaptureFactory,
-    sleep: SleepFn,
-    max_attempts: int | None,
-) -> Any:
-    attempts = 0
-    while max_attempts is None or attempts < max_attempts:
-        attempts += 1
-        capture = None
-        keep_open = False
-        try:
-            capture = factory(camera_index) if camera_backend is None else factory(camera_index, camera_backend)
-            if capture is not None and bool(capture.isOpened()):
-                ok, frame = capture.read()
-                if ok and frame is not None and hasattr(frame, "size") and int(frame.size) > 0:
-                    print(f"已检测到 USB 相机 device_index={camera_index}，打开实时窗口。")
-                    keep_open = True
-                    return capture
-        except Exception:
-            pass
-        finally:
-            if capture is not None and not keep_open:
-                try:
-                    capture.release()
-                except Exception:
-                    pass
-        sleep(1.0)
-    raise USBCameraError(CAMERA_OPEN_FAILED, f"等待 USB 相机超时 device_index={camera_index}")
-
-
-def _idle_pause(*, cv2, np, show: ShowFrame, key_fn: WaitKey, max_idle_frames: int | None) -> str:
-    paused = np.zeros((220, 720, 3), dtype=np.uint8)
-    _put_hud(paused, cv2, "Preview paused", y=70)
-    _put_hud(paused, cv2, "Any other key = reopen camera", y=110)
-    _put_hud(paused, cv2, "Q / Esc = exit program   no pump", y=150)
-    frames = 0
-    while max_idle_frames is None or frames < max_idle_frames:
-        show(IDLE_WINDOW, paused)
-        key = int(key_fn(100))
-        frames += 1
-        if key < 0:
-            continue
-        key = key & 0xFF
-        if key in QUIT_KEYS:
-            return "exit"
-        return "reopen"
-    return "exit"
-
-
-def _compose_preview(
-    frame,
-    *,
-    algorithm: str,
-    camera_index: int,
-    status: str,
-    cv2,
-    segment_demo_image,
-    draw_contamination,
-    pump_on_analyze: bool = False,
-):
-    try:
-        segmentation = segment_demo_image(frame, algorithm)
-        view = draw_contamination(frame, segmentation.mask, segmentation.measurement.centroid_px, cv2)
-        area = segmentation.measurement.area_px
-        centroid = segmentation.measurement.centroid_px
-        hint = f"area={area:.0f}px  center={centroid}"
-    except Exception as exc:
-        view = frame.copy()
-        hint = f"segment failed: {type(exc).__name__}"
-        status = hint
-    space_hint = "SPACE=analyze+pump" if pump_on_analyze else "SPACE=analyze"
-    _put_hud(view, cv2, f"index={camera_index}  {algorithm}  {space_hint}  H/O/G/E/L=algo  Q=pause")
-    _put_hud(view, cv2, hint, y=56)
-    _put_hud(view, cv2, status, y=80)
-    return view, status
-
-
-def _put_hud(image, cv2, text: str, *, y: int = 32) -> None:
-    cv2.putText(image, text[:88], (12, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 3, cv2.LINE_AA)
-    cv2.putText(image, text[:88], (12, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 1, cv2.LINE_AA)
-
-
-def _apply_resolution(capture: Any, cv2, width: int | None, height: int | None) -> None:
-    if width is not None:
-        try:
-            capture.set(cv2.CAP_PROP_FRAME_WIDTH, float(width))
-        except Exception:
-            pass
-    if height is not None:
-        try:
-            capture.set(cv2.CAP_PROP_FRAME_HEIGHT, float(height))
-        except Exception:
-            pass

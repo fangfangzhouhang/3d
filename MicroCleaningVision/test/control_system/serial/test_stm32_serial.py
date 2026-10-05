@@ -75,6 +75,54 @@ class ScriptedNucleoSerial:
 
 
 class STM32SerialControllerTests(unittest.TestCase):
+    def test_stop_drains_interrupted_action_before_matching_ack_done(self):
+        class Interrupted(ScriptedNucleoSerial):
+            def write(self, data):
+                count = super().write(data)
+                if data.strip() == b"MCV1|STOP":
+                    self._queue.insert(0, b"MCV1|ERR|old_action|STOPPED\n")
+                return count
+        port = Interrupted()
+        controller = STM32SerialController(serial_factory=lambda: port)
+        self.addCleanup(controller.close)
+        done = controller.stop()
+        self.assertEqual("DONE", done.kind)
+        self.assertEqual("STOP", done.action_id)
+        self.assertEqual(3, len(controller.stop_replies))
+        self.assertFalse(any(data.startswith(b"MCV1|PUMP|") for data in port.writes))
+
+    def test_stop_does_not_accept_old_done_as_stop_success(self):
+        class WrongDone(ScriptedNucleoSerial):
+            def write(self, data):
+                count = super().write(data)
+                if data.strip() == b"MCV1|STOP":
+                    self._queue[-1] = b"MCV1|DONE|old_action\n"
+                return count
+        controller = STM32SerialController(serial_factory=WrongDone)
+        self.addCleanup(controller.close)
+        with self.assertRaises(ValueError):
+            controller.stop()
+
+    def test_stop_is_bounded_when_only_abort_errors_arrive(self):
+        class ErrorsOnly(ScriptedNucleoSerial):
+            def write(self, data):
+                self.writes.append(data)
+                self._queue.extend([b"MCV1|ERR|old_action|STOPPED\n"] * 20)
+                return len(data)
+        controller = STM32SerialController(serial_factory=ErrorsOnly)
+        self.addCleanup(controller.close)
+        reply = controller.stop()
+        self.assertEqual("ERR", reply.kind)
+        self.assertLessEqual(len(controller.stop_replies), 9)
+
+    def test_preflight_does_not_consume_pump_token(self):
+        controller = STM32SerialController(arm_pump=True, serial_factory=ScriptedNucleoSerial)
+        self.addCleanup(controller.close)
+        controller.validate_allow(self.request, self.allow)
+        controller.validate_allow(self.request, self.allow)
+        self.assertTrue(controller.execute(self.request, self.allow).success)
+        with self.assertRaises(PermissionError):
+            controller.validate_allow(self.request, self.allow)
     def setUp(self):
         quality = ImageQuality(0.95, 0.95, 0.95)
         self.pre = build_observation(
