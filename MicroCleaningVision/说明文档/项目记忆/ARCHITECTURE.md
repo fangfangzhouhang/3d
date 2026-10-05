@@ -1,6 +1,6 @@
 # ARCHITECTURE｜整个系统怎么工作
 
-核对日期：2026-10-03；源码基线 `17bf617`。目标和真实进度见 [PROJECT](PROJECT.md)，交接字段见 [INTERFACES](INTERFACES.md)。
+核对日期：2026-10-05；源码基线 `f31e445` + 本轮未提交固件迁移/集成修改。目标和真实进度见 [PROJECT](PROJECT.md)，交接字段见 [INTERFACES](INTERFACES.md)。
 
 ## 1. 目标系统与当前实现
 
@@ -19,7 +19,7 @@
 
 ```text
 图像分析链：文件 / USB → 质量 → local 等分割 → 测量 → 像素路径 → 保存
-喷水链 Stage 1：目标 + 固定喷头 → PUMP_IN_PLACE → 人工关卡 → MCV1 → 泵回执
+喷水主机链 MCV1：目标 + 固定喷头 → PUMP_IN_PLACE → 人工关卡 → MCV1 → 泵回执
 运动链 Stage 2：像素路径 + 电机尺度 JSON + 人工零点
              → MotionRequest → 运动关卡 → 人确认/武装
              → HELLO/MOVEXY/READXY → 计数回执 + 位置账本
@@ -42,9 +42,11 @@ Stage 2 目前使用 C 模块内的 MotionRequest，不走共享 ActionRequest/E
 | C | `control_system/serial/` | FakeSerial、MCV1 泵适配器、Stage 2 双轴协议与发送器 |
 | C | `control_system/replay/` | Mock、软件回放、Episode 持久化 |
 | 集成 | `demo/demo_pipeline.py`、`demo/live_station.py` | 编排各模块、模式选择、预览、保存结果；变更前协调消费者 |
-| 硬件组 | `firmware/stm32f103/f103-stage1/` | Stage 1 泵与联锁固件 |
-| 硬件组 | `firmware/stage2-stepmotor/` | Stage 2 双轴步进测试固件 |
-| 硬件组 | `firmware/keil/` | 两份 Keil 工程；构建输出不是烧录证据 |
+| H1 | `firmware/pump/` | 泵输出及测试 |
+| H2 | `firmware/motion/` | XY脉冲、名义针头偏移及测试 |
+| 公共 | `firmware/common/main.c`、`board/` | 唯一联合入口、读按钮、时钟/中断、输出 |
+| 公共 | `firmware/common/safety/`、`serial/` | 复用原控制核心与MCV1，当前main实际调用 |
+| 公共 | `firmware/common/keil/`、`compat/stage1/` | 两份可构建工程，旧入口兼容保留；不等于烧录 |
 
 镜像测试在 `test/data_learning/`、`test/vision/`、`test/control_system/{planning,safety,serial,replay}/` 及 Demo 测试。不要恢复旧 control_system 扁平路径或已删除的 `legacy/`。
 
@@ -95,7 +97,25 @@ Demo 先规划、检查每轴累计最多 1600 步和相对人工零点 ±3200 �
 | GAP-CTRL-01 | `scripts/center_object.py` 默认 COM5，直接 serial 写 MOVEXY；标定脚本也直接发运动。二者不经过 Demo motion_gate | ROADMAP：先说明调试入口，再由 C/硬件组提统一关卡方案 |
 | GAP-CTRL-02 | Stage 2 运动是局部合同和侧文件；共享 Episode 不能独立容纳完整运动回执 | INTERFACES：合同债务；变更需提案，不能塞成喷射 ActionRequest |
 | GAP-VERIFY-01 | 面积复检依赖调用者给 `images_comparable`；没有真实配准验收和自动损伤检测 | B 用真实前后图验证可比性 |
-| GAP-INTEGRATION-01 | Stage 1 泵与 Stage 2 运动没有统一固件/会话 | 先固定点闭环候选，再评估移动喷洗集成 |
+| GAP-INTEGRATION-01 | 统一固件源码已实现并离线验收；主机运动/喷水会话、偏移、后图与现场版本仍未统一 | C提主机编排方案，H1/H2提供接线及偏移实测，不宣称E3 |
 | GAP-DATA-01 | 旧样本来源未知，正式同条件 U500 数据及现场证据未完整共享 | A 建采集批次与证据包 |
 
 本系统当前是确定性软件流程，不是多 Agent 自动控制机器人。研发 Agent 可审计、实现和评审；本次没有增加 Agent Graph 运行代码，也没有授予物理执行权。
+
+## 7. 本轮固件连接及其边界
+
+~~~text
+common/main.c
+├─ service_safety → 读 PB2/PB3/毫秒 → MCV1 + 原 safety/control_core
+│                  → apply_safe_outputs → pump_on/off
+│                  → E_STOP / FAULT 时 sm_stop
+├─ MOVEXY → motion/sm_start_xy → TIM2/TIM3 实际中断转发
+├─ TO_NEEDLE / TO_SCOPE → sm_start_scope_offset → 同一 sm_start_xy
+└─ STOP / MCV1 STOP → 两轴停止 + 关泵 + 对应回执
+~~~
+
+PUMP ON 固定 300 ms，重复不延期；MCV1有限时ACK/DONE。PB2 改为常闭接地/上拉假设，断线高锁存停止；实物未核对，未插触点会阻止动作。PB3 释放 JTAG 保留 SWD，默认 ARM 按钮非强制。
+
+名义TO偏移继承24mm/7680Y脉冲，不是标定或回零；PC正式Stage2发送器仍不调用它，且现有1600步预算不能直接容纳。偏移未来必须来自单一有符号标定，不能主机与固件各加一次。
+
+五组当前C、七组旧兼容、工程路径和两套Keil编译证明代码能连接。主机旧独立脚本授权/尝试耗尽/补关等债务仍保留，A/B/C源码未在本轮修改。详见 [本次验收](../硬件组/结构整理与验收记录_2026-10-05.md)。

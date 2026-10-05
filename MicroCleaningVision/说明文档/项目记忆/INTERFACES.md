@@ -1,6 +1,6 @@
 # INTERFACES｜模块之间怎样传数据
 
-核对日期：2026-10-03。共享 Python 合同版本 `mcl-v0.1`；泵线上协议 `MCV1`；步进协议 `v0.3`。三个版本各管不同层，不能相互替代。
+核对日期：2026-10-05，HEAD f31e445 + 当前未提交固件改动；Python共享接口未改变。共享 Python 合同版本 `mcl-v0.1`；泵线上协议 `MCV1`；步进协议 `v0.3`。三个版本各管不同层，不能相互替代。
 
 ## 1. 合同的真实来源
 
@@ -56,7 +56,7 @@ capture(task_id: str, phase: str) -> Observation
 - 图上总体中心可能落在多个区域之间；规划按连通块处理，不能只相信总体质心就是可喷的位置。
 - `mask_ref` 为文件引用时，读者必须知道它相对哪个运行目录。图片 ID、路径和版本在 summary 中对齐。
 
-## 5. C → Stage 1：固定喷头短喷
+## 5. C → MCV1：固定喷头短喷
 
 ControllerPort 保持：
 
@@ -66,9 +66,9 @@ execute(request: ActionRequest, decision: SafetyDecision) -> ExecutionReceipt
 
 `PUMP_IN_PLACE` 使用 `coordinate_frame=nozzle_fixed`、目标 `(0,0)` 和禁止 XY 的约束；这里的 `(0,0)` 表示喷头不移动，不是伪造工作台定位。`SPRAY_AT_POINT` 才需要有效 `work_mm` 标定。
 
-线上是 `MCV1|PING`、`STATUS`、`PUMP|action_id|duration_ms`、`STOP`；回 `PONG`、`STATUS`、`ACK`、`DONE`、`ERR`。ACK 表示接受，DONE 表示固件动作流程结束，均不能独自证明液体到达目标或污染减少。电脑当前泵时长 100–500 ms，底层仍须自己限制。
+线上是 `MCV1|PING`、`STATUS`、`PUMP|action_id|duration_ms`、`STOP`；回 `PONG`、`STATUS`、`ACK`、`DONE`、`ERR`。ACK 表示接受，DONE 表示固件动作流程结束，均不能独自证明液体到达目标或污染减少。电脑当前泵时长 100–500 ms；MCU沿用旧范围100–2000ms，未扩大电脑权限。当前common/main.c已接入共享MCV1，旧Stage1兼容构建继续使用同一协议。
 
-Stage 1 F103 引脚和完整协议只查共同协议文档。不要恢复 F401 PB5/PB12 作为当前板子配置。
+当前F103引脚和完整协议只查共同协议文档。PB2在联合入口假设常闭接地，断开高急停；实际接线未确认。不要恢复 F401 PB5/PB12 作为当前板子配置。
 
 ## 6. C → Stage 2：受限双轴运动
 
@@ -76,7 +76,7 @@ Stage 1 F103 引脚和完整协议只查共同协议文档。不要恢复 F401 P
 
 MotionRequest 是 C 的局部数据类，包含 request_id、task_id、lines、position_before_steps、start_reference、calibration_ref/sha256/warnings、dispatch_truncated、rule_version。审批摘要绑定这些内容，发送器核对同一 tuple of lines。
 
-线上是 `HELLO → STEP_OK v0.3`、`MOVEXY`、`READXY` 和 `STOP`。PUMP/MCV1 不能塞入这个会话。READXY 给的是 X/Y 已发脉冲与忙闲标记，没有绝对位置、清洗效果或喷液数据。
+线上是 `HELLO → STEP_OK v0.3`、`MOVEXY`、`READXY` 和 `STOP`。这份现有主机发送器仍拒绝PUMP/MCV1，不能向它的会话随意塞入喷水消息。固件同时支持两类协议，但电脑混合会话管理尚未实现。READXY 给的是 X/Y 已发脉冲与忙闲标记，没有绝对位置、清洗效果或喷液数据。
 
 | 文件 | 写入时机 | 保存什么 |
 |---|---|---|
@@ -95,3 +95,15 @@ MotionRequest 是 C 的局部数据类，包含 request_id、task_id、lines、p
 5. **数据划分债务**：旧 9/4 按文件名划分不等于新同场景数据已按样本/批次隔离；以后要防相邻帧泄漏。
 
 接口提案应包含问题、现有消费者、字段/单位/版本、旧数据迁移、最小失败测试。未批准前只写提案，不修改共享接口。
+
+## 8. 固件迁移与本次新增连接
+
+源文件归 H1 pump / H2 motion / common 共同入口；Keil和旧Stage1移到common，安全核心与MCV1分别在safety/serial，只有一份共享实现。源代码迁移路径见验收记录。
+
+TO_NEEDLE/TO_SCOPE 由同一XY驱动执行，相对Y名义7680步；正式主机还不自动发送，现有预算不足。它们不能直接升级为work_mm标定，也不是“自动返回保存位置”。
+
+旧PUMP ON回复保留但限时300ms；CLEAR只解除已恢复的急停，不续跑；ARM是否需要按钮取决于配置（默认不强制）。PB2上拉/常闭的现场条件改变需要人确认。默认物理按钮握手不是已经启用的能力。
+
+MCV1动作只缓存最近8个已完成编号，电脑必须保持唯一编号。STOP中止时会有被中止动作的ERR和STOP自身ACK/DONE；既有主机stop可能先返回该ERR，不能把它当作清洗完成。未来会话管理需要关联动作并清理剩余回复。
+
+本轮改变固件入口连接与故障处理，不改变contracts.py/ports.py签名或ActionRequest业务含义；共享Python运动合同债务仍需另行提案。

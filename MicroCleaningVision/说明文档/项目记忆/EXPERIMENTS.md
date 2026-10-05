@@ -1,12 +1,38 @@
 # EXPERIMENTS｜做过什么，结果怎样
 
-核对日期：2026-10-03；源码基线 `17bf617`。下面区分本次运行、历史文件、现场报告和待做实验。测试通过、提交标题、实物转动与清洗效果分别记录。
+核对日期：2026-10-05；本轮源码为f31e445加未提交修改。10-03的17bf617等历史实验保留各自日期与版本，下面区分本轮运行、历史文件、现场报告和待做实验。测试通过、提交标题、实物转动与清洗效果分别记录。
 
 ## 1. 证据能带到另一台电脑吗
 
 当前 `.gitignore` 忽略 output/；本机历史评价、Demo 和调参 JSON **没有进入 Git**。原图、Labelme、Mask、metadata 当前部分已被 Git 跟踪，但 ignore 规则会影响新增数据文件。不要为了本轮记忆自动放行全部数据和输出。
 
 本文件保存重要数值、文件位置和哈希，能随 Git 携带结论索引；它不是原始实验包的替代。另一台电脑缺文件时标记“原始证据未共享”，不能伪造重建同一实验。后续只共享经成员确认的小型证据包或有版本/哈希的存储索引。
+
+## EXP-FW-20261005｜固件结构整理、安全连接与协议对接（本轮实际运行）
+
+源码：fix/stage2-motion-gate@f31e445 + 本轮未提交工作区修改；没有fetch、提交、推送、烧录、真实COM或电机/泵操作。保留此前未提交修改，A/B/C Python业务及其测试未改。证据级别仍是组件/软件连接，不升硬件E3。
+
+- 先迁移再修复：65个非生成文件在纯迁移阶段SHA256一致；最终65个旧文件全部有对应新路径，48个仍字节相同，17个为明确代码/路径/说明修订。26个保护文件（泵低层、原安全核心/协议、板级及旧入口业务）均字节不变。生成/历史本地产物移动保留，不递归删除源码。
+- 当前C：5个程序通过，包含真实main的计时、急停、TO往返、STOP、非法输入、过长行注入、BUSY、挂起中断、按钮配置。
+- 旧兼容C：7个程序共648断言通过；迁移前本机快照的原3个程序也通过。
+- Python编码 → 真实C入口 → Python回复解析：19项离线交互通过（16个协议请求+3个模拟时间/中断/急停推进），保存逐项收发。芯片GPIO/时钟为替身，无串口硬件。
+- Node工程布局检查通过；两份Keil分别完整重建，均0错误0警告。联合工程Code=13148，旧兼容Code=8296；这些尺寸不用于评估实物性能。
+- .venv全量：233 tests，2.513秒，OK，无跳过。本轮Python回归不会产生实物动作。
+- 审查过程中发现：旧/新HAL同名头文件混用会使旧Keil编译失败；改为各自隔离include后重建通过。保留这个失败，不把纯C回归当全部工程证据。
+
+本机原始证据（Git忽略，尚未共享）：output/firmware_audit/2026-10-05/ 的 before、before_manifest.json、migration_manifest.json、final_mapping.json、c_regression.log、python_regression.log、keil_unified.log、keil_compat.log；协议逐帧在 firmware/common/.tools/host-tests/f1ce2a3f8baa412aa4104113aabada48/host_contract_transcript.json。
+
+| 文件 | SHA256 |
+|---|---|
+| migration_manifest.json | BB9F6FAEE284E0C0550936089F6A0C6E0762C746B5A78143EBB2C17694852934 |
+| final_mapping.json | F0039FA66287DE21261C1670A148E76C7BA1264652890E619F86FC23B014AE8A |
+| c_regression.log | F4C12243A42C183B17F7C8761468C6283D4E0DDBEFC790E2B3BFEF26EC5A6EBA |
+| python_regression.log | 885476703E7B109487D92F80B05764E3DD44D9964DCD7A11D22BFCEFE77C3B40 |
+| host_contract_transcript.json | 4FC5EDB8155A072FEDFF0F92DACF46E556B21E0EFCFC0CC16873B160AD57FB6B |
+
+复跑命令和完整审查见 [硬件验收记录](../硬件组/结构整理与验收记录_2026-10-05.md)。不依赖本机快照的默认C测试仍能在别的电脑运行，需本地编译器；Keil依赖显式路径。
+
+未证明：PB2常闭接线实际匹配、真实电气停止、输出时长/液量、位移/偏移标定、主机混合会话授权、真实前后图和清洗效果。默认按钮非强制；轮询不是独立硬件急停。center_object.py等直接入口仍未整改。尚无第二位成员独立签字。
 
 ## EXP-SW-01｜本次软件回归（2026-10-03，实际运行）
 

@@ -23,14 +23,15 @@
 
 ## 这个项目现在到底在做什么
 
-长期目标是研究机器怎样感知、处理并复检微观表面。当前接通的实验链是：一帧画面变成污渍路径，再变成 `MOVEXY`，由 STM32F103 的 Stage 2 固件驱动两台步进电机。喷水仍是另一份 Stage 1 固件，默认不发送。毫米是占位值，不能写成已经标定或已经清洗。
+长期目标是研究机器怎样感知、处理并复检微观表面。当前接通的实验链是：一帧画面变成污渍路径，再变成 `MOVEXY`，由 STM32F103 的 Stage 2 固件驱动两台步进电机。当前联合固件已接入运动、水泵和既有联锁；电脑正式运动入口仍不发泵，旧 Stage 1 仅保留兼容构建。毫米是占位值，不能写成已经标定或已经清洗。
 
 ## 三个人的责任和目录
 
 - A 数据与模型：`microcleaning/data_learning/`、`test/data_learning/`。
 - B 视觉识别与测量：`microcleaning/vision/`、`test/vision/`。
 - C 目标规划与控制仿真：`microcleaning/control_system/`、`test/control_system/`。
-- 硬件组：`firmware/stage2-stepmotor/`、`firmware/stm32f103/`、`firmware/keil/`。不提交 `.hex`。Stage 2 与 Stage 1 不能同时烧在一块芯片上。
+- H1 喷洗：`firmware/pump/`（含测试）；H2 托盘运动：`firmware/motion/`（含测试）。
+- 共享固件：`firmware/common/`，含唯一当前 `main.c`、board、safety、serial、keil 和 compat 旧工程。默认 H1 主改集成、H2 复核，一次一位主改；协议需 C 参与核对。不提交 `.hex`，不把测试产物当烧录证据。
 
 所有人理解整条链，但只直接修改自己的业务目录。上游未到位时使用合成fixture继续，不把fixture写成真实证据。
 
@@ -99,5 +100,8 @@
 4. 第一次真实泵动作必须经过 Safety Governor（HUMAN）→ `--confirm-pump` → `--arm-pump`，并有人在场。缺一不可。
 5. 视觉模块不得 `serial.write`。未接 12V 的 PUMP 回执只能写逻辑脚/协议，不能写清洗有效。
 6. 固件源码在仓不等于这次上电已经烧的是这份程序。
+7. 当前主入口 PB2 上拉假设常闭触点接地，断开高为急停；未连接会阻止动作。真实接线未经确认不得烧录后绕过急停。
+8. 固件 TO_NEEDLE/TO_SCOPE 已复用普通 XY 驱动，但 24 mm/7680 步未标定，正式主机还不自动调用。主机预算不可静默放宽，偏移只能由一个有符号标定来源施加一次。
+9. 固件限时关泵不替代主机授权、失败不喷和异常清理。center_object.py 等独立脚本仍未统一入关卡，不得宣布所有入口安全。
 
 术语、Git 和长期阶段见 `说明文档/总流程说明/` 与 `说明文档/未来计划/`。

@@ -1,7 +1,7 @@
 # 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
 # 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
-updated_at: 2026-10-03
-current_phase: "F103 Stage 2 步进试验已在仓库；analyze 不发脉冲。喷水是另一份 Stage 1 固件。识别仍缺 U500 过关集。毫米未验收。"
+updated_at: 2026-10-05
+current_phase: "固件已按 pump/motion/common 整理；当前单一入口接入已有联锁、限时泵协议和名义针头偏移，离线测试及两套Keil编译通过。主机联动、接线/烧录/偏移标定和真实闭环未验收。"
 
 current_evidence_level:
   overall_hardware: E0
@@ -20,6 +20,9 @@ team_scope:
     - 未经人工关卡的真实泵、电机、喷头和平台控制
 
 validated_capabilities:
+  - "2026-10-05在HEAD f31e445加本轮工作区修改运行Python全量233项，2.513秒，OK；A/B/C业务和测试未修改。"
+  - "当前固件5个C测试程序、旧兼容7个程序(648项断言)、迁移前现场快照3个程序通过；两套Keil完整重建均0错误0警告。实际主入口连接旧安全核心/MCV1，GPIO/时钟用替身，未操作实物。"
+  - "结构迁移阶段65个非生成固件文件SHA256保持一致；旧工程/测试/供应商引用保留。本机备份和编译原始证据在output及common/.tools，Git忽略，详见验收记录。"
   - "2026-10-03在HEAD 17bf617与项目.venv运行全量233项测试，25.324秒，全部通过无跳过；含数据、分割、Live/Demo、MCV1、Stage 2运动关卡、异常STOP与位置账本。这是软件证据，不是实机验收。"
   - "真实文件入口测试会由OpenCV解码程序生成PNG、计算SHA-256和基础质量指标；图片仍不是团队相机采集证据。"
   - "Mock和软件回放不会打开真实COM口；main.py只运行纯合成Mock。"
@@ -66,6 +69,17 @@ module_ownership:
     role: 目标规划与控制仿真
     source: microcleaning/control_system/
     tests: test/control_system/
+  hardware_h1:
+    role: 喷洗
+    source: firmware/pump/
+    tests: firmware/pump/tests/
+  hardware_h2:
+    role: 托盘运动
+    source: firmware/motion/
+    tests: firmware/motion/tests/
+  hardware_common:
+    source: firmware/common/
+    ownership: "默认H1主改公共集成、H2复核，一次一位主改；协议须C参与确认。"
 
 software_loop:
   status: first_source_unverified_real_pixel_evaluation_complete
@@ -111,16 +125,21 @@ hardware_boundary:
   controller_port: microcleaning/ports.py
   real_hardware_armed: false
   stm32_board: STM32F103C8T6
-  stm32_pump_pin_plan: "Stage 1 泵 PB0，低电平有效；空闲必须停。不是已删除的 F401 PB5"
-  stm32_estop_pin_plan: "Stage 1 急停 PB2。F401 的 PB12 方案已不在当前固件目录"
+  stm32_pump_pin_plan: "联合入口与旧兼容均PB0，低开高关；当前联合入口PUMP ON固定300ms，由共享状态机到时关闭；实物极性未验收。"
+  stm32_estop_pin_plan: "当前联合入口PB2上拉，假设常闭触点接地，断开高锁存急停；接线尚未确认。不是F401 PB12；旧兼容入口配置保留原样。"
   stm32_pc_connection_plan: "人确认的 USB 转 TTL 或调试口；禁止扫口。Stage 2 步进协议见串口协议与参数.md"
-  stm32_firmware_status: stage1_pump_and_stage2_stepper_sources_in_repo_not_a_closed_loop
-  stm32_firmware_path: firmware/stm32f103/f103-stage1/
-  stage2_firmware_path: firmware/stage2-stepmotor/
+  stm32_firmware_status: unified_xy_timed_pump_interlocks_offline_verified_not_flashed
+  stm32_firmware_path: firmware/common/
+  stm32_legacy_firmware_path: firmware/common/compat/stage1/
+  keil_projects_path: firmware/common/keil/
+  pump_module_path: firmware/pump/
+  motion_module_path: firmware/motion/
+  scope_to_nozzle_offset_status: nominal_y_7680_steps_not_calibrated_not_enabled_in_formal_host
+  stage2_firmware_path: firmware/common/
   stm32_host_protocol: microcleaning/control_system/serial/stm32_protocol.py
   stm32_controller: microcleaning/control_system/serial/stm32_serial.py
   stm32_probe_entry: scripts/probe_stm32_link.py
-  serial_protocol_status: mcv1_host_and_controller_tested_hardware_unverified
+  serial_protocol_status: step_and_mcv1_in_same_firmware_offline_tested_host_sessions_separate_hardware_unverified
 
 development_environment:
   recommended_python: "CPython 3.12 + 项目本地.venv"
@@ -130,6 +149,9 @@ development_environment:
   serial_profile: "requirements/control-serial.txt；仅获得真实协议并批准后使用"
 
 major_risks:
+  - "本轮PB2改为常闭接地/上拉，断线阻止动作；必须先核对现场接线。默认ARM按钮非强制，轮询联锁不替代独立断电。"
+  - "名义针头偏移7680步超过正式主机1600步预算，未标定；TO_SCOPE是相对反向而非回零，主机/固件不得重复补偿。"
+  - "固件限时不能修复center_object尝试耗尽后喷水、补关缺口、相机/标定硬编码；本轮未改这些主机文件。"
   - "Demo运动关卡只覆盖当前主发送器；center_object和calibrate_motor_mm_per_px脚本直接发串口运动，不能宣称所有运动入口都统一授权。"
   - "三人尚无稳定投入时间，采用核心/扩展/备用任务和实际专注时段回填。"
   - "用户持有相机和GPU经验，A阶段负担可能在标注/训练期上升，需要按两轮真实记录再平衡。"
@@ -142,7 +164,7 @@ blockers:
   - "已有USB probe图片和本机camera Demo，但U500身份、条件、驱动信息和重复采集证据包未完成正式验收。"
   - "同条件可追溯U500批次数据集仍缺；旧13图已labeled且冻结开发/留出，来源unknown，不能写成U500过关集。"
   - "真实标记物、样本状态和固定成像条件尚未形成证据。"
-  - "Stage 1 与 Stage 2 源码都在仓，但不能同时烧在一块 F103 上。FakeSerial 或测试通过不能写成联调完成。"
+  - "当前单一联合固件源码已支持XY和MCV1限时泵；主机混合会话/偏移未统一，实际PB2接线、烧录版本和通电测试未验收。离线测试不等于联调完成。"
   - "步进方向和双轴试验已有提交，步距、限位开关、像素到毫米仍未验收。电机转了不是清洗。"
 
 next_actions:
@@ -150,7 +172,10 @@ next_actions:
   - "A-P1-U500-01：插入U500后运行scripts/probe_usb_camera.py，再运行--capture-test；保存index、分辨率、FPS、PNG、SHA256和质量结果。"
   - "B-U500-01：只在 U500 开发集一次改 LocalContrastPolicy 一个字段；升降看新留出，不碰 public_002/011/M9/M12。"
   - "C-PATH-01：analyze 不发步进。stage2-move 必须有标定 JSON、运动关卡、人确认和 --arm-stage2-xy。无实测标定不把毫米写成已验收。"
-  - "HW-SPOT-01：Stage 1 喷水与 Stage 2 步进分开烧录。湿斑和限位仍要实测，不能用提交标题代替。"
+  - "H1-PUMP-01：核对已有定时/停止通路及PB0/PB2/PB3接线；批准后现场测输出与短喷覆盖；不要重做计时状态机。"
+  - "H2-MOTION-01：测方向/步距/行程和显微镜到针头的有符号偏移；先短距离验收，不能直接试名义7680步。"
+  - "HW-COMMON-01：H1主改、H2复核当前联合固件的构建/烧录身份和停止证据；旧Stage1只作兼容对照。"
+  - "C-ENTRY-01（未实施）：统一center_object/标定入口授权、失败不喷、异常补关、一份有符号偏移和返回复检；先提文件级方案，不静默抬高1600步预算。"
   - "A-P1-DATA-01：13张已登记；继续核实来源、设备、倍率和日期，无法核实的字段保持unknown。"
   - "A-P1-LABEL-01：13张已labeled；开发9张、留出public_002/public_011/M9/M12已冻结。不要为刷分改留出标注。"
   - "A-P1-CAPTURE-01：补采至少12张、两个批次的USB显微镜图片；先导入1张运行analyze，再扩展到50张。"
@@ -170,6 +195,7 @@ documentation:
   legacy_stage_guide: 说明文档/未来计划/长期分阶段研发规划.md
   glossary: 说明文档/总流程说明/项目术语与概念词典.md
   git_tutorial: 说明文档/总流程说明/Git与GitHub协作教程.md
-  u500_guide: 说明文档/成员A/U500_USB数码显微镜接入指南.md
+  u500_guide: 说明文档/软件组/成员A/U500_USB数码显微镜接入指南.md
   hardware_group_index: 说明文档/硬件组/README.md
   stm32_contract: 说明文档/硬件组/串口协议与参数.md
+  # 结构整理证据入口为说明文档/硬件组/结构整理与验收记录_2026-10-05.md；未提交、未推送、未烧录。
