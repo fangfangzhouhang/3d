@@ -8,6 +8,24 @@
 
 本文件保存重要数值、文件位置和哈希，能随 Git 携带结论索引；它不是原始实验包的替代。另一台电脑缺文件时标记“原始证据未共享”，不能伪造重建同一实验。后续只共享经成员确认的小型证据包或有版本/哈希的存储索引。
 
+## EXP-SW-20261005｜单串口顺序、单目标复检与序列规划的合成干跑
+
+源码：`feat/closed-loop-cleaning-v1`，闭环测试提交 `4f23918`。没有打开真实 COM，没有相机，没有烧录，没有电机。证据级别是软件集成，不升硬件。
+
+命令（工作目录 `MicroCleaningVision`，使用项目 `.venv`）：
+
+```text
+python -m unittest discover -s test/control_system/serial -v
+python -m unittest discover -s test/control_system/safety -v
+python -m unittest discover -s test/vision -v
+python -m unittest discover -s test/control_system/planning -v
+python -m unittest discover -s test/integration -v
+```
+
+结果：serial 47、safety 25、vision 48、planning 41、integration 12，全部通过。干跑断言包括：步进失败或未批准时喷水字节为 0；只有 `DONE` 才算喷水输出流程成功；STEP 与 MCV1 回复不能被对方解析器当成成功；一个会话不能被两个控制器同时占用；T2/T3 变化不能把仍在的 T1 判成已洗净；配不准是 HUMAN 或未匹配；排序可重复；空 Mask 不发运动也不发喷水；主机步数预算仍是 1600。
+
+还不能说：真实前后图已经配准、清洗率已验收、电机按这些步数走过、喷头偏移已标定。
+
 ## EXP-FW-20261005｜固件结构整理、安全连接与协议对接（本轮实际运行）
 
 源码：fix/stage2-motion-gate@f31e445 + 本轮未提交工作区修改；没有fetch、提交、推送、烧录、真实COM或电机/泵操作。保留此前未提交修改，A/B/C Python业务及其测试未改。证据级别仍是组件/软件连接，不升硬件E3。
@@ -32,7 +50,7 @@
 
 复跑命令和完整审查见 [硬件验收记录](../硬件组/结构整理与验收记录_2026-10-05.md)。不依赖本机快照的默认C测试仍能在别的电脑运行，需本地编译器；Keil依赖显式路径。
 
-未证明：PB2常闭接线实际匹配、真实电气停止、输出时长/液量、位移/偏移标定、主机混合会话授权、真实前后图和清洗效果。默认按钮非强制；轮询不是独立硬件急停。center_object.py等直接入口仍未整改。尚无第二位成员独立签字。
+未证明：PB2常闭接线实际匹配、真实电气停止、输出时长/液量、位移/偏移标定、真实前后图和清洗效果。电脑端顺序会话是后来的软件干跑，见上面的 EXP-SW-20261005，当时还没有，也还没接到 Demo。默认按钮非强制；轮询不是独立硬件急停。center_object.py 等直接入口仍未整改。尚无第二位成员独立签字。
 
 ## EXP-SW-01｜本次软件回归（2026-10-03，实际运行）
 

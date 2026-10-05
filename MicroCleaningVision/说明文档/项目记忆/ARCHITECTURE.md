@@ -27,6 +27,16 @@
 
 Stage 2 目前使用 C 模块内的 MotionRequest，不走共享 ActionRequest/ExecutionReceipt。运动证据在 `stage2_intent.json`、`stage2_receipt.json`，Episode 中 `execution_receipt` 仍为空。完整合同化尚未实现，见 GAP-CTRL-02。
 
+2026-10-05 另有一条软件干跑链，入口是 `test/integration/test_closed_loop_dry_run.py`，不是 Demo：
+
+```text
+合成 Mask → TargetInstance 列表 → 测试里抄成 SequenceTarget
+→ plan_sequence → F103Session（先 MOVEXY，成功才 MCV1|PUMP）
+→ verify_single_target → verify_area_change
+```
+
+`sequence_planner` 不导入 `TargetInstance`。Demo 的 `analyze` / `stage2-move` / `arm-pump` 仍各自独立。
+
 ## 2. 实际目录及责任
 
 | 所有者 | 目录 / 主要文件 | 实际职责 |
@@ -36,10 +46,10 @@ Stage 2 目前使用 C 模块内的 MotionRequest，不走共享 ActionRequest/E
 | A | `annotation_tools.py`、`mask_evaluation.py`、`eval_split.py` | 人工 JSON 转 Mask、对照评价、冻结划分 |
 | A | `train_entry.py`、`review_round.py` | 当前 OpenCV 调参工作流；不是网络训练 |
 | B | `microcleaning/vision/local_contrast_baseline.py`、`hsv_baseline.py`、`otsu_baseline.py`、`exg_baseline.py` | 基线分割；local 为 Demo 默认，ExG/ExR 为颜色对照 |
-| B | `contamination.py`、`state_estimator.py`、`verification.py`、`scale_measure.py` | 测量、状态、面积复检、离线尺度 |
-| C | `control_system/planning/` | 小区域中心点、大区域往复扫描、分块访问；坐标与脉冲预览 |
+| B | `contamination.py`、`state_estimator.py`、`verification.py`、`target_instance.py`、`scale_measure.py` | 测量、状态、整图面积复检、单目标复检、离线尺度 |
+| C | `control_system/planning/` | 小区域中心点、大区域往复扫描、分块访问；`sequence_planner.py` 只排下一块洗谁；坐标与脉冲预览 |
 | C | `control_system/safety/` | 固定规则动作申请、泵治理器、运动关卡 |
-| C | `control_system/serial/` | FakeSerial、MCV1 泵适配器、Stage 2 双轴协议与发送器 |
+| C | `control_system/serial/` | FakeSerial、MCV1 泵适配器、Stage 2 双轴协议与发送器；`f103_session.py` 让两者顺序共用一条串口 |
 | C | `control_system/replay/` | Mock、软件回放、Episode 持久化 |
 | 集成 | `demo/demo_pipeline.py`、`demo/live_station.py` | 编排各模块、模式选择、预览、保存结果；变更前协调消费者 |
 | H1 | `firmware/pump/` | 泵输出及测试 |
