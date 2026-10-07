@@ -41,6 +41,7 @@ def main() -> int:
     parser.add_argument("--camera-backend", type=int, default=1400, help="1400=MSMF, 700=DSHOW")
     parser.add_argument("--algorithm", default="local", choices=["hsv", "otsu", "exg", "exr", "local"])
     parser.add_argument("--max-steps", type=int, default=MAX_STEPS_PER_MOVE)
+    parser.add_argument("--no-spray", action="store_true", help="居中后不自动喷水（用于 Gate5 等不含泵的阶段）")
     args = parser.parse_args()
 
     import cv2
@@ -184,7 +185,7 @@ def main() -> int:
                 move_result["success"] = True
                 spray = detected
 
-            if spray:
+            if spray and not args.no_spray:
                 move_result["message"] = "spraying..."
                 print("居中完成，喷水 300ms")
                 if pump_spray(PUMP_ON_MS):

@@ -57,7 +57,7 @@ static void board_aux_gpio_init(void) {
   GPIO_ResetBits(GPIOB, GPIO_Pin_1);
 
   /* 常闭触点接地：断开/拔线读高，锁存停止；实际接线须实机确认。 */
-  gpio.GPIO_Pin = GPIO_Pin_2;
+  gpio.GPIO_Pin = GPIO_Pin_12;
   gpio.GPIO_Mode = GPIO_Mode_IPU;
   GPIO_Init(GPIOB, &gpio);
   gpio.GPIO_Pin = GPIO_Pin_3;         /* PB3 ARM 输入，维持原上拉配置 */
@@ -92,7 +92,7 @@ static void tx_response(const char *s) {
 static fw_inputs_t read_inputs(void) {
   fw_inputs_t inputs;
   inputs.now_ms = hal_now_ms();
-  inputs.estop_high = GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_2) != Bit_RESET;
+  inputs.estop_high = GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_12) != Bit_RESET;
   inputs.arm_button_low = GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_3) == Bit_RESET;
   return inputs;
 }

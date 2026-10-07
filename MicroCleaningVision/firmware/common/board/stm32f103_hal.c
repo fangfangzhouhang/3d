@@ -56,9 +56,9 @@ void hal_gpio_init(void) {
   gpio.GPIO_Mode = GPIO_Mode_AF_PP;
   GPIO_Init(GPIOA, &gpio);
 
-  /* PA3 = USART2_RX 浮空输入 */
+  /* PA3 = USART2_RX 上拉输入：空闲稳定在高电平，抗噪声，避免把命令读坏 */
   gpio.GPIO_Pin = GPIO_Pin_3;
-  gpio.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+  gpio.GPIO_Mode = GPIO_Mode_IPU;
   GPIO_Init(GPIOA, &gpio);
 }
 
@@ -79,8 +79,12 @@ void hal_uart2_init(void) {
 }
 
 bool hal_uart_rx_byte(uint8_t *out) {
+  /* 先清溢出错误：F1 上 ORE 置位后接收器停摆，必须读 SR 再读 DR 才能恢复 */
+  if (USART_GetFlagStatus(USART2, USART_FLAG_ORE) == SET) {
+    (void)USART_ReceiveData(USART2);
+  }
   if (USART_GetFlagStatus(USART2, USART_FLAG_RXNE) == SET) {
-    *out = (uint8_t)(uint8_t)USART_ReceiveData(USART2);
+    *out = (uint8_t)USART_ReceiveData(USART2);
     return true;
   }
   return false;

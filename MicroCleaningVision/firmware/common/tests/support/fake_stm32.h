@@ -62,6 +62,7 @@ extern uint32_t fake_apb1_clocks, fake_apb2_clocks;
 #define GPIO_Pin_5 ((uint16_t)0x0020)
 #define GPIO_Pin_6 ((uint16_t)0x0040)
 #define GPIO_Pin_7 ((uint16_t)0x0080)
+#define GPIO_Pin_12 ((uint16_t)0x1000)
 #define RCC_APB2Periph_GPIOA 1u
 #define RCC_APB2Periph_GPIOB 2u
 #define RCC_APB2Periph_AFIO 16u

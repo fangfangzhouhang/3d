@@ -34,7 +34,7 @@ int main(void) {
   assert(GPIOB->modes[1] == GPIO_Mode_Out_PP);
   assert(GPIOB->speeds[1] == GPIO_Speed_2MHz);
   assert((GPIOB->output & GPIO_Pin_1) == 0u);
-  assert(GPIOB->modes[2] == GPIO_Mode_IPU);
+  assert(GPIOB->modes[12] == GPIO_Mode_IPU);
   assert(GPIOB->modes[3] == GPIO_Mode_IPU);
   assert(GPIOA->modes[5] == GPIO_Mode_Out_PP);
   assert((GPIOA->output & GPIO_Pin_5) == 0u);
