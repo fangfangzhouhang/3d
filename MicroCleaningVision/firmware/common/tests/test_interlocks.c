@@ -57,14 +57,14 @@ int main(void) {
 
   command("PUMP ON", "PUMP_ON\r\n");
   command("MOVEXY 10 FWD 10 FWD", "STEP2_START X=10 FWD Y=10 FWD\r\n");
-  GPIOB->input |= GPIO_Pin_2; /* 急停或常闭线断开。 */
+  GPIOB->input |= GPIO_Pin_12; /* 急停或常闭线断开。 */
   service_safety();
   assert((GPIOB->output & GPIO_Pin_0) != 0u);
   assert(!TIM2->enabled && !TIM3->enabled);
   command("TO_NEEDLE", "ERR: ESTOP\r\n");
   command("CLEAR", "ERR: CLEAR_REJECTED\r\n");
   command("MCV1|PUMP|estopped_1|300", "MCV1|ERR|estopped_1|ESTOP\r\n");
-  GPIOB->input &= (uint16_t)~GPIO_Pin_2;
+  GPIOB->input &= (uint16_t)~GPIO_Pin_12;
   command("MOVEXY 1 FWD 1 FWD", "ERR: ESTOP\r\n"); /* 松急停不自动恢复。 */
   command("CLEAR", "CLEARED\r\n");
   assert((GPIOB->output & GPIO_Pin_0) != 0u);
