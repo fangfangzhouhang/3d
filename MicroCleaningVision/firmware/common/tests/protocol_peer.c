@@ -24,7 +24,7 @@ int main(void) {
       fake_timer_ticks(TIM2, ticks);
       fake_timer_ticks(TIM3, ticks);
     } else if (strcmp(input, "@ESTOP\n") == 0) {
-      GPIOB->input |= GPIO_Pin_2;
+      GPIOB->input |= GPIO_Pin_12;
     } else {
       for (p = input; *p != '\0'; ++p) feed_byte(*p);
     }
