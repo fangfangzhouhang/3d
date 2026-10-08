@@ -254,6 +254,20 @@ class LiveStationTests(unittest.TestCase):
                     "stm32",
                 ]
             )
+        with self.assertRaises(SystemExit):
+            main(
+                [
+                    "--from-camera",
+                    "--live",
+                    "--mode",
+                    "stage2-move",
+                    "--arm-stage2-xy",
+                    "--serial-port",
+                    "COM8",
+                    "--stage2-calibration",
+                    "firmware/mm_per_px.json",
+                ]
+            )
 
     def test_space_arm_pump_fake_sends_receipt_when_target_present(self):
         from demo.live_station import LIVE_WINDOW_PUMP
@@ -405,6 +419,68 @@ class LiveStationTests(unittest.TestCase):
         self.assertTrue(first.released)
         self.assertTrue(second.released)
 
+
+class OneWindowTests(unittest.TestCase):
+    def test_preview_uses_the_panel_instead_of_a_second_window(self):
+        import numpy as np
+        from demo.camera_preview import CameraPreview
+        from demo.image_ops import FrozenSegmenter
+
+        class Panel:
+            def __init__(self):
+                self.names = []
+
+            def show_frame(self, name, image):
+                self.names.append(str(name))
+
+            def wait_key(self, delay):
+                return 32
+
+        panel = Panel()
+        frame = np.full((20, 20, 3), 80, dtype=np.uint8)
+        fake = FakeVideoCapture(reads=[(True, frame)])
+
+        def factory(index):
+            return fake
+
+        source = CameraPreview(camera_index=1, segmenter=FrozenSegmenter("hsv"), warmup_frames=1,
+            capture_factory=factory, panel=panel)
+        self.addCleanup(source.close)
+        source.capture("pre")
+        self.assertIs(source.show.__self__, panel)
+        self.assertTrue(panel.names)
+
+    def test_confirmation_and_first_labels_share_one_window(self):
+        try:
+            import tkinter as tk
+            probe = tk.Tk()
+            probe.destroy()
+        except Exception:
+            self.skipTest("tkinter window unavailable")
+        import numpy as np
+        from demo.station_window import StationPanel
+        panel = StationPanel()
+        self.addCleanup(panel.close)
+
+        def accept():
+            if panel._waiting == "yesno":
+                panel._decide(True)
+            elif panel.root is not None:
+                panel.root.after(20, accept)
+
+        panel.root.after(20, accept)
+        self.assertTrue(panel.ask("输入 yes 才喷水"))
+        text = panel.log.get("1.0", "end")
+        self.assertIn("输入 yes 才喷水", text)
+        self.assertIn("不用回到 Cursor 终端", text)
+        roster = np.zeros((30, 40, 3), np.uint8)
+        roster[0, 0] = (0, 255, 255)
+        panel.show_roster(roster)
+        path = np.zeros((30, 40, 3), np.uint8)
+        path[0, 0] = (255, 0, 0)
+        panel.show_frame("MicroCleaningVision path", path)
+        self.assertTrue(panel.roster_locked)
+        self.assertEqual("roster", panel._right_source)
 
 
 if __name__ == "__main__":

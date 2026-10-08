@@ -38,10 +38,11 @@ class MotionGateTests(unittest.TestCase):
         self.assertIn("STAGE2_MOTION_REQUIRES_HUMAN", decision.reason_codes)
         self.assertIsNone(decision.approval_token)
 
-    def test_run_total_over_cap_is_denied(self):
-        decision = evaluate_motion(_request(["MOVEXY 1000 FWD 0 FWD", "MOVEXY 1000 REV 0 FWD"]))
-        self.assertIs(SafetyOutcome.DENY, decision.outcome)
-        self.assertIn("RUN_STEPS_OVER_CAP", decision.reason_codes)
+    def test_separate_moves_are_not_added_together(self):
+        decision = evaluate_motion(_request(["MOVEXY 4001 FWD 0 FWD", "MOVEXY 4001 REV 0 FWD"]))
+        self.assertIs(SafetyOutcome.HUMAN, decision.outcome)
+        self.assertNotIn("RUN_STEPS_OVER_CAP", decision.reason_codes)
+        self.assertNotIn("LEG_STEPS_OVER_CAP", decision.reason_codes)
 
     def test_single_leg_over_cap_is_denied(self):
         decision = evaluate_motion(_request([f"MOVEXY {STAGE2_RUN_STEP_CAP + 1} FWD 0 FWD"]))
@@ -61,13 +62,13 @@ class MotionGateTests(unittest.TestCase):
         self.assertIn("POSITION_UNKNOWN", decision.reason_codes)
 
     def test_intermediate_excursion_outside_soft_limit_is_denied(self):
-        # 终点回到 3000，但中途到过 3300，超出默认 ±3200。
+        # 终点回到 9800，但中途到过 10100，超出默认 ±10000。
         request = _request(
             ["MOVEXY 300 FWD 0 FWD", "MOVEXY 300 REV 0 FWD"],
-            position_before_steps=(3000, 0),
+            position_before_steps=(9800, 0),
         )
         plan = summarize_motion(request)
-        self.assertEqual((3000, 0), plan.position_after)
+        self.assertEqual((9800, 0), plan.position_after)
         decision = evaluate_motion(request)
         self.assertIn("SOFT_LIMIT_EXCEEDED", decision.reason_codes)
 

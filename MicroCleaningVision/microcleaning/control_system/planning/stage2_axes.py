@@ -13,7 +13,7 @@ from microcleaning.control_system.planning.stepper_preview import (
 
 
 MAX_PULSE_STEPS = 20000
-DEFAULT_TRANSMIT_BUDGET = 1600
+DEFAULT_TRANSMIT_BUDGET = 10000
 
 _MOVEXY_LINE = re.compile(r"^MOVEXY \d+ (?:FWD|REV) \d+ (?:FWD|REV)$")
 
@@ -96,7 +96,7 @@ def dispatch_motion(
     *,
     budget: int = DEFAULT_TRANSMIT_BUDGET,
 ) -> Stage2Dispatch:
-    """每个路径段一行 MOVEXY，双轴同时发送；两轴累计步数都不超过预算。"""
+    """每个路径段一行 MOVEXY。每一段单独和预算比较，前面各段的步数不累加。"""
 
     slots = {slot.name: slot for slot in stage2_axis_slots()}
     for slot in slots.values():
@@ -117,10 +117,7 @@ def dispatch_motion(
         planned_y += ay
         if ax == 0 and ay == 0:
             continue
-        if ax > MAX_PULSE_STEPS or ay > MAX_PULSE_STEPS:
-            truncated = True
-            break
-        if tx_x + ax > budget or tx_y + ay > budget:
+        if ax > MAX_PULSE_STEPS or ay > MAX_PULSE_STEPS or ax > budget or ay > budget:
             truncated = True
             break
         lines.append(_xy_line(leg))

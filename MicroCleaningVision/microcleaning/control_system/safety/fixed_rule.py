@@ -11,8 +11,8 @@ from microcleaning.contracts import ActionRequest, StateEstimate
 PUMP_IN_PLACE = "PUMP_IN_PLACE"
 NOZZLE_FIXED_FRAME = "nozzle_fixed"
 IN_PLACE_TARGET_MM = (0.0, 0.0)
-DEFAULT_IN_PLACE_DURATION_MS = 200
-MAX_IN_PLACE_DURATION_MS = 300
+DEFAULT_IN_PLACE_DURATION_MS = 500
+MAX_IN_PLACE_DURATION_MS = 500
 PUMP_IN_PLACE_RULE_VERSION = "pump-in-place-v0"
 
 
@@ -20,7 +20,7 @@ PUMP_IN_PLACE_RULE_VERSION = "pump-in-place-v0"
 class FixedActionPolicy:
     """软件回放使用的固定动作参数，不代表真实硬件参数。"""
 
-    duration_ms: int = 200
+    duration_ms: int = DEFAULT_IN_PLACE_DURATION_MS
     pressure: float = 0.30
     version: str = "fixed-replay-rule-v0"
 

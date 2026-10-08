@@ -68,7 +68,7 @@ execute(request: ActionRequest, decision: SafetyDecision) -> ExecutionReceipt
 
 `PUMP_IN_PLACE` 使用 `coordinate_frame=nozzle_fixed`、目标 `(0,0)` 和禁止 XY 的约束；这里的 `(0,0)` 表示喷头不移动，不是伪造工作台定位。`SPRAY_AT_POINT` 才需要有效 `work_mm` 标定。
 
-线上是 `MCV1|PING`、`STATUS`、`PUMP|action_id|duration_ms`、`STOP`；回 `PONG`、`STATUS`、`ACK`、`DONE`、`ERR`。ACK 表示接受，DONE 表示固件动作流程结束，均不能独自证明液体到达目标或污染减少。MCV1 编码器上限 500 ms；主机控制器及新闭环 PUMP_IN_PLACE 许可为 100–300 ms；MCU沿用旧范围100–2000ms，未扩大电脑权限。当前common/main.c已接入共享MCV1，旧Stage1兼容构建继续使用同一协议。
+线上是 `MCV1|PING`、`STATUS`、`PUMP|action_id|duration_ms`、`STOP`；回 `PONG`、`STATUS`、`ACK`、`DONE`、`ERR`。ACK 表示接受，DONE 表示固件动作流程结束，均不能独自证明液体到达目标或污染减少。MCV1 编码器上限 500 ms；主机控制器及新闭环 PUMP_IN_PLACE 许可为 100–500 ms，闭环默认 500 ms。固件 PUMP ON 仍是固定 300 ms。MCU 沿用旧范围 100–2000 ms，不把固件上限当作用户可以直接申请的上限。当前 common/main.c 已接入共享 MCV1，旧 Stage1 兼容构建继续使用同一协议。
 
 当前F103引脚和完整协议只查共同协议文档。PB2在联合入口假设常闭接地，断开高急停；实际接线未确认。不要恢复 F401 PB5/PB12 作为当前板子配置。
 

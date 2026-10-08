@@ -27,9 +27,9 @@ from microcleaning.control_system.planning.stage2_axes import parse_movexy_line
 
 
 STAGE2_MOTION_GATE_VERSION = "stage2-motion-gate-v0"
-STAGE2_RUN_STEP_CAP = 1600
-STAGE2_LEG_STEP_CAP = 1600
-DEFAULT_SOFT_LIMIT_STEPS = 3200
+STAGE2_RUN_STEP_CAP = 10000
+STAGE2_LEG_STEP_CAP = 10000
+DEFAULT_SOFT_LIMIT_STEPS = 10000
 START_REFERENCES = frozenset({"image_center", "nozzle_px"})
 
 _consumed_tokens: set[str] = set()
@@ -171,8 +171,6 @@ def evaluate_motion(request: MotionRequest, limits: MotionLimits = MotionLimits(
         denied.append("RULE_VERSION_MISMATCH")
     if plan.max_leg_steps > limits.max_steps_per_leg:
         denied.append("LEG_STEPS_OVER_CAP")
-    if plan.abs_steps[0] > limits.max_abs_steps_per_axis or plan.abs_steps[1] > limits.max_abs_steps_per_axis:
-        denied.append("RUN_STEPS_OVER_CAP")
     if request.start_reference not in START_REFERENCES:
         denied.append("UNSUPPORTED_START_REFERENCE")
     if limits.require_calibration:

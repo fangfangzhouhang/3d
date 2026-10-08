@@ -133,6 +133,7 @@ class Stage2SerialLink:
         self._lease = object()
         self._read_limit = read_limit
         self._connection: Any = None
+        self.on_progress: Callable[[dict[str, str]], None] | None = None
 
     @property
     def external_connection(self) -> Any:
@@ -274,10 +275,23 @@ class Stage2SerialLink:
         flush = getattr(connection, "flush", None)
         if callable(flush):
             flush()
+        sent = payload.decode("ascii", errors="replace").strip()
+        self._emit("tx", sent)
         raw = connection.readline()
         if not raw:
             raise TimeoutError("RESPONSE_TIMEOUT")
-        return parse_stage2_reply(raw)
+        reply = parse_stage2_reply(raw)
+        self._emit("rx", reply.raw.strip())
+        return reply
+
+    def _emit(self, phase: str, message: str) -> None:
+        callback = self.on_progress
+        if callback is None:
+            return
+        try:
+            callback({"phase": phase, "message": message})
+        except Exception as exc:
+            print(f"[画面] 更新失败，步进继续：{exc}", flush=True)
 
     def _ensure_connection(self) -> Any:
         if self._connection is not None:

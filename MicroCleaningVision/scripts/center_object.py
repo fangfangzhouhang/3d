@@ -8,7 +8,7 @@
   4. 发 MOVEXY 命令，让载物台移动把物体拉回中央
 
 改进：电机移动在后台线程执行，预览窗口在移动过程中持续刷新。
-居中成功后自动喷水一次（300ms，符合 PC 安全上限）。
+居中成功后自动喷水一次（本脚本仍是 300ms。主机闭环短喷许可是 500ms）。
 """
 
 from __future__ import annotations
@@ -27,10 +27,10 @@ if str(ROOT) not in sys.path:
 MM_PER_PX_X = 0.0187
 MM_PER_PX_Y = 0.0181
 STEPS_PER_MM = 320.0
-MAX_STEPS_PER_MOVE = 1600  # 安全上限，1 圈 = 5mm
+MAX_STEPS_PER_MOVE = 10000  # 安全上限；1600 步/圈仍是细分，不是这个上限
 ITERATIONS = 3  # 迭代居中次数，越多次越准
 CENTER_TOLERANCE_PX = 3.0  # 距中心小于此像素视为已居中
-PUMP_ON_MS = 300  # 单次喷水时长，PC 安全策略上限 300ms
+PUMP_ON_MS = 300  # 本脚本固定 300ms。主机定点短喷许可已是 500ms，这里不跟着改。
 
 
 def main() -> int:

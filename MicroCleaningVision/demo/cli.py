@@ -108,7 +108,7 @@ def main(argv: list[str] | None = None) -> int:
         "--stage2-max-steps",
         type=int,
         default=STAGE2_RUN_STEP_CAP,
-        help=f"一次运行每轴累计脉冲上限，只能调小；最大 {STAGE2_RUN_STEP_CAP}（1 圈，约 5 mm）",
+        help=f"一次运行每轴累计脉冲上限，只能调小；最大 {STAGE2_RUN_STEP_CAP}",
     )
     parser.add_argument(
         "--wait-usb",
@@ -143,7 +143,10 @@ def main(argv: list[str] | None = None) -> int:
     if not 0 <= args.stage2_max_steps <= STAGE2_RUN_STEP_CAP:
         parser.error(f"--stage2-max-steps 必须在 0 到 {STAGE2_RUN_STEP_CAP} 之间（只能调小）")
     if args.live and stage2_any:
-        parser.error("实时窗口不发送步进；请去掉 --live，用 --from-camera --stage2-xy")
+        parser.error(
+            "旧入口 --live 不发送步进。实时画面、抓帧、路径和步进请用新入口 "
+            "python -m demo.closed_loop_station --real"
+        )
     if args.live:
         if not args.from_camera:
             parser.error("--live 必须与 --from-camera 一起使用")

@@ -1,0 +1,33 @@
+{
+  "work": {
+    "version": "work-frame-placeholder-v0",
+    "mm_per_px": null,
+    "mm_per_px_y": null,
+    "assumed_mm_per_px": 0.01,
+    "origin_px": [0.0, 0.0],
+    "rotation_deg": 0.0,
+    "flip_y": true,
+    "nozzle_offset_mm": [0.0, 0.0],
+    "travel_min_mm": null,
+    "travel_max_mm": null,
+    "homography_3x3": null,
+    "scale_json_ref": "firmware/mm_per_px.json",
+    "feeds_action_request": false
+  },
+  "stepper": {
+    "version": "stepper-placeholder-v0",
+    "steps_per_rev": 1600,
+    "microstep": 1,
+    "lead_mm_per_rev_x": 5.0,
+    "lead_mm_per_rev_y": 5.0,
+    "assumed_lead_mm_per_rev": 5.0,
+    "steps_per_mm_x": null,
+    "steps_per_mm_y": null,
+    "homed": false,
+    "send_to_controller": false
+  },
+  "assumed_spray_width_mm": null,
+  "visit_start_px": [0.0, 0.0],
+  "feeds_action_request": false,
+  "evidence_boundary": "只为新入口启动提供占位。喷头偏移只来自 nozzle-offset JSON，这里必须是 0。实际 MOVEXY 用电机标定替换毫米尺度。不是已验收工作坐标。"
+}

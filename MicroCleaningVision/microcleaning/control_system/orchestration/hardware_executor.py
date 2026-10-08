@@ -11,7 +11,7 @@ from microcleaning.contracts import ActionRequest, ExecutionReceipt, Observation
 from microcleaning.control_system.planning.stage2_axes import parse_movexy_line
 from microcleaning.control_system.planning.stage2_geometry import CycleGeometry
 from microcleaning.control_system.planning.stage2_position import load_position, mark_unknown, record_completed
-from microcleaning.control_system.safety.fixed_rule import FixedActionPolicy, PUMP_IN_PLACE_RULE_VERSION, propose_pump_in_place
+from microcleaning.control_system.safety.fixed_rule import DEFAULT_IN_PLACE_DURATION_MS, FixedActionPolicy, PUMP_IN_PLACE_RULE_VERSION, propose_pump_in_place
 from microcleaning.control_system.safety.governor import approve_human_gate, evaluate_action
 from microcleaning.control_system.safety.motion_gate import approve_motion_gate, evaluate_motion, motion_request_digest
 from microcleaning.control_system.serial.f103_session import F103SerialSession, F103StepThenPumpResult
@@ -65,7 +65,7 @@ class CycleExecution:
 class HardwareExecutor:
     def __init__(self, *, session: F103SerialSession, link: Stage2SerialLink,
                  controller: STM32SerialController, position_path: str | Path,
-                 confirm: Callable[[dict], bool], pump_duration_ms: int = 200) -> None:
+                 confirm: Callable[[dict], bool], pump_duration_ms: int = DEFAULT_IN_PLACE_DURATION_MS) -> None:
         self.session, self.link, self.controller = session, link, controller
         self.position_path = Path(position_path)
         self.confirm = confirm
@@ -90,94 +90,190 @@ class HardwareExecutor:
         if geometry.reasons or denied:
             result.reasons = geometry.reasons + denied
             return result
-        if not self.link.armed or not self.controller.arm_pump:
-            result.reasons = ("EXPLICIT_MOTION_AND_PUMP_ARM_REQUIRED",)
+        if not self.link.armed:
+            result.reasons = ("EXPLICIT_MOTION_ARM_REQUIRED",)
             return result
         if not self._same_reference(geometry.observation_position, preview):
             result.reasons = ("POSITION_CHANGED_BEFORE_AUTHORIZATION",)
             return result
-        stage("AUTHORIZE")
-        if not self.confirm({**preview, "geometry": geometry.to_dict(), "pump_request": asdict(request)}):
-            result.reasons = ("HUMAN_DECLINED",)
+        if not self.controller.arm_pump:
+            self._run_motion_only(result, geometry, observation, preview, stage, request)
             return result
+        self._run_spray_cycle(result, geometry, observation, preview, stage, request, outbound, returning)
+        return result
+
+    def _run_spray_cycle(self, result, geometry, observation, preview, stage, request, outbound, returning) -> None:
+        """去程、针头重合、短喷、回原位各自等人确认。重合确认之前不发 PUMP。"""
+
+        stage("AUTHORIZE")
+        facts = {**preview, "geometry": geometry.to_dict(), "include_pump": True, "pump_request": asdict(request)}
+        if not self.confirm({**facts, "phase": "move"}):
+            result.reasons = ("HUMAN_DECLINED",)
+            return
         result.motion_decision = approve_motion_gate(geometry.outbound_request, outbound, confirmed=True)
-        result.return_decision = approve_motion_gate(geometry.return_request, returning, confirmed=True)
         try:
-            # 只有运动已获 ALLOW 后才开指定 COM；使用同一会话探测，不另开连接。
             stage("PROBE_DEVICE")
-            pong = self.controller.ping()
-            status = self.controller.status()
-            result.device_probe = {"pong": pong.raw, "status": status.raw,
-                "interlock_evidence": "MCV1_STATUS_ONLY; physical wiring remains field acceptance"}
-            facts = {**state.device_state, "controller_connected": pong.kind == "PONG" and status.kind == "STATUS",
-                "interlock_ok": not status.estop_active and not status.pump_active,
-                "e_stop_active": bool(status.estop_active), "pump_active": bool(status.pump_active)}
-            result.state = replace(state, device_state=facts)
-            self.controller.close()  # 释放 MCV1 租约，物理连接继续由 session 持有。
+            self._probe(result)
+            looked = evaluate_action(result.state, request)
+            if looked.outcome is SafetyOutcome.DENY:
+                result.pump_decision = looked
+                result.reasons = looked.reason_codes
+                return
+            if not self._same_reference(geometry.observation_position, preview):
+                result.reasons = ("POSITION_CHANGED_AFTER_AUTHORIZATION",)
+                return
+            stage("MOVE")
+            self._motion_uncertain = True
+            sent = self.link.transmit(geometry.outbound, request=geometry.outbound_request, decision=result.motion_decision)
+            position = record_completed(self.position_path, sent.sent_lines, run_id=observation.task_id)
+            result.used_abs_steps = _absolute(sent.sent_lines)
+            if tuple(sent.sent_lines) != tuple(geometry.outbound.lines) or position.xy() != geometry.execution_position:
+                self._motion_uncertain = True
+                raise RuntimeError("EXECUTION_POSITION_MISMATCH")
+            self._motion_uncertain = False
+            stage("ALIGN_AT_NOZZLE")
+            if not self.confirm({**facts, "phase": "align"}):
+                self._return_without_spray(result, geometry, observation, preview, stage, facts, returning)
+                return
+            stage("PROBE_DEVICE")
+            self._probe(result)
             pump_human = evaluate_action(result.state, request)
             result.pump_decision = pump_human
             if pump_human.outcome is SafetyOutcome.DENY:
                 result.reasons = pump_human.reason_codes
-                return result
+                return
             result.pump_decision = approve_human_gate(result.state, request, pump_human, confirmed=True)
             self.controller.validate_allow(request, result.pump_decision)
-            if not self._same_reference(geometry.observation_position, preview):
-                result.reasons = ("POSITION_CHANGED_AFTER_AUTHORIZATION",)
-                return result
-            stage("MOVE_THEN_PUMP")
-            self._motion_uncertain = True
-            def before_pump(motion_result):
-                # 先记已完成的运动，再检查本轮回程批准是否仍有效；异常不会遗失位置事实。
-                if not self._same_reference(geometry.observation_position, preview):
-                    raise RuntimeError("POSITION_REFERENCE_CHANGED_DURING_MOTION")
-                position = record_completed(self.position_path, motion_result.sent_lines, run_id=observation.task_id)
-                result.used_abs_steps = _absolute(motion_result.sent_lines)
-                if position.xy() != geometry.execution_position:
-                    raise RuntimeError("EXECUTION_POSITION_MISMATCH")
-                self._motion_uncertain = False
-                _require_current_return_approval(geometry.return_request, result.return_decision)
-                stage("PUMP")
-            outcome = self.session.run_step_then_pump(self.link, self.controller,
-                dispatch=geometry.outbound, motion_request=geometry.outbound_request,
-                motion_decision=result.motion_decision, pump_request=request,
-                pump_decision=result.pump_decision, close_after=False, before_pump=before_pump)
-            result.session_result = outcome
-            if outcome.motion_result is not None:
-                position = load_position(self.position_path)
-                result.used_abs_steps = _absolute(outcome.motion_result.sent_lines)
-                self._motion_uncertain = False
-                if position.xy() != geometry.execution_position:
-                    self._motion_uncertain = True
-                    raise RuntimeError("EXECUTION_POSITION_MISMATCH")
-            elif outcome.motion_error is not None:
-                self._motion_uncertain = outcome.motion_error.motion_attempted
-            else:
-                self._motion_uncertain = False  # 授权预检拒绝，尚未发 MOVEXY。
-            if not outcome.output_finished:
+            result.return_decision = approve_motion_gate(geometry.return_request, returning, confirmed=True)
+            _require_current_return_approval(geometry.return_request, result.return_decision)
+            stage("PUMP")
+            receipt = self.controller.execute(request, result.pump_decision)
+            output_finished = bool(receipt.success and receipt.controller_state == "DONE")
+            stopped = False
+            if not output_finished:
+                try:
+                    done = self.controller.stop()
+                    stopped = done.kind == "DONE" and done.action_id == "STOP"
+                except Exception:
+                    stopped = False
+            result.session_result = F103StepThenPumpResult(
+                serial_opened=self.session.is_open, pump_called=True, pump_bytes=self.session.pump_bytes,
+                output_finished=output_finished, stopped=stopped, receipt=receipt, motion_result=sent,
+                pump_reason=None if output_finished else (receipt.error_code or "PUMP_OUTPUT_NOT_FINISHED"),
+            )
+            self.controller.close()
+            if not output_finished:
                 result.status = "ERROR"
-                result.reasons = (outcome.motion_reason or outcome.pump_reason or "PUMP_OUTPUT_NOT_FINISHED",)
-                if self._motion_uncertain:
-                    mark_unknown(self.position_path, run_id=observation.task_id, reason=result.reasons[0])
-                return result
+                result.reasons = (result.session_result.pump_reason or "PUMP_OUTPUT_NOT_FINISHED",)
+                return
+            stage("AUTHORIZE_RETURN")
+            if not self.confirm({**facts, "phase": "return"}):
+                result.status = "HUMAN"
+                result.reasons = ("HUMAN_DECLINED_RETURN",)
+                return
+            self._ensure_return_token(result, geometry, returning)
             stage("RETURN")
-            if load_position(self.position_path).xy() != geometry.return_request.position_before_steps:
-                self._motion_uncertain = True
-                raise RuntimeError("POSITION_CHANGED_BEFORE_RETURN")
-            self._motion_uncertain = True
+            self._transmit_return(result, geometry, observation)
+            result.status, result.reasons = "RETURNED", ("PUMP_DONE_AND_RETURN_CONFIRMED",)
+        except (Exception, KeyboardInterrupt) as exc:
+            if isinstance(exc, Stage2TransmitError):
+                self._motion_uncertain = exc.motion_attempted
+            result.status = "ERROR"
+            result.reasons = ("INTERRUPTED" if isinstance(exc, KeyboardInterrupt) else getattr(exc, "reason_code", str(exc) or type(exc).__name__),)
+            self._stop()
+            if self._motion_uncertain:
+                mark_unknown(self.position_path, run_id=observation.task_id, reason=result.reasons[0])
+            self.session.failed = True
+            self.session.close()
+        finally:
+            self.controller.close()
+            if result.status != "RETURNED":
+                self.session.close()
+
+    def _return_without_spray(self, result, geometry, observation, preview, stage, facts, returning) -> None:
+        """人没有确认重合时不喷水。仍可单独确认是否回到原观察位。"""
+
+        result.reasons = ("HUMAN_DECLINED_SPRAY",)
+        if not self.confirm({**facts, "phase": "return_without_spray"}):
+            result.status = "HUMAN"
+            result.reasons = ("HUMAN_DECLINED_SPRAY", "HUMAN_DECLINED_RETURN")
+            return
+        stage("RETURN")
+        self._ensure_return_token(result, geometry, returning)
+        self._transmit_return(result, geometry, observation)
+        result.status = "HUMAN"
+        result.reasons = ("HUMAN_DECLINED_SPRAY", "RETURNED_WITHOUT_SPRAY")
+
+    def _ensure_return_token(self, result, geometry, evaluated) -> None:
+        decision = result.return_decision
+        if decision is not None and decision.outcome is SafetyOutcome.ALLOW:
             try:
-                back = self.link.transmit(geometry.returning, request=geometry.return_request, decision=result.return_decision)
-            except Stage2TransmitError as exc:
-                result.return_error = exc
-                raise
+                _require_current_return_approval(geometry.return_request, decision)
+                return
+            except PermissionError:
+                pass
+        result.return_decision = approve_motion_gate(geometry.return_request, evaluated, confirmed=True)
+
+    def _transmit_return(self, result, geometry, observation) -> None:
+        if load_position(self.position_path).xy() != geometry.return_request.position_before_steps:
+            self._motion_uncertain = True
+            raise RuntimeError("POSITION_CHANGED_BEFORE_RETURN")
+        self._motion_uncertain = True
+        try:
+            back = self.link.transmit(geometry.returning, request=geometry.return_request, decision=result.return_decision)
+        except Stage2TransmitError as exc:
+            result.return_error = exc
+            self._motion_uncertain = exc.motion_attempted
+            raise
+        result.return_result = back
+        position = record_completed(self.position_path, back.sent_lines, run_id=observation.task_id)
+        result.used_abs_steps = tuple(a + b for a, b in zip(result.used_abs_steps, _absolute(back.sent_lines)))
+        if tuple(back.sent_lines) != geometry.returning.lines or position.xy() != geometry.observation_position:
+            raise RuntimeError("RETURN_NOT_COMPLETED_AT_ORIGINAL_OVERVIEW")
+        self._motion_uncertain = False
+        result.returned_at = datetime.now(timezone.utc).isoformat()
+
+    def _probe(self, result) -> None:
+        pong = self.controller.ping()
+        status = self.controller.status()
+        result.device_probe = {"pong": pong.raw, "status": status.raw,
+            "interlock_evidence": "MCV1_STATUS_ONLY; physical wiring remains field acceptance"}
+        facts = {**result.state.device_state, "controller_connected": pong.kind == "PONG" and status.kind == "STATUS",
+            "interlock_ok": not status.estop_active and not status.pump_active,
+            "e_stop_active": bool(status.estop_active), "pump_active": bool(status.pump_active)}
+        result.state = replace(result.state, device_state=facts)
+        self.controller.close()
+
+    def _run_motion_only(self, result, geometry, observation, preview, stage, request) -> None:
+        """只走去程和回程。没有喷水武装时不发 PUMP，也不把脉冲计数写成清洗结果。"""
+
+        stage("AUTHORIZE")
+        if not self.confirm({**preview, "phase": "move", "geometry": geometry.to_dict(), "include_pump": False, "pump_request": asdict(request)}):
+            result.reasons = ("HUMAN_DECLINED",)
+            return
+        result.motion_decision = approve_motion_gate(geometry.outbound_request, result.motion_decision, confirmed=True)
+        result.return_decision = approve_motion_gate(geometry.return_request, result.return_decision, confirmed=True)
+        try:
+            stage("MOVE")
+            self._motion_uncertain = True
+            sent = self.link.transmit(geometry.outbound, request=geometry.outbound_request, decision=result.motion_decision)
+            position = record_completed(self.position_path, sent.sent_lines, run_id=observation.task_id)
+            result.used_abs_steps = _absolute(sent.sent_lines)
+            if tuple(sent.sent_lines) != tuple(geometry.outbound.lines) or position.xy() != geometry.execution_position:
+                self._motion_uncertain = True
+                raise RuntimeError("EXECUTION_POSITION_MISMATCH")
+            self._motion_uncertain = False
+            stage("RETURN")
+            self._motion_uncertain = True
+            back = self.link.transmit(geometry.returning, request=geometry.return_request, decision=result.return_decision)
             result.return_result = back
             position = record_completed(self.position_path, back.sent_lines, run_id=observation.task_id)
             result.used_abs_steps = tuple(a + b for a, b in zip(result.used_abs_steps, _absolute(back.sent_lines)))
-            if tuple(back.sent_lines) != geometry.returning.lines or position.xy() != geometry.observation_position:
+            if tuple(back.sent_lines) != tuple(geometry.returning.lines) or position.xy() != geometry.observation_position:
                 raise RuntimeError("RETURN_NOT_COMPLETED_AT_ORIGINAL_OVERVIEW")
             self._motion_uncertain = False
             result.returned_at = datetime.now(timezone.utc).isoformat()
-            result.status, result.reasons = "RETURNED", ("PUMP_DONE_AND_RETURN_CONFIRMED",)
-            return result
+            result.status, result.reasons = "MOVED", ("MOTION_COMPLETED_NO_PUMP",)
         except (Exception, KeyboardInterrupt) as exc:
             result.status = "ERROR"
             result.reasons = ("INTERRUPTED" if isinstance(exc, KeyboardInterrupt) else getattr(exc, "reason_code", str(exc) or type(exc).__name__),)
@@ -186,10 +282,8 @@ class HardwareExecutor:
                 mark_unknown(self.position_path, run_id=observation.task_id, reason=result.reasons[0])
             self.session.failed = True
             self.session.close()
-            return result
         finally:
-            self.controller.close()
-            if result.status != "RETURNED":
+            if result.status != "MOVED":
                 self.session.close()
 
     def _stop(self) -> None:

@@ -165,7 +165,7 @@ class STM32SerialControllerTests(unittest.TestCase):
         self.assertEqual("DONE", receipt.controller_state)
         self.assertEqual(self.request.duration_ms, receipt.actual_duration_ms)
         self.assertEqual((0.0, 0.0), receipt.actual_target_mm)
-        self.assertIn(encode_pump(self.request.action_id, self.request.duration_ms, max_duration_ms=300), serial.writes)
+        self.assertIn(encode_pump(self.request.action_id, self.request.duration_ms), serial.writes)
         pump_writes = [item for item in serial.writes if item.startswith(b"MCV1|PUMP|")]
         self.assertEqual(1, len(pump_writes))
 

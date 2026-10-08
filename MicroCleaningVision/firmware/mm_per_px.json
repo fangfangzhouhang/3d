@@ -1,0 +1,21 @@
+{
+  "calibration_id": "motor_mm_per_px_cal_20261006T121727Z",
+  "method": "motor_known_displacement",
+  "steps_per_axis": 800,
+  "known_displacement_mm": 2.5,
+  "steps_per_mm_assumed": 320.0,
+  "x_axis": {
+    "pixel_shift_along": 147.0,
+    "match_score": 0.994
+  },
+  "y_axis": {
+    "pixel_shift_along": 149.0,
+    "match_score": 0.616
+  },
+  "feeds_action_request": false,
+  "evidence_boundary": "按 Gate 4 记录 cal_20261006T121727Z 重建的尺度。不是当时 mm_per_px.json 的原始字节；记录未给出交叉轴像素。",
+  "mm_per_px_x": 0.017006802721088437,
+  "mm_per_px_y": 0.016778523489932886,
+  "warnings": [],
+  "source_record": "firmware/Gate0-8_实物联调进度记录.md Gate 4"
+}

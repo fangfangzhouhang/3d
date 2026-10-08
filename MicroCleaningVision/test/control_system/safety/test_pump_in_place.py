@@ -47,7 +47,7 @@ class PumpInPlaceTests(unittest.TestCase):
         self.assertEqual(IN_PLACE_TARGET_MM, request.target_centroid_mm)
         self.assertFalse(request.constraints["xy_motion"])
         self.assertFalse(request.constraints["work_mm"])
-        self.assertEqual(200, request.duration_ms)
+        self.assertEqual(500, request.duration_ms)
 
     def test_no_target_does_not_propose_pump(self):
         empty = estimate_state(
@@ -99,9 +99,12 @@ class PumpInPlaceTests(unittest.TestCase):
         self.assertEqual(SafetyOutcome.DENY, decision.outcome)
         self.assertIn("IN_PLACE_TARGET_NOT_NOZZLE_ORIGIN", decision.reason_codes)
 
-    def test_in_place_duration_above_300_ms_is_denied(self):
+    def test_in_place_duration_above_500_ms_is_denied(self):
         request = propose_pump_in_place(self.state)
-        forged = replace(request, duration_ms=500)
+        self.assertEqual(500, request.duration_ms)
+        allowed = evaluate_action(self.state, request)
+        self.assertEqual(SafetyOutcome.HUMAN, allowed.outcome)
+        forged = replace(request, duration_ms=501)
         decision = evaluate_action(self.state, forged)
         self.assertEqual(SafetyOutcome.DENY, decision.outcome)
         self.assertIn("DURATION_OUT_OF_BOUNDS", decision.reason_codes)

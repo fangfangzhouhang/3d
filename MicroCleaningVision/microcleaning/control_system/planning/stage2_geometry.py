@@ -138,7 +138,7 @@ def build_cycle_geometry(
     """复用 preview/dispatch，去程加一次偏移，回程回原观察位，预留整个任务预算。"""
     offset.validate(calibration, real=real)
     if not isinstance(budget, int) or isinstance(budget, bool) or not 1 <= budget <= STAGE2_RUN_STEP_CAP:
-        raise ValueError("BUDGET_MUST_NOT_EXCEED_1600")
+        raise ValueError(f"BUDGET_MUST_NOT_EXCEED_{STAGE2_RUN_STEP_CAP}")
     if any(not isinstance(v, int) or isinstance(v, bool) or v < 0 for v in used_abs_steps):
         raise ValueError("USED_BUDGET_INVALID")
     if base.work.nozzle_offset_mm != (0.0, 0.0) or (calibration and calibration.nozzle_px is not None):
@@ -170,11 +170,6 @@ def build_cycle_geometry(
         reasons.append("EXECUTION_STRATEGY_UNSUPPORTED_V1")
     if outbound.truncated or returning.truncated:
         reasons.append("INCOMPLETE_DISPATCH")
-    if any(used + required > budget for used, required in zip(used_abs_steps, cycle_abs)):
-        reasons.append("TASK_BUDGET_INCLUDES_RETURN_EXCEEDED")
-    # 单次 dispatch 也不能超过上限，即使多段互相抵消。
-    if outbound.planned_abs_steps_x > budget or outbound.planned_abs_steps_y > budget:
-        reasons.append("OUTBOUND_BUDGET_EXCEEDED")
     if preview.motion.out_of_travel:
         reasons.append("PATH_OUT_OF_TRAVEL")
     reference = calibration.ref if calibration else "mock://declared-stage2-geometry"

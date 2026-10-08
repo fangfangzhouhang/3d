@@ -41,15 +41,15 @@ PR #24 最初的合成干跑入口是 `test/integration/test_closed_loop_dry_run
 
 ```text
 closed_loop_station CLI
-→ CameraPreview/MockFrames：同一相机生命周期、空格只冻结新帧
+→ CameraPreview/MockFrames：实物同一个窗口显示实时画面和第一次标注；空格只冻结新帧
 → FrozenSegmenter：锁定已有算法/参数/哈希 → B 提取和匹配工具
-→ TargetLedger：稳定 S 编号 → 原 plan_sequence 选择下一块
+→ TargetLedger：第一次画面的 S 编号是本轮名单，按编号顺序逐块清洗；复检对不上也不漏下一块，之后不新开污渍
 → 同原图尺寸单目标 Mask → 原 plan_cleaning/path_preview/Stage2Dispatch
 → CycleGeometry：q_obs + d_target + 一次有符号偏移、整任务含回程预算
-→ HardwareExecutor：逐轮 YES、独立去程/泵/回程令牌
-→ 同一 F103SerialSession：只读探测、足量 MOVEXY、MCV1 短喷、RETURN
-→ 原观察位新后图 → 相同分割策略 → 原 verify_single_target
-→ SUCCESS 后重新抓图选下一块 / 有限新帧 RETRY / HUMAN / ERROR
+→ HardwareExecutor：去程、针头重合、短喷、回程各自在同一个窗口确认；重合确认前不发 PUMP
+→ 同一 F103SerialSession：只读探测、足量 MOVEXY、确认后的 MCV1 默认 500 ms 短喷、再确认的 RETURN
+→ 回原位后再确认 → 原观察位新后图 → 相同分割策略 → 原 verify_single_target
+→ 同一个窗口显示复检数字后再确认，才结束这一块并抓下一块 / 有限新帧 RETRY 也要确认 / HUMAN / ERROR
 ```
 
 V1 只执行 CENTER_POINT，RASTER_SCAN 交 HUMAN。新入口不更改共享 contracts/ports、固件或算法；运动仍在局部请求/回执侧文件中，Episode 存真实泵回执及前后观测。STATUS/READXY/DONE 都不能替代电气、绝对位置或清洗效果验收。
@@ -84,7 +84,7 @@ V1 只执行 CENTER_POINT，RASTER_SCAN 交 HUMAN。新入口不更改共享 con
 |---|---|---|---|
 | `main.py` | 内置合成数据 | Mock Episode | 无 |
 | `demo.closed_loop_station --mock`（默认） | 合成原图/串口替身 | 多轮复检、执行回执、完整运行目录 | 无；Mock 独立位置账本 |
-| `demo.closed_loop_station --real` | 人指定相机/COM/电机标定/工作坐标/偏移 | 同进程抓图、YES、去程/短喷/回程/后图 | 全部武装及每轮 YES 后可执行；本轮未实物验证 |
+| `demo.closed_loop_station --real` | 人指定相机/COM/电机标定/工作坐标/偏移 | 同一个窗口抓图、确认、去程/重合后 500 ms 短喷/回程/后图 | 喷水要两个武装参数，并且重合确认之后才发 PUMP；第一次画面的标注是污渍名单 |
 | Demo `analyze` / `camera-analyze` | 文件或 USB 图 | Mask、测量、路径、summary/Episode | 无；加 `--stage2-xy` 也只保存命令预览 |
 | Demo `simulate` | 图像 + 模拟条件 | FakeSerial 回执与模拟后状态 | 无；后图变化由模拟产生 |
 | Demo `ping-only` | 图像来源 + 人指定的泵协议端口 | PING/STATUS | 不发 PUMP/MOVEXY；探测须与匹配固件配套 |
@@ -114,7 +114,7 @@ cd "D:\大创\3d\MicroCleaningVision"
 
 ## 5. 运动执行与错误传播
 
-Demo 先规划、检查每轴累计最多 1600 步和相对人工零点 ±3200 步软限位，缺标定/有警告/位置未知时拒发。全部满足仍先给 HUMAN；人在场输入 YES 后才获得短时一次性 ALLOW，发送器核对内容摘要与武装状态再打开 COM。
+Demo 先规划、检查每一条 MOVEXY 每轴最多 10000 步和相对人工零点 ±10000 步软限位，缺标定/有警告/位置未知时拒发。去程和回程不相加。全部满足仍先给 HUMAN；人在场输入 YES 后才获得短时一次性 ALLOW，发送器核对内容摘要与武装状态再打开 COM。
 
 协议先确认 `STEP_OK v0.3`，按段发送 MOVEXY，轮询 READXY，两轴都停且每个非零轴已发计数等于申请才发下一段。两轴频率相同、步数不同，较短轴先停；**没有按比例插补斜线**。对角路线的图上预览和真实轨迹可能不同，应实测。
 

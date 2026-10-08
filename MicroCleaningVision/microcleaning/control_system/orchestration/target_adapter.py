@@ -38,6 +38,7 @@ class TargetLedger:
         self.entries: dict[str, TaskTarget] = {}
         self._next_id = 1
         self._retired_views: dict[str, tuple[TargetInstance, Any]] = {}
+        self.ignored_new = 0
         for instance in instances:
             self._add(observation_id, instance)
 
@@ -49,8 +50,11 @@ class TargetLedger:
     def pending(self) -> list[SequenceTarget]:
         return [entry.as_sequence_target() for entry in self.entries.values() if not entry.completed and entry.instance is not None]
 
-    def advance(self, observation_id: str, mask: Any, instances: list[TargetInstance], *, completed_id: str | None = None) -> None:
-        """先完成整个一对一检查再写账本；一对多、多对一或未洗目标消失交人工。"""
+    def advance(self, observation_id: str, mask: Any, instances: list[TargetInstance], *, completed_id: str | None = None, allow_new: bool = True) -> None:
+        """先完成整个一对一检查再写账本；一对多、多对一或未洗目标消失交人工。
+
+        allow_new 为 False 时，第一次画面之外新分出来的区域只计数，不登记成新污渍。
+        """
         by_label = {instance.component_label: instance for instance in instances}
         mapping: dict[str, TargetInstance | None] = {}
         claimed: set[int] = set()
@@ -82,9 +86,13 @@ class TargetLedger:
             entry.observation_id = observation_id
         if completed_id is not None:
             self.entries[completed_id].completed = True
+        self.ignored_new = 0
         for label, instance in by_label.items():
             if label not in claimed:
-                self._add(observation_id, instance)
+                if allow_new:
+                    self._add(observation_id, instance)
+                else:
+                    self.ignored_new += 1
         self.mask = mask.copy()
 
     def to_dict(self) -> dict[str, object]:
