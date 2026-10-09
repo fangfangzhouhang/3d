@@ -365,7 +365,7 @@ X/Y方向是否相反或旋转
 
 没有步进电机、没有 MCV2 时，不要申请 XY。可改用定点短喷：`propose_pump_in_place()` 生成
 `primitive=PUMP_IN_PLACE`、`coordinate_frame=nozzle_fixed`、目标 `(0,0)`，表示喷头
-原地 100～300 ms 脉冲，不是伪造的 `work_mm` 标定。治理器对此返回 HUMAN；Demo
+原地 100～500 ms 脉冲，不是伪造的 `work_mm` 标定。治理器对此返回 HUMAN；Demo
 需要 `--mode arm-pump --confirm-pump`。`STM32SerialController` 还要 `--arm-pump`
 才会把 ALLOW 翻译成 `MCV1|PUMP`。`stop()` 可在未武装时发送 `MCV1|STOP`，不发泵。
 默认 `--from-camera` 只分析，不发泵。当前固件遇到 `HOME`/`MOVE` 必须拒绝。

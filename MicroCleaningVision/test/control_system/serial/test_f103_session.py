@@ -358,7 +358,7 @@ class F103SessionTests(unittest.TestCase):
         self.assertNotEqual("ACK", result.receipt.controller_state)
         pump_request, _decision = pump
         self.assertIn(
-            encode_pump(result.receipt.action_id, pump_request.duration_ms, max_duration_ms=300),
+            encode_pump(result.receipt.action_id, pump_request.duration_ms),
             port.writes,
         )
 

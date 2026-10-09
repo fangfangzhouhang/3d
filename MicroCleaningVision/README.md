@@ -32,7 +32,7 @@ cd D:\大创\wt-single-entry-cleaning\MicroCleaningVision
 
 `--mock-scenario retry --max-retries-per-target 1 --max-cycles 4` 可验证新帧、新动作和新审批；`motion-short`、`pump-timeout`、`return-timeout` 等失败样例应停在 ERROR，`decline`/`noncomparable` 应停在 HUMAN。退出码：SUCCESS=0、HUMAN=2、ERROR=3。
 
-V1 只执行单块 CENTER_POINT；扫描路径保存预览后交人工。偏移只来自 `scope_to_nozzle_delta_steps=[dx,dy]`，真实未知为 null；总预算每轴 1600 步包含所有去程和回程。RETURN 回到第一帧的原观察位，不能只反转喷头偏移。旧直接串口脚本尚未统一整改。
+V1 只执行单块 CENTER_POINT；扫描路径保存预览后交人工。偏移只来自 `scope_to_nozzle_delta_steps=[dx,dy]`，真实未知为 null；主机不再另设单次步数上限，能否移动只看位置账本，人工零点两侧各 10000 步。RETURN 回到第一帧的原观察位，不能只反转喷头偏移。旧直接串口脚本尚未统一整改。
 
 实物参数、偏移格式、每轮大写 YES 和各组验收材料见 [现场可测入口](说明文档/硬件组/现场可测入口.md)，剩余实物阻塞见 [联调差距](说明文档/总流程说明/一条启动命令的实物联调差距.md)，实现/续做记录见 [续做记录](说明文档/进度记录/单入口闭环续做记录.md)。本轮未操作真实相机、COM、电机或泵，未提交/推送。
 
@@ -51,4 +51,4 @@ V1 只执行单块 CENTER_POINT；扫描路径保存预览后交人工。偏移�
 .\.venv\Scripts\python.exe -m demo.demo_pipeline --from-camera --mode stage2-move --stage2-calibration output\calibration\cal_<时间>\mm_per_px.json --arm-stage2-xy --serial-port COMx --camera-index 0
 ```
 
-输出在 `output/demo/<run_id>/`：`stage2_xy_pulses.txt` 是计划的句子，`stage2_intent.json` 写于打开串口前，`stage2_receipt.json` 写于发送后（成败都写）；是否真的发过，以 `summary.json` 的 `hardware_actions` 为准。每轴每次最多 1600 步，离零点超过 ±3200 步拒发。发送失败会先 STOP，位置记为未知，需要重新对位归零。`--live` 只预览，不能同时发步进。规则细节见[团队总流程与输入输出](说明文档/总流程说明/团队总流程与输入输出.md)。
+输出在 `output/demo/<run_id>/`：`stage2_xy_pulses.txt` 是计划的句子，`stage2_intent.json` 写于打开串口前，`stage2_receipt.json` 写于发送后（成败都写）；是否真的发过，以 `summary.json` 的 `hardware_actions` 为准。离人工零点超过 ±10000 步拒发。发送失败会先 STOP，位置记为未知，需要重新对位归零。`--live` 只预览，不能同时发步进。规则细节见[团队总流程与输入输出](说明文档/总流程说明/团队总流程与输入输出.md)。

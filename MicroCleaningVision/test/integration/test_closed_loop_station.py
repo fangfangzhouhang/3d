@@ -11,12 +11,16 @@ from demo.closed_loop_station import main
 
 
 class ClosedLoopCLITests(unittest.TestCase):
-    def test_terminal_confirmation_requires_uppercase_yes(self):
+    def test_terminal_confirmation_accepts_any_yes_case(self):
         from unittest.mock import patch
         from demo.closed_loop_station import _yes
-        for answer, expected in (("yes", False), ("Y", False), ("YES", True)):
+        for answer, expected in (("yes", True), ("Yes", True), ("YES", True), ("Y", False), ("no", False)):
             with self.subTest(answer=answer), patch("builtins.input", return_value=answer):
                 self.assertEqual(expected, _yes("confirm"))
+
+    def test_pump_duration_above_500_ms_is_rejected(self):
+        with self.assertRaises(SystemExit):
+            main(["--pump-duration-ms", "501"])
     def run_cli(self, *arguments):
         temporary = TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -31,20 +35,28 @@ class ClosedLoopCLITests(unittest.TestCase):
         self.assertEqual("SUCCESS", summary["status"])
         self.assertEqual(3, len(summary["cycles"]))
         phases = [event["phase"] for event in summary["events"]]
-        for phase in ("CAPTURE_PRE", "SELECT_TARGET", "PLAN_TARGET", "AUTHORIZE", "MOVE_THEN_PUMP", "RETURN", "CAPTURE_POST", "VERIFY_TARGET"):
+        for phase in ("CAPTURE_PRE", "SELECT_TARGET", "PLAN_TARGET", "AUTHORIZE", "MOVE", "ALIGN_AT_NOZZLE", "PUMP", "RETURN", "CAPTURE_POST", "VERIFY_TARGET"):
             self.assertIn(phase, phases)
         serial = json.loads((folder / "serial.json").read_text(encoding="utf-8"))
         tx = [event["line"] for event in serial["events"] if event["direction"] == "tx"]
         self.assertEqual(3, sum(line.startswith("MCV1|PUMP|") for line in tx))
+        self.assertTrue(all(line.endswith("|500") for line in tx if line.startswith("MCV1|PUMP|")))
         self.assertFalse(any("TO_NEEDLE" in line or "TO_SCOPE" in line for line in tx))
         self.assertTrue(all(cycle["segmentation_sha256"] == summary["segmentation_sha256"] for cycle in summary["cycles"]))
 
     def test_cli_reports_failure_and_human_routes(self):
-        for scenario, expected in (("motion-short", 3), ("return-timeout", 3), ("decline", 2), ("noncomparable", 2)):
+        for scenario, expected in (("motion-short", 3), ("return-timeout", 3), ("decline", 2)):
             with self.subTest(scenario=scenario):
                 code, summary, _ = self.run_cli("--mock-scenario", scenario)
                 self.assertEqual(expected, code)
                 self.assertNotEqual("SUCCESS", summary["status"])
+
+    def test_noncomparable_confirmation_finishes_the_first_roster_without_claiming_clean(self):
+        code, summary, _ = self.run_cli("--mock-scenario", "noncomparable")
+        self.assertEqual(0, code)
+        self.assertEqual(["ALL_OBSERVED_TARGETS_COMPLETED"], summary["reasons"])
+        self.assertEqual(3, len(summary["initial_target_ids"]))
+        self.assertEqual(3, len(summary["cycles"]))
 
     def test_cli_cleanup_failure_keeps_full_run_summary_and_returns_error(self):
         from unittest.mock import patch

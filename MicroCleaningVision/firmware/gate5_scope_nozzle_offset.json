@@ -1,0 +1,17 @@
+{
+  "version": "scope-nozzle-v1",
+  "setup_id": "rig-001",
+  "scope_to_nozzle_delta_steps": [
+    0,
+    7559
+  ],
+  "coordinate_frame": "stage2_signed_steps_scope_to_nozzle",
+  "axes_confirmed": true,
+  "calibration_source": "Gate5 2026-10-07：显微镜中心 (X=77,Y=121) 到针尖正下方 (X=77,Y=7680)，净步数 [0, 7559]",
+  "uncertainty_steps": [
+    11,
+    127
+  ],
+  "motor_calibration_sha256": "c32ff76e09d48c77e932c1c724d4d6df2ab179bb3bfff8bb3d79a4c7d44ef172",
+  "mock_only": false
+}

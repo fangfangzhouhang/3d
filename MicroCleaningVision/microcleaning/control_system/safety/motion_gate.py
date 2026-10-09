@@ -9,7 +9,8 @@
 复用 ``contracts.SafetyDecision``，共享合同字段不改。``MotionRequest`` 是 C 自己的
 数据类，不进共享合同；运动回执合同化见 mcl-v0.2 提案。
 
-步数上限是代码常量，命令行改不了。软限位是相对人工零点的计数，不是回零：
+主机不再另设单次步数上限。能不能移动，只看位置账本会不会越出人工零点两侧的边界。
+一条 MOVEXY 仍不能超过固件报文的 20000 步。软限位是计数，不是回零：
 丢步或断电后会漂，每次上电都要人重新对位后归零。
 """
 
@@ -23,13 +24,13 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from microcleaning.contracts import SafetyDecision, SafetyOutcome
-from microcleaning.control_system.planning.stage2_axes import parse_movexy_line
+from microcleaning.control_system.planning.stage2_axes import MAX_PULSE_STEPS, parse_movexy_line
 
 
 STAGE2_MOTION_GATE_VERSION = "stage2-motion-gate-v0"
-STAGE2_RUN_STEP_CAP = 1600
-STAGE2_LEG_STEP_CAP = 1600
-DEFAULT_SOFT_LIMIT_STEPS = 3200
+STAGE2_RUN_STEP_CAP = MAX_PULSE_STEPS
+STAGE2_LEG_STEP_CAP = MAX_PULSE_STEPS
+DEFAULT_SOFT_LIMIT_STEPS = 10000
 START_REFERENCES = frozenset({"image_center", "nozzle_px"})
 
 _consumed_tokens: set[str] = set()
@@ -171,8 +172,6 @@ def evaluate_motion(request: MotionRequest, limits: MotionLimits = MotionLimits(
         denied.append("RULE_VERSION_MISMATCH")
     if plan.max_leg_steps > limits.max_steps_per_leg:
         denied.append("LEG_STEPS_OVER_CAP")
-    if plan.abs_steps[0] > limits.max_abs_steps_per_axis or plan.abs_steps[1] > limits.max_abs_steps_per_axis:
-        denied.append("RUN_STEPS_OVER_CAP")
     if request.start_reference not in START_REFERENCES:
         denied.append("UNSUPPORTED_START_REFERENCE")
     if limits.require_calibration:
@@ -197,6 +196,79 @@ def evaluate_motion(request: MotionRequest, limits: MotionLimits = MotionLimits(
         None,
         policy_version=limits.version,
     )
+
+
+def format_side_clearance(position: tuple[int, int], limits: MotionLimits = MotionLimits()) -> str:
+    """当前位置离软限位两侧还剩多少步。计数相对人工零点，不是台面实测。"""
+
+    x, y = int(position[0]), int(position[1])
+    xmin, ymin = limits.soft_min_steps
+    xmax, ymax = limits.soft_max_steps
+    return (
+        f"账本位置 X={x} 步，Y={y} 步，相对人工零点计数。"
+        f"X 负方向还剩 {x - xmin} 步，正方向还剩 {xmax - x} 步。"
+        f"Y 负方向还剩 {y - ymin} 步，正方向还剩 {ymax - y} 步。"
+    )
+
+
+def explain_travel_block(
+    outbound: MotionRequest,
+    returning: MotionRequest,
+    limits: MotionLimits = MotionLimits(),
+) -> str | None:
+    """去程或回程会越出边界、或单次步数放不下时，给出中文拦截说明。能发令时返回 None。"""
+
+    outbound_decision = evaluate_motion(outbound, limits)
+    return_decision = evaluate_motion(returning, limits)
+    blocked = (
+        outbound_decision.outcome is SafetyOutcome.DENY
+        or return_decision.outcome is SafetyOutcome.DENY
+        or outbound.dispatch_truncated
+        or returning.dispatch_truncated
+    )
+    if not blocked:
+        return None
+    sentences = ["已拦住，电机不会动，也不会喷水。"]
+    if outbound.position_before_steps is None:
+        sentences.append("当前位置未知，离两边还剩多少步也未知，所以不能发移动命令。")
+    else:
+        sentences.append(format_side_clearance(outbound.position_before_steps, limits))
+    sentences.extend(_leg_block_sentences("去程", outbound, limits))
+    sentences.extend(_leg_block_sentences("回程", returning, limits))
+    return "".join(sentences)
+
+
+def _leg_block_sentences(label: str, request: MotionRequest, limits: MotionLimits) -> list[str]:
+    plan = summarize_motion(request, limits)
+    sentences: list[str] = []
+    if request.dispatch_truncated:
+        sentences.append(f"{label}有一段超过这条报文允许写入的步数，整段没有放进移动命令。")
+    elif plan.max_leg_steps > limits.max_steps_per_leg:
+        sentences.append(
+            f"{label}单条有一轴要走 {plan.max_leg_steps} 步，超过固件一条报文能写的 {limits.max_steps_per_leg} 步，没有放进移动命令。"
+        )
+    if request.position_before_steps is None or not request.lines:
+        return sentences
+    cursor = (int(request.position_before_steps[0]), int(request.position_before_steps[1]))
+    points = [cursor]
+    for line in request.lines:
+        try:
+            dx, dy = parse_movexy_line(line)
+        except ValueError:
+            continue
+        cursor = (cursor[0] + dx, cursor[1] + dy)
+        points.append(cursor)
+    for index, name, low, high in (
+        (0, "X", limits.soft_min_steps[0], limits.soft_max_steps[0]),
+        (1, "Y", limits.soft_min_steps[1], limits.soft_max_steps[1]),
+    ):
+        highest = max(point[index] for point in points)
+        lowest = min(point[index] for point in points)
+        if highest > high:
+            sentences.append(f"{label}的 {name} 会走到 {highest} 步，正方向边界是 {high} 步，超出 {highest - high} 步。")
+        if lowest < low:
+            sentences.append(f"{label}的 {name} 会走到 {lowest} 步，负方向边界是 {low} 步，超出 {low - lowest} 步。")
+    return sentences
 
 
 def approve_motion_gate(

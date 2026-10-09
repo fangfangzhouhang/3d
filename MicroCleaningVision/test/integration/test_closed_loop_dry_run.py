@@ -491,18 +491,18 @@ class ClosedLoopDryRunTests(unittest.TestCase):
         self.assertFalse(session.is_open)
         self.assertEqual(0, opened["n"])
 
-    def test_step_budget_stays_1600_and_nominal_offset_is_not_travel(self) -> None:
+    def test_step_budget_stays_at_code_cap_and_over_cap_offset_is_not_travel(self) -> None:
         nominal_offset_steps = 24 * 320
-        self.assertEqual(1600, STAGE2_RUN_STEP_CAP)
-        self.assertEqual(1600, STAGE2_LEG_STEP_CAP)
-        self.assertEqual(1600, DEFAULT_TRANSMIT_BUDGET)
-        self.assertLess(STAGE2_RUN_STEP_CAP, nominal_offset_steps)
+        self.assertEqual(20000, STAGE2_RUN_STEP_CAP)
+        self.assertEqual(20000, STAGE2_LEG_STEP_CAP)
+        self.assertEqual(20000, DEFAULT_TRANSMIT_BUDGET)
+        self.assertLess(nominal_offset_steps, 10000)
+        self.assertGreater(nominal_offset_steps * 2, 10000)
+        self.assertLess(nominal_offset_steps * 2, STAGE2_RUN_STEP_CAP)
         with self.assertRaises(ValueError):
-            MotionLimits(max_abs_steps_per_axis=nominal_offset_steps).validate()
-        refused = single_move_dispatch(nominal_offset_steps, "FWD", 0, "FWD")
-        self.assertTrue(refused.truncated)
-        self.assertEqual((), refused.lines)
-        self.assertEqual(0, refused.transmit_abs_steps_x)
+            MotionLimits(max_abs_steps_per_axis=STAGE2_RUN_STEP_CAP + 1).validate()
+        with self.assertRaises(ValueError):
+            single_move_dispatch(STAGE2_RUN_STEP_CAP + 1, "FWD", 0, "FWD")
 
         selected = self._first_target(extract_target_instances(_three_stains()))
         dispatch, _request, _decision = self._motion(selected.target_id)

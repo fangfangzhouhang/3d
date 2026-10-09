@@ -11,6 +11,8 @@ from microcleaning.control_system.safety.motion_gate import (
     MotionRequest,
     approve_motion_gate,
     evaluate_motion,
+    explain_travel_block,
+    format_side_clearance,
     motion_request_digest,
     new_motion_request_id,
     require_motion_allow,
@@ -38,10 +40,11 @@ class MotionGateTests(unittest.TestCase):
         self.assertIn("STAGE2_MOTION_REQUIRES_HUMAN", decision.reason_codes)
         self.assertIsNone(decision.approval_token)
 
-    def test_run_total_over_cap_is_denied(self):
-        decision = evaluate_motion(_request(["MOVEXY 1000 FWD 0 FWD", "MOVEXY 1000 REV 0 FWD"]))
-        self.assertIs(SafetyOutcome.DENY, decision.outcome)
-        self.assertIn("RUN_STEPS_OVER_CAP", decision.reason_codes)
+    def test_separate_moves_are_not_added_together(self):
+        decision = evaluate_motion(_request(["MOVEXY 4001 FWD 0 FWD", "MOVEXY 4001 REV 0 FWD"]))
+        self.assertIs(SafetyOutcome.HUMAN, decision.outcome)
+        self.assertNotIn("RUN_STEPS_OVER_CAP", decision.reason_codes)
+        self.assertNotIn("LEG_STEPS_OVER_CAP", decision.reason_codes)
 
     def test_single_leg_over_cap_is_denied(self):
         decision = evaluate_motion(_request([f"MOVEXY {STAGE2_RUN_STEP_CAP + 1} FWD 0 FWD"]))
@@ -60,14 +63,34 @@ class MotionGateTests(unittest.TestCase):
         self.assertIs(SafetyOutcome.DENY, decision.outcome)
         self.assertIn("POSITION_UNKNOWN", decision.reason_codes)
 
+    def test_boundary_block_names_the_remaining_steps_in_chinese(self):
+        text = format_side_clearance((0, 0))
+        self.assertIn("X 负方向还剩 10000 步，正方向还剩 10000 步", text)
+        self.assertIn("Y 负方向还剩 10000 步，正方向还剩 10000 步", text)
+        outbound = _request(["MOVEXY 300 FWD 0 FWD"], position_before_steps=(9800, 0))
+        returning = _request(["MOVEXY 300 REV 0 FWD"], position_before_steps=(10100, 0))
+        blocked = explain_travel_block(outbound, returning)
+        self.assertIsNotNone(blocked)
+        self.assertIn("已拦住，电机不会动，也不会喷水。", blocked)
+        self.assertIn("正方向还剩 200 步", blocked)
+        self.assertIn("去程的 X 会走到 10100 步，正方向边界是 10000 步，超出 100 步。", blocked)
+        self.assertNotIn("SOFT_LIMIT_EXCEEDED", blocked)
+        self.assertIsNone(explain_travel_block(_request(["MOVEXY 10 FWD 0 FWD"]), _request(["MOVEXY 10 REV 0 FWD"])))
+
+    def test_unknown_position_block_does_not_invent_a_margin(self):
+        outbound = _request(["MOVEXY 10 FWD 0 FWD"], position_before_steps=None)
+        text = explain_travel_block(outbound, _request([], position_before_steps=None))
+        self.assertIn("当前位置未知", text)
+        self.assertNotIn("SOFT_LIMIT", text)
+
     def test_intermediate_excursion_outside_soft_limit_is_denied(self):
-        # 终点回到 3000，但中途到过 3300，超出默认 ±3200。
+        # 终点回到 9800，但中途到过 10100，超出默认 ±10000。
         request = _request(
             ["MOVEXY 300 FWD 0 FWD", "MOVEXY 300 REV 0 FWD"],
-            position_before_steps=(3000, 0),
+            position_before_steps=(9800, 0),
         )
         plan = summarize_motion(request)
-        self.assertEqual((3000, 0), plan.position_after)
+        self.assertEqual((9800, 0), plan.position_after)
         decision = evaluate_motion(request)
         self.assertIn("SOFT_LIMIT_EXCEEDED", decision.reason_codes)
 
