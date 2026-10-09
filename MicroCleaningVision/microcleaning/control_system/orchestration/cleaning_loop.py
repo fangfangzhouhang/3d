@@ -18,7 +18,7 @@ from microcleaning.control_system.planning.path_preview import draw_path_overlay
 from microcleaning.control_system.planning.sequence_planner import STRATEGIES, plan_sequence
 from microcleaning.control_system.planning.stage2_geometry import build_cycle_geometry, stage2_placeholders
 from microcleaning.control_system.planning.stage2_position import load_position
-from microcleaning.control_system.safety.motion_gate import STAGE2_RUN_STEP_CAP
+from microcleaning.control_system.safety.motion_gate import STAGE2_RUN_STEP_CAP, explain_travel_block
 from microcleaning.control_system.replay.episode_store import write_episode
 from microcleaning.data_learning.image_quality import build_observation, measure_image_quality
 from microcleaning.vision.contamination import ContaminationMeasurement
@@ -98,6 +98,7 @@ class CleaningLoop:
         self.roster_mask = None
         self.roster_plan: dict = {}
         self.ignored_new_total = 0
+        self.boundary_notice: str | None = None
         self.used = (0, 0)
         self.cycles: list[dict] = []
         self.events: list[dict] = []
@@ -194,6 +195,10 @@ class CleaningLoop:
                     str(cycle_dir / "selected_target_mask.png"), 1, pre["measurement"].algorithm_version)
                 outcome = self.executor.execute(geometry=geometry, observation=pre["observation"],
                     measurement=measurement, preview=active, stage=self.stage)
+                notice = explain_travel_block(geometry.outbound_request, geometry.return_request)
+                if notice and outcome.status not in {"MOVED", "RETURNED"}:
+                    self.boundary_notice = notice
+                    self._say(notice)
                 self.used = tuple(a + b for a, b in zip(self.used, outcome.used_abs_steps))
                 active["execution"] = outcome.to_dict()
                 write_json(cycle_dir / "execution.json", outcome.to_dict())
@@ -289,7 +294,8 @@ class CleaningLoop:
                 "segmentation_sha256": self.policy_hash, "events": self.events,
                 "evidence_boundary": "规则复检通过不是已验收洁净标准；MCV1 DONE 只表示输出完成",
                 "initial_target_ids": list(self.roster_ids),
-                "ignored_new_components": self.ignored_new_total}
+                "ignored_new_components": self.ignored_new_total,
+                "boundary_notice": self.boundary_notice}
             write_json(self.folder / "serial.json", {"events": self.executor.session.serial_events,
                 "preserved_replies": [line.decode("ascii", errors="replace").strip() for line in self.executor.session.preserved_replies]})
             write_json(self.folder / "summary.json", summary)

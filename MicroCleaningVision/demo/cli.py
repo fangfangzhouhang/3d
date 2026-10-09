@@ -108,7 +108,7 @@ def main(argv: list[str] | None = None) -> int:
         "--stage2-max-steps",
         type=int,
         default=STAGE2_RUN_STEP_CAP,
-        help=f"一次运行每轴累计脉冲上限，只能调小；最大 {STAGE2_RUN_STEP_CAP}",
+        help=f"一条报文最多能写的步数，只能调小；固件最大 {STAGE2_RUN_STEP_CAP}。越不越界看位置账本",
     )
     parser.add_argument(
         "--wait-usb",

@@ -95,7 +95,7 @@ software_loop:
   controller: microcleaning/control_system/serial/stm32_serial.py
   fake_controller: microcleaning/control_system/serial/fake_serial.py
   note: "新入口持续同相机/串口、单目标原尺寸Mask、唯一有符号偏移、回原观察位。未武装喷水时一次确认只走去程和回程，不做清洁复检。同时有喷水武装时，去程、针头重合确认、500ms短喷、回原位、复检和下一块各自在同一个窗口确认。第一次画面的编号顺序是清洗顺序，后面不新开；复检对不上时确认仍继续下一块。显微镜窗口标出光心十字和右下角S/N小图。仅CENTER_POINT，扫描HUMAN。旧 demo --live 不发送步进。station_20261008_203402_ed901155 只喷了S0001一次后因TARGET_UNMATCHED停下，S0002未喷。编号顺序的软件修正还没有在COM8上再跑。"
-  budget_rule: "每一条MOVEXY每轴最多10000步，去程与回程不相加；单段超限整段拒绝。软限位为人工零点±10000步。"
+  budget_rule: "主机不再另设单次步数上限。能否移动只看位置账本，人工零点两侧各10000步。越界时窗口和终端用中文说明当前位置、两侧剩余和超出步数，然后拦住。固件一条报文最多20000步。"
   nozzle_offset_rule: "scope_to_nozzle_delta_steps实物须实测/方向确认/来源/不确定性/电机标定SHA256绑定；null不等于0；拒绝重复补偿。"
 
 current_dataset:

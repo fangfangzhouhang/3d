@@ -27,7 +27,7 @@ if str(ROOT) not in sys.path:
 MM_PER_PX_X = 0.0187
 MM_PER_PX_Y = 0.0181
 STEPS_PER_MM = 320.0
-MAX_STEPS_PER_MOVE = 10000  # 安全上限；1600 步/圈仍是细分，不是这个上限
+MAX_STEPS_PER_MOVE = 20000  # 固件一条报文的上限；闭环是否越界看位置账本
 ITERATIONS = 3  # 迭代居中次数，越多次越准
 CENTER_TOLERANCE_PX = 3.0  # 距中心小于此像素视为已居中
 PUMP_ON_MS = 300  # 本脚本固定 300ms。主机定点短喷许可已是 500ms，这里不跟着改。

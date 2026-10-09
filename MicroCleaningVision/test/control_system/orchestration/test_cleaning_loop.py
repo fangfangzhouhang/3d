@@ -11,7 +11,7 @@ from microcleaning.control_system.orchestration.cleaning_loop import CleaningLoo
 from microcleaning.control_system.orchestration.hardware_executor import HardwareExecutor
 from microcleaning.control_system.planning.path_preview import PathPlaceholderConfig
 from microcleaning.control_system.planning.stage2_position import load_position, set_zero
-from microcleaning.control_system.safety.motion_gate import STAGE2_RUN_STEP_CAP
+from microcleaning.control_system.safety.motion_gate import DEFAULT_SOFT_LIMIT_STEPS, STAGE2_RUN_STEP_CAP
 from microcleaning.control_system.serial.f103_session import F103SerialSession
 from microcleaning.control_system.serial.stage2_link import Stage2SerialLink
 from microcleaning.control_system.serial.stm32_serial import STM32SerialController
@@ -278,8 +278,26 @@ class CleaningLoopTests(unittest.TestCase):
         self.assertEqual("SUCCESS", result["status"])
         self.assertGreater(raw.pump_count, 0)
 
+    def test_over_boundary_move_is_stopped_with_a_chinese_notice(self):
+        import io
+        from contextlib import redirect_stdout
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            result, raw, _, _, _ = self.run_case(
+                budget=STAGE2_RUN_STEP_CAP,
+                offset=replace(mock_offset(), scope_to_nozzle_delta_steps=(0, DEFAULT_SOFT_LIMIT_STEPS + 200)))
+        text = buffer.getvalue()
+        self.assertEqual("HUMAN", result["status"])
+        self.assertEqual(0, raw.pump_count)
+        self.assertEqual(0, raw.opens)
+        self.assertIn("已拦住，电机不会动，也不会喷水。", text)
+        self.assertIn("正方向边界是 10000 步", text)
+        self.assertIn(result["boundary_notice"], text)
+        self.assertNotIn("SOFT_LIMIT_EXCEEDED", result["boundary_notice"])
+
     def test_truncated_offset_and_raster_are_not_executed(self):
-        for kwargs in ({"offset": replace(mock_offset(), scope_to_nozzle_delta_steps=(0, STAGE2_RUN_STEP_CAP + 1))}, {"scenario": "raster"}):
+        for kwargs in ({"offset": replace(mock_offset(), scope_to_nozzle_delta_steps=(0, DEFAULT_SOFT_LIMIT_STEPS + 200))}, {"scenario": "raster"}):
             with self.subTest(kwargs=kwargs):
                 result, raw, _, _, folder = self.run_case(**kwargs)
                 self.assertEqual("HUMAN", result["status"])

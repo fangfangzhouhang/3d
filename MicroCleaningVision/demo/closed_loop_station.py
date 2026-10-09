@@ -27,7 +27,7 @@ from microcleaning.control_system.planning.stage2_position import DEFAULT_POSITI
 from microcleaning.control_system.planning.work_frame import load_motor_calibration
 from microcleaning.control_system.planning.stage2_axes import parse_movexy_line
 from microcleaning.control_system.safety.fixed_rule import DEFAULT_IN_PLACE_DURATION_MS, MAX_IN_PLACE_DURATION_MS
-from microcleaning.control_system.safety.motion_gate import STAGE2_RUN_STEP_CAP
+from microcleaning.control_system.safety.motion_gate import STAGE2_RUN_STEP_CAP, format_side_clearance
 from microcleaning.control_system.serial.f103_session import F103SerialSession
 from microcleaning.control_system.serial.stage2_link import Stage2SerialLink
 from microcleaning.control_system.serial.stm32_serial import STM32SerialController
@@ -198,6 +198,9 @@ def confirm_cycle(preview: dict) -> bool:
     geometry = preview.get("geometry") or {}
     if phase == "move":
         _arm_overlay(preview, geometry.get("observation_position"))
+        origin = geometry.get("observation_position")
+        if origin is not None:
+            _tell(format_side_clearance((int(origin[0]), int(origin[1]))))
         _print_path(preview)
         if preview.get("include_pump", True):
             _tell(f"预定短喷 {preview['pump_request']['duration_ms']} ms。这一次 yes 不喷水。")
@@ -359,7 +362,11 @@ def main(argv: list[str] | None = None) -> int:
             result["status"] = "ERROR"
             result.setdefault("cleanup_errors", []).extend(cleanup_errors)
             write_json(folder / "summary.json", result)
-    _tell(f"闭环结果：{result['status']}；原因：{result['reasons']}；记录：{folder.resolve()}")
+    notice = result.get("boundary_notice")
+    if notice:
+        _tell(f"闭环结果：{notice}记录：{folder.resolve()}")
+    else:
+        _tell(f"闭环结果：{result['status']}；原因：{result['reasons']}；记录：{folder.resolve()}")
     if panel is not None:
         panel.wait_dismiss(8)
     return {"SUCCESS": 0, "HUMAN": 2, "ERROR": 3}[result["status"]]

@@ -13,7 +13,7 @@ from microcleaning.control_system.planning.stepper_preview import (
 
 
 MAX_PULSE_STEPS = 20000
-DEFAULT_TRANSMIT_BUDGET = 10000
+DEFAULT_TRANSMIT_BUDGET = MAX_PULSE_STEPS
 
 _MOVEXY_LINE = re.compile(r"^MOVEXY \d+ (?:FWD|REV) \d+ (?:FWD|REV)$")
 
