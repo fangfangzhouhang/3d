@@ -100,6 +100,13 @@ class STM32SerialController(ControllerPort):
     def stop(self) -> STM32Response:
         """发送 MCV1|STOP。不要求 --arm-pump，也不发送 PUMP。"""
 
+        from contextlib import nullcontext
+        cancel = getattr(self._session, "cancellation", None)
+        with cancel.stopping() if cancel is not None else nullcontext():
+            return self._stop_without_cancel()
+
+    def _stop_without_cancel(self) -> STM32Response:
+
         self.stop_replies = []
         ack = self._command(encode_stop(), expected_kind=None, reset_buffer=True)
         self.stop_replies.append(ack.raw)

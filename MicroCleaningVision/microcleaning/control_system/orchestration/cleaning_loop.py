@@ -13,6 +13,9 @@ from uuid import uuid4
 
 from microcleaning.contracts import Episode, FailureRecord, NextRoute, VerificationResult
 from microcleaning.control_system.orchestration.target_adapter import TargetIdentityError, TargetLedger
+from microcleaning.control_system.orchestration.task_model import TaskModel
+from microcleaning.control_system.orchestration.result_evidence import QUALITY_POLICY, evaluate_target, final_quality
+from microcleaning.control_system.orchestration.workbench_events import OperationCancelled
 from microcleaning.control_system.planning.cleaning_plan import plan_cleaning
 from microcleaning.control_system.planning.path_preview import draw_path_overlay, resolve_plan_policy
 from microcleaning.control_system.planning.sequence_planner import STRATEGIES, plan_sequence
@@ -22,7 +25,7 @@ from microcleaning.control_system.safety.motion_gate import STAGE2_RUN_STEP_CAP,
 from microcleaning.control_system.replay.episode_store import write_episode
 from microcleaning.data_learning.image_quality import build_observation, measure_image_quality
 from microcleaning.vision.contamination import ContaminationMeasurement
-from microcleaning.vision.target_instance import extract_target_instances, extract_target_mask, verify_single_target
+from microcleaning.vision.target_instance import extract_target_instances, extract_target_mask, match_target_instance, verify_single_target
 
 
 VERSION = "single-entry-cleaning-v1"
@@ -50,6 +53,8 @@ _STAGE_TEXT = {
     "HUMAN": "已停止。",
     "ERROR": "因错误停止。脉冲和 DONE 不是清洗有效。",
     "RETRY": "按你的确认，再试同一块。",
+    "REVIEW_CANDIDATES": "请审核首次候选；仅确认处理且定位有效的目标进入锁定名单。",
+    "CANCELLED": "任务已取消；请查看停止回执和中止记录。",
 }
 
 
@@ -81,10 +86,11 @@ class LoopConfig:
 class CleaningLoop:
     def __init__(self, *, output_dir: str | Path, source, segmenter, executor,
                  placeholders, calibration, offset, config: LoopConfig = LoopConfig(),
-                 compare: Callable[[dict], bool] | None = None) -> None:
+                 compare: Callable[[dict], bool] | None = None, review: Callable | None = None,
+                 metadata: dict | None = None, on_event: Callable[[dict], None] | None = None) -> None:
         config.validate()
         self.config = config
-        self.folder = Path(output_dir)
+        self.folder = Path(output_dir).resolve()
         self.folder.mkdir(parents=True, exist_ok=True)
         if (self.folder / "summary.json").exists():
             raise FileExistsError("RUN_DIRECTORY_ALREADY_USED")
@@ -92,6 +98,10 @@ class CleaningLoop:
         self.source, self.segmenter, self.executor = source, segmenter, executor
         self.placeholders, self.calibration, self.offset = placeholders, calibration, offset
         self.compare = compare
+        self.review, self.metadata, self.on_event = review, metadata or {}, on_event
+        self.task: TaskModel | None = None
+        self.cancellation = getattr(executor, "cancellation", None)
+        self.current_target_id: str | None = None
         self.policy_hash = segmenter.sha256
         self.ledger = None
         self.roster_ids: tuple[str, ...] = ()
@@ -111,6 +121,8 @@ class CleaningLoop:
             "config": asdict(config), "segmentation": segmenter.configuration, "segmentation_sha256": self.policy_hash,
             "offset": offset.to_dict(), "placeholders": placeholders.to_dict(),
             "motor_calibration": None if calibration is None else calibration.to_dict(),
+            "metadata": self.metadata, "quality_policy": QUALITY_POLICY,
+            "task_manifest_ref": "task_manifest.json" if review is not None else None,
             "evidence_boundary": "Mock 是软件证据；实物需独立记录"})
 
     def stage(self, phase: str) -> None:
@@ -122,6 +134,17 @@ class CleaningLoop:
         tell = getattr(self.source, "tell", None)
         if callable(tell):
             tell(_STAGE_TEXT.get(phase, phase))
+        self._emit("stage", phase=phase, explanation=_STAGE_TEXT.get(phase, phase), cycle=self._cycle,
+                   current_target_id=self.current_target_id)
+
+    def _emit(self, kind: str, **payload) -> None:
+        if self.on_event is not None:
+            self.on_event({"kind": kind, **payload,
+                "task": None if self.task is None else self.task.to_dict()})
+
+    def _check_cancel(self) -> None:
+        if self.cancellation is not None:
+            self.cancellation.check()
 
     def run(self) -> dict:
         status, reasons = "ERROR", ("LOOP_NOT_STARTED",)
@@ -131,6 +154,7 @@ class CleaningLoop:
         try:
             # 每一轮（含 RETRY）都重新拍前图；不复用旧动作和旧令牌。
             for number in range(1, self.config.max_cycles + 1):
+                self._check_cancel()
                 self._cycle = number
                 outcome, pre, post, verification = None, None, None, None
                 episode_written = False
@@ -149,6 +173,8 @@ class CleaningLoop:
                 if self.ledger is None:
                     self.ledger = TargetLedger(pre["observation"].observation_id, pre["mask"], targets)
                     self._publish_roster(pre)
+                    if self.review is not None:
+                        self._review_candidates(pre)
                 else:
                     self._advance_closed(pre["observation"].observation_id, pre["mask"])
                 self.stage("SELECT_TARGET")
@@ -164,10 +190,28 @@ class CleaningLoop:
                         self._say(f"第一次画面标注的 {len(self.roster_ids)} 块都已处理过。不再重复清洗。这次结束不是洁净验收。")
                     status, reasons = "SUCCESS", ("ALL_OBSERVED_TARGETS_COMPLETED",) if self.cycles else ("NO_TARGET",)
                     break
-                entry = self.ledger.entries[selected]
+                entry = self.ledger.entries.get(selected)
+                if entry is None and self.task is not None:
+                    entry = self.task.targets[selected]
                 instance = self.roster_plan[selected]
+                self.current_target_id = selected
+                if self.task is not None:
+                    item = self.task.targets[selected]
+                    if item.source == "algorithm":
+                        match = match_target_instance(pre_target=instance, pre_mask=self.roster_mask, post_mask=pre["mask"])
+                        matched = next((target for target in targets if target.component_label == match.post_label), None)
+                        drift = None if matched is None else sum((a - b) ** 2 for a, b in zip(matched.centroid_px, instance.centroid_px)) ** 0.5
+                        if match.status != "matched" or matched is None or drift > 2.0:
+                            raise TargetIdentityError(f"{selected}:CURRENT_LOCATION_NOT_VERIFIED")
+                    elif number > 1 and not self.executor.confirm({"phase": "manual_location", "target_id": selected,
+                            "centroid_px": instance.centroid_px, "bbox": instance.bbox}):
+                        raise TargetIdentityError(f"{selected}:MANUAL_LOCATION_NOT_CONFIRMED")
+                    item.execution = "RUNNING"
+                    self.task.persist()
+                    self._emit("target")
                 self.stage("PLAN_TARGET")
-                target_mask = extract_target_mask(self.roster_mask, instance)
+                target_mask = self.task.manual_masks[selected] if self.task is not None and selected in self.task.manual_masks else extract_target_mask(self.roster_mask, instance)
+                verification_mask = target_mask if self.task is not None and selected in self.task.manual_masks else self.roster_mask
                 write_png(cycle_dir / "selected_target_mask.png", target_mask)
                 normalized, _ = stage2_placeholders(self.placeholders, self.roster_mask.shape, self.calibration)
                 plan = plan_cleaning(target_mask, policy=resolve_plan_policy(normalized))
@@ -209,6 +253,8 @@ class CleaningLoop:
                     episode_written = True
                     active["used_abs_steps_after"] = self.used
                     self.cycles.append(active)
+                    if self.task is not None:
+                        self.task.update_attempt(selected, active, quality="UNCERTAIN", finished=False)
                     active = None
                     status, reasons = "SUCCESS", outcome.reasons
                     break
@@ -229,9 +275,16 @@ class CleaningLoop:
                     comparable, evidence = self._comparable(pre, post, outcome)
                     active["comparability"] = evidence
                     verification = verify_single_target(task_id=self.task_id, pre=pre["observation"], post=post["observation"],
-                        pre_target=instance, pre_mask=self.roster_mask, post_mask=post["mask"],
+                        pre_target=instance, pre_mask=verification_mask, post_mask=post["mask"],
                         receipt=outcome.receipt, images_comparable=comparable)
                     active["verification"] = asdict(verification)
+                    if self.task is not None:
+                        quality = evaluate_target(source=self.task.targets[selected].source, execution=active["execution"],
+                            verification=active["verification"], comparability=evidence, mode="real" if self.config.real else "mock")
+                        active["quality_evidence"] = quality.to_dict()
+                        self.task.targets[selected].quality = quality.quality
+                        self._emit("verification", target_id=selected, verification=active["verification"],
+                                   quality_evidence=quality.to_dict(), pre=pre["metadata"], post=post["metadata"])
                     write_json(cycle_dir / "verification.json", asdict(verification))
                     _say_recheck(self, verification)
                     route = self._after_recheck(active, verification, entry, post)
@@ -240,6 +293,9 @@ class CleaningLoop:
                     episode_written = True
                     active["used_abs_steps_after"] = self.used
                     self.cycles.append(active)
+                    if self.task is not None:
+                        self.task.update_attempt(selected, active, quality=active["quality_evidence"]["quality"],
+                            finished=route != "retry")
                     write_json(cycle_dir / "cycle.json", active)
                     active = None
                     if route in {"next", "retry"}:
@@ -256,6 +312,8 @@ class CleaningLoop:
                 episode_written = True
                 active["used_abs_steps_after"] = self.used
                 self.cycles.append(active)
+                if self.task is not None:
+                    self.task.update_attempt(selected, active, quality="UNCERTAIN", finished=False)
                 write_json(cycle_dir / "cycle.json", active)
                 active = None
                 status, reasons = outcome.status, outcome.reasons
@@ -264,6 +322,8 @@ class CleaningLoop:
                 status, reasons = "HUMAN", ("MAX_CYCLES_REACHED",)
         except TargetIdentityError as exc:
             status, reasons = "HUMAN", ("TARGET_IDENTITY_UNCERTAIN", str(exc))
+        except OperationCancelled as exc:
+            status, reasons = "CANCELLED", (str(exc),)
         except (Exception, KeyboardInterrupt) as exc:
             status, reasons = "ERROR", ("INTERRUPTED" if isinstance(exc, KeyboardInterrupt) else getattr(exc, "reason_code", str(exc) or type(exc).__name__),)
         finally:
@@ -281,8 +341,12 @@ class CleaningLoop:
                     self._episode(cycle_dir, pre, post, outcome, verification, failure=(self.events[-1]["phase"], reasons))
                 active["failure"] = {"status": status, "reasons": reasons}
                 self.cycles.append(active)
+                if self.task is not None:
+                    self.task.update_attempt(active["target_id"], active, quality="UNCERTAIN", finished=False)
                 write_json(self.folder / f"cycle_{self._cycle:03d}" / "cycle.json", active)
             self.stage(status)
+            if self.task is not None:
+                self.task.finish("CANCELLED" if status == "CANCELLED" else "COMPLETED" if status == "SUCCESS" else "FAILED")
             if status != "SUCCESS":
                 write_json(self.folder / "failure.json", {"status": status, "reasons": reasons, "cycle": self._cycle,
                     "position": load_position(self.executor.position_path).to_dict()})
@@ -293,12 +357,21 @@ class CleaningLoop:
                 "position": load_position(self.executor.position_path).to_dict(),
                 "segmentation_sha256": self.policy_hash, "events": self.events,
                 "evidence_boundary": "规则复检通过不是已验收洁净标准；MCV1 DONE 只表示输出完成",
-                "initial_target_ids": list(self.roster_ids),
+                "initial_target_ids": list(self.task.initial_ids if self.task is not None else self.roster_ids),
                 "ignored_new_components": self.ignored_new_total,
                 "boundary_notice": self.boundary_notice}
+            if self.task is not None:
+                rows = [item.to_dict() for item in self.task.targets.values()]
+                quality, quality_reasons = final_quality(rows, workflow_status=self.task.state, mode=summary["mode"])
+                summary.update(workflow_status=self.task.state, quality_status=quality, quality_reasons=quality_reasons,
+                    task_manifest_ref="task_manifest.json", review_log_ref="review_log.jsonl",
+                    candidate_target_ids=list(self.task.targets), execution_target_ids=list(self.task.execution_ids),
+                    cancellation=None if self.cancellation is None else {"requested_at": self.cancellation.requested_at,
+                        "reason": self.cancellation.reason if self.cancellation.event.is_set() else None})
             write_json(self.folder / "serial.json", {"events": self.executor.session.serial_events,
                 "preserved_replies": [line.decode("ascii", errors="replace").strip() for line in self.executor.session.preserved_replies]})
             write_json(self.folder / "summary.json", summary)
+            self._emit("completed", summary=summary, folder=str(self.folder.resolve()))
         return summary
 
     def _observe(self, phase, folder, after=None):
@@ -359,13 +432,19 @@ class CleaningLoop:
             return self._finish_stain_and_continue(post, selected, cleaned=True)
         if result.next_route is NextRoute.RETRY:
             if entry.retry_count >= self.config.max_retries_per_target:
+                if self.task is not None:
+                    if self.executor.confirm({**active, "phase": "next_incomplete", "verification": asdict(verification),
+                            "stop_reasons": ("MAX_RETRIES_PER_TARGET_REACHED",) + result.reason_codes,
+                            "cycles_left": self.config.max_cycles - self._cycle, "next_target_id": self._following_id(selected)}):
+                        return self._finish_stain_and_continue(post, selected, cleaned=False)
+                    return ("HUMAN_STOPPED_AFTER_RESIDUE",) + result.reason_codes
                 self.executor.confirm({**active, "phase": "stop", "verification": asdict(verification),
                     "stop_reasons": ("MAX_RETRIES_PER_TARGET_REACHED",) + result.reason_codes})
                 return ("MAX_RETRIES_PER_TARGET_REACHED",) + result.reason_codes
             if not self.executor.confirm({**active, "phase": "retry", "verification": asdict(verification)}):
                 return ("HUMAN_DECLINED_RETRY",) + result.reason_codes
             self.stage("RETRY")
-            self.ledger.entries[selected].retry_count += 1
+            entry.retry_count += 1
             self._say(f"再试 {selected}。这还不是下一块。")
             return "retry"
         accepted = self.executor.confirm({**active, "phase": "next_incomplete", "verification": asdict(verification),
@@ -377,7 +456,9 @@ class CleaningLoop:
         return self._finish_stain_and_continue(post, selected, cleaned=False)
 
     def _finish_stain_and_continue(self, post, selected, *, cleaned: bool):
-        self._advance_closed(post["observation"].observation_id, post["mask"], completed_id=selected)
+        self._advance_closed(post["observation"].observation_id, post["mask"], completed_id=selected if selected in self.ledger.entries else None)
+        if self.task is not None:
+            self.task.targets[selected].finished = True
         self.stage("STAIN_RECORDED")
         finished = sum(1 for item in self.ledger.entries.values() if item.completed)
         nxt = self._following_id(selected)
@@ -399,7 +480,11 @@ class CleaningLoop:
 
     def _next_roster_id(self) -> str | None:
         for stable in self.roster_ids:
-            entry = self.ledger.entries.get(stable)
+            entry = self.task.targets.get(stable) if self.task is not None else self.ledger.entries.get(stable)
+            if self.task is not None:
+                if entry is not None and not entry.finished:
+                    return stable
+                continue
             if entry is not None and not entry.completed:
                 return stable
         return None
@@ -410,7 +495,8 @@ class CleaningLoop:
             if stable == selected:
                 seen = True
                 continue
-            if seen and not self.ledger.entries[stable].completed:
+            unfinished = not self.task.targets[stable].finished if self.task is not None else not self.ledger.entries[stable].completed
+            if seen and unfinished:
                 return stable
         return None
 
@@ -435,6 +521,46 @@ class CleaningLoop:
         show = getattr(self.source, "show_roster", None)
         if callable(show):
             show(view)
+
+    def _review_candidates(self, pre) -> None:
+        self.task = TaskModel(folder=self.folder, task_id=self.task_id, image_shape=pre["mask"].shape,
+            entries=self.ledger.entries, metadata={**self.metadata, "mode": "real" if self.config.real else "mock"},
+            references={"initial_image": pre["observation"].raw_image_ref, "initial_mask": str(Path(pre["observation"].raw_image_ref).with_name("pre_mask.png")),
+                "initial_image_sha256": pre["metadata"]["raw_sha256"], "segmentation_sha256": self.policy_hash,
+                "motor_calibration": None if self.calibration is None else self.calibration.to_dict(), "offset": self.offset.to_dict()},
+            policy={**QUALITY_POLICY, "max_location_drift_px": 2.0, "step_budget": self.config.step_budget,
+                "pump_duration_ms": self.executor.pump_duration_ms, "max_cycles": self.config.max_cycles})
+        for stable, candidate in self.task.targets.items():
+            self.prepare_candidate(stable)
+        self.task.persist()
+        self.stage("REVIEW_CANDIDATES")
+        self.review(self.task, pre, self.prepare_candidate)
+        self._check_cancel()
+        if self.task.state != "RUNNING":
+            raise PermissionError("HUMAN_LOCK_AND_START_REQUIRED")
+        self.roster_ids = self.task.execution_ids
+        self.roster_plan.update({stable: item.instance for stable, item in self.task.targets.items()})
+
+    def prepare_candidate(self, stable: str) -> None:
+        from microcleaning.contracts import SafetyOutcome
+        from microcleaning.control_system.safety.motion_gate import evaluate_motion
+        candidate = self.task.targets[stable]
+        mask = self.task.manual_masks[stable] if candidate.source == "manual" else extract_target_mask(self.roster_mask, candidate.instance)
+        normalized, _ = stage2_placeholders(self.placeholders, mask.shape, self.calibration)
+        plan = plan_cleaning(mask, policy=resolve_plan_policy(normalized))
+        geometry = build_cycle_geometry(plan, base=self.placeholders, calibration=self.calibration, offset=self.offset,
+            observation_position=self.observation_position, task_id=self.task_id, budget=self.config.step_budget, real=self.config.real)
+        reasons = list(geometry.reasons)
+        for request in (geometry.outbound_request, geometry.return_request):
+            decision = evaluate_motion(request)
+            if decision.outcome is SafetyOutcome.DENY:
+                reasons.extend(decision.reason_codes)
+        if candidate.source == "manual":
+            if "OVERLAPS_EXISTING_TARGET" in candidate.eligibility_reasons:
+                reasons.append("OVERLAPS_EXISTING_TARGET")
+            write_png(self.folder / f"manual_{stable}_mask.png", mask)
+        self.task.set_plan(stable, {"action": plan.strategy.value, "geometry": geometry.to_dict(),
+            "centroid_px": candidate.instance.centroid_px, "pump_duration_ms": self.executor.pump_duration_ms}, tuple(dict.fromkeys(reasons)))
 
     def _advance_closed(self, observation_id: str, mask, *, completed_id: str | None = None) -> None:
         try:

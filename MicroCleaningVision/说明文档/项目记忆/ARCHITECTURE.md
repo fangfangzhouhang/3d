@@ -1,5 +1,7 @@
 # ARCHITECTURE｜整个系统怎么工作
 
+2026-10-09 当前新增链：`closed_loop_station` → 五页 `WorkbenchWindow/workbench_views` → `workbench_runtime`（主线程只收事件，相机线程独占VideoCapture，设备线程独占串口）→ `TaskModel` 全名单/审核/不可变锁定 → 原 `CleaningLoop/HardwareExecutor/serial` → 原 Episode + 补充 task_manifest/review_log → `result_evidence` → reporting。锁定只选已确认目标；不修改共享八对象，UI答复不是硬件命令。实际 MOVE 跳监控、结束跳结果；原记录自动保存、导出由用户选择。旧 StationPanel 和不加 workbench 的 Mock 保留，以下旧快照只代表当时版本。
+
 核对日期：2026-10-05；基线 main `341224f`（PR #24 后），`feat/single-entry-cleaning-v1` worktree 的主机代码/说明改动尚未提交。固件未在此轮修改或重建，真实设备未操作。 目标见 [PROJECT](PROJECT.md)，接口见 [INTERFACES](INTERFACES.md)。
 
 ## 1. 目标系统与当前实现

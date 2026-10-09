@@ -1,5 +1,7 @@
 # INTERFACES｜模块之间怎样传数据
 
+2026-10-09 工作台局部接口补充：`workbench-task-v1` task_manifest 保存全候选/决定/冻结名单/原像素几何/哈希；`review_log.jsonl` 追加编辑及质量复核；`quality-report-v1` 规范化原档案供 UI/HTML/CSV 使用；`workbench-evidence-v1` 解释证据，不改 B 原 verification。事件队列和 request_id 仅用于主机线程通信，串口句子和 mcl-v0.1 contracts/ports 没有改变。serial 会话新增可选 cancellation/on_serial_event，旧调用默认不启用；消费者仅工作台和其测试。summary 保留旧键并增加 workflow/quality、manifest引用、执行子集。版本和路径见手册；以下基线为历史。
+
 核对日期：2026-10-05；基线 main `341224f`（PR #24 后），`feat/single-entry-cleaning-v1` worktree 的主机代码/说明改动尚未提交。固件未在此轮修改或重建，真实设备未操作。 共享 Python 合同 mcl-v0.1、泵 MCV1、步进 v0.3 均未更改。
 
 ## 1. 合同的真实来源

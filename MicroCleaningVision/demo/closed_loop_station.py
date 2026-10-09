@@ -1,7 +1,8 @@
-"""单进程入口：同一个窗口里看显微镜、看第一次标注，并在这个窗口确认。
+"""闭环入口：工作台按检测、审核、监控和报告分页面显示。
 
 没有同时武装喷水时只走去程和回程。旧的 demo.demo_pipeline --live 不发送步进。
-短喷默认 500 ms。第一次画面标注了几块污渍，就处理几块。
+短喷默认 500 ms。工作台只处理首次候选中人工确认并锁定的目标。
+旧 Mock CLI 保留首次算法名单；--workbench 启动 Mock 分页面工作台。
 """
 
 from __future__ import annotations
@@ -262,7 +263,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--mock", action="store_true", help="软件闭环（默认），自动确认仅限 Mock")
-    mode.add_argument("--real", action="store_true", help="显式选择实物；还需逐轮终端 YES")
+    mode.add_argument("--real", action="store_true", help="实物五页工作台；每一步仍需人工确认")
     parser.add_argument("--mock-scenario", choices=SCENARIOS, default="success")
     parser.add_argument("--output-root", type=Path, default=Path("output/closed_loop"))
     parser.add_argument("--algorithm", choices=VISION_ALGORITHMS, default="local")
@@ -283,12 +284,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--serial-timeout", type=float, default=2.0)
     parser.add_argument("--arm-stage2-xy", action="store_true")
     parser.add_argument("--arm-pump", action="store_true")
-    parser.add_argument("--confirm-pump", action="store_true", help="启用逐轮 YES 流程；参数本身不批准动作")
+    parser.add_argument("--confirm-pump", action="store_true", help="启用当步人工确认；参数本身不批准动作")
     parser.add_argument("--camera-index", type=int)
     parser.add_argument("--camera-width", type=int)
     parser.add_argument("--camera-height", type=int)
     parser.add_argument("--camera-backend", type=int)
     parser.add_argument("--warmup-frames", type=int, default=5)
+    parser.add_argument("--workbench", action="store_true", help="Mock 使用五页交互工作台；Real 默认启用")
     args = parser.parse_args(argv)
     try:
         config = LoopConfig(args.max_cycles, args.max_retries_per_target, args.sequence_strategy, args.stage2_max_steps, args.real)
@@ -310,6 +312,10 @@ def main(argv: list[str] | None = None) -> int:
         offset.validate(calibration, real=args.real)
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
+    if args.real or args.workbench:
+        from demo.workbench_runtime import WorkbenchRuntime
+        return WorkbenchRuntime(args=args, config=config, segmenter=segmenter,
+            placeholders=placeholders, calibration=calibration, offset=offset).run()
     folder = args.output_root / f"station_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
     folder.mkdir(parents=True)
     source, executor, panel = None, None, None

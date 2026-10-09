@@ -1,7 +1,7 @@
 # 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
 # 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
-updated_at: 2026-10-05
-current_phase: "基线 main 341224f + feat/single-entry-cleaning-v1 未提交主机改动。新单入口 Mock 闭环、有限重试和失败停止已验证；346 项测试通过。固件未改；实物接线/烧录/偏移/回程和真实复检未验收。"
+updated_at: 2026-10-09
+current_phase: "当前 fzh-branch@8c422cf 加未提交五页工作台改动。审核锁定子集、原安全执行、双图监控、复检、独立结果页及用户选择报告导出已打通 Mock 3候选/2执行/3记录。固件/标定/B算法/共享contracts未改；本轮未操作实物。最新测试见实时进度及工作台手册。"
 
 current_evidence_level:
   overall_hardware: E0
@@ -20,6 +20,9 @@ team_scope:
     - 未经人工关卡的真实泵、电机、喷头和平台控制
 
 validated_capabilities:
+  - "2026-10-09全量399项45.084秒OK；独立五页Tk交互/心跳/审核动作可视区域2项17.645秒OK。最终读档完成后发布idle；日志和证据索引见实时进度/工作台手册。HTML/CSV软件核验通过，浏览器排版与实际打印未验收。"
+  - "2026-10-09工作台3候选、确认2排除1，仅2次Mock PUMP；完整报告3行，混合场景FAIL（1残留、1待复核、1排除）。原始记录自动保存，HTML/CSV/打印由用户选择。真实模块串接，非硬编码verification。"
+  - "工作台Tk主事件循环、独立相机所有者、单一串口执行线程；50ms分段可取消读取；去程/泵/回程等待取消有原STOP回执和未知位置保护。Mock证明不代表驱动/实物STOP延迟已验收。"
   - "2026-10-05本 worktree 主机全量346项，16.594秒OK；新 demo.closed_loop_station 默认Mock三目标成功，有限一次重试四轮成功，计数不足ERROR且PUMP=0；未操作实物。"
   - "2026-10-05在feat/closed-loop-cleaning-v1用合成Mask和脚本串口跑通干跑：serial 47、safety 25、vision 48、planning 41、integration 12。运动失败不喷；单目标复检不看整图面积；序列规划可重复。不是实机，不是清洗有效。"
   - "2026-10-05在HEAD f31e445加本轮工作区修改运行Python全量233项，2.513秒，OK；A/B/C业务和测试未修改。"
@@ -84,7 +87,12 @@ module_ownership:
     ownership: "默认H1主改公共集成、H2复核，一次一位主改；协议须C参与确认。"
 
 software_loop:
-  status: single_entry_mock_closed_loop_validated_real_unverified
+  status: workbench_mock_integration_validated_real_unverified
+  workbench_runtime: demo/workbench_runtime.py
+  workbench_views: demo/workbench_views.py
+  task_model: microcleaning/control_system/orchestration/task_model.py
+  result_evidence: microcleaning/control_system/orchestration/result_evidence.py
+  reporting: microcleaning/control_system/reporting/
   closed_loop_entry: demo/closed_loop_station.py
   orchestrator: microcleaning/control_system/orchestration/cleaning_loop.py
   hardware_executor: microcleaning/control_system/orchestration/hardware_executor.py
@@ -97,6 +105,7 @@ software_loop:
   note: "新入口持续同相机/串口、单目标原尺寸Mask、唯一有符号偏移、回原观察位。未武装喷水时一次确认只走去程和回程，不做清洁复检。同时有喷水武装时，去程、针头重合确认、500ms短喷、回原位、复检和下一块各自在同一个窗口确认。第一次画面的编号顺序是清洗顺序，后面不新开；复检对不上时确认仍继续下一块。显微镜窗口标出光心十字和右下角S/N小图。仅CENTER_POINT，扫描HUMAN。旧 demo --live 不发送步进。station_20261008_203402_ed901155 只喷了S0001一次后因TARGET_UNMATCHED停下，S0002未喷。编号顺序的软件修正还没有在COM8上再跑。"
   budget_rule: "主机不再另设单次步数上限。能否移动只看位置账本，人工零点两侧各10000步。越界时窗口和终端用中文说明当前位置、两侧剩余和超出步数，然后拦住。固件一条报文最多20000步。"
   nozzle_offset_rule: "scope_to_nozzle_delta_steps实物须实测/方向确认/来源/不确定性/电机标定SHA256绑定；null不等于0；拒绝重复补偿。"
+  workbench_note: "Real默认五页工作台；交互Mock加--workbench；旧Mock自动确认CLI保留。首次候选待审、锁定确认子集。运行中新增不入队列；下一目标当前定位未唯一匹配或漂移超过2px则HUMAN。原图/实时并列，MOVE触发监控，结束独立结果页。报告质量INCOMPLETE优先于FAIL/REVIEW_REQUIRED/PASS；0.80仅回放规则、无前景需复核。历史缺字段未记录。"
 
 current_dataset:
   status: legacy13_labeled_plus_usb_probe1_identity_unverified
@@ -134,7 +143,7 @@ hardware_boundary:
   real_hardware_armed: false
   stm32_board: STM32F103C8T6
   stm32_pump_pin_plan: "联合入口与旧兼容均PB0，低开高关；当前联合入口PUMP ON固定300ms，由共享状态机到时关闭；实物极性未验收。"
-  stm32_estop_pin_plan: "当前联合入口PB2上拉，假设常闭触点接地，断开高锁存急停；接线尚未确认。不是F401 PB12；旧兼容入口配置保留原样。"
+  stm32_estop_pin_plan: "当前firmware/common/main.c初始化/读取PB12上拉，假设常闭接地、断开读高；旧PB2文字为历史。实际烧录与接线尚未确认，主机工作台不推断当前物理引脚。"
   stm32_pc_connection_plan: "人确认的 USB 转 TTL 或调试口；禁止扫口。Stage 2 步进协议见串口协议与参数.md"
   stm32_firmware_status: unified_xy_timed_pump_interlocks_offline_verified_not_flashed
   stm32_firmware_path: firmware/common/
@@ -157,8 +166,8 @@ development_environment:
   serial_profile: "requirements/control-serial.txt；仅获得真实协议并批准后使用"
 
 major_risks:
-  - "本轮PB2改为常闭接地/上拉，断线阻止动作；必须先核对现场接线。默认ARM按钮非强制，轮询联锁不替代独立断电。"
-  - "名义针头偏移7680步超过正式主机1600步预算，未标定；TO_SCOPE是相对反向而非回零，主机/固件不得重复补偿。"
+  - "源码当前PB12，旧资料仍有PB2；必须核对同次烧录和接线。默认ARM按钮非强制，轮询联锁不替代独立断电。"
+  - "名义针头偏移7680步仍未实测确认；当前±10000软边界和20000报文限制不能作为几何验收。TO_SCOPE是相对反向而非回零，主机/固件不得重复补偿。"
   - "固件限时不能修复center_object尝试耗尽后喷水、补关缺口、相机/标定硬编码；本轮未改这些主机文件。"
   - "Demo运动关卡只覆盖当前主发送器；center_object和calibrate_motor_mm_per_px脚本直接发串口运动，不能宣称所有运动入口都统一授权。"
   - "三人尚无稳定投入时间，采用核心/扩展/备用任务和实际专注时段回填。"
@@ -176,6 +185,7 @@ blockers:
   - "步进方向和双轴试验已有提交，步距、限位开关、像素到毫米仍未验收。电机转了不是清洗。"
 
 next_actions:
+  - "WORKBENCH-FIELD-01：软件界面完成Mock后，由操作者按手册审核子集；H1/H2先交同次接线/烧录/STOP及标定，A/B交可比前后图；再单目标独立现场验收。不要把Mock报告PASS解释为实物效果。"
   - "C-LOOP-FIELD-01：H2交三份实测配置、H1交同次固件/接线/停止证据、A/B交可比图后，C仅做新单入口--real --max-cycles 1、默认不重试，逐轮YES并保存完整运行目录；未实物运行。"
   - "TEAM-POST-01：从同学机拷回成功 Episode、PONG 原文和命令；不要在无 diff 时覆盖本机 demo/ 当官方实喷。"
   - "A-P1-U500-01：插入U500后运行scripts/probe_usb_camera.py，再运行--capture-test；保存index、分辨率、FPS、PNG、SHA256和质量结果。"
@@ -191,6 +201,7 @@ next_actions:
   - "说明：Agent每次改代码或制定改进计划先完整读六份项目记忆，再核对Git与提交/进度日志。本机main停在2026-09-13，不要用它判断进度。"
 
 documentation:
+  workbench_manual: 说明文档/软件组/可视化工作台操作手册.md
   project_memory: 说明文档/项目记忆/PROJECT.md
   architecture_memory: 说明文档/项目记忆/ARCHITECTURE.md
   interfaces_memory: 说明文档/项目记忆/INTERFACES.md
