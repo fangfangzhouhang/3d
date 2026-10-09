@@ -2,13 +2,15 @@
 
 from datetime import datetime, timezone
 from math import hypot
+from threading import RLock
 
 from microcleaning.control_system.orchestration.cleaning_loop import CapturedFrame
 from microcleaning.control_system.planning.stage2_geometry import NozzleOffset
 
 
 SCENARIOS = ("success", "retry", "no-target", "decline", "motion-short", "motion-timeout",
-             "pump-timeout", "return-timeout", "wrong-protocol", "post-quality", "noncomparable", "stale-post", "raster")
+             "pump-timeout", "return-timeout", "wrong-protocol", "post-quality", "noncomparable", "stale-post", "raster",
+             "workbench-mixed", "workbench-residual", "workbench-unmatched")
 
 
 class MockFrames:
@@ -26,21 +28,39 @@ class MockFrames:
         self.pumps = 0
         self.closed = False
         self.capture_phases = []
+        self._lock = RLock()
+        self.residual = {}
 
     def select_target(self, target):
-        self.selected = min(self.remaining, key=lambda index: hypot(self.centers[index][0] - target.centroid_px[0], self.centers[index][1] - target.centroid_px[1]))
+        with self._lock:
+            choices = self.remaining or set(range(len(self.centers)))
+            self.selected = min(choices, key=lambda index: hypot(self.centers[index][0] - target.centroid_px[0], self.centers[index][1] - target.centroid_px[1]))
 
     def pump_finished(self):
-        self.pumps += 1
-        if self.scenario != "retry" or self.pumps != 1:
-            self.remaining.discard(self.selected)
+        with self._lock:
+            self.pumps += 1
+            if self.scenario == "workbench-residual" or (self.scenario == "workbench-mixed" and self.selected == 1):
+                self.residual[self.selected] = 5
+            elif self.scenario == "workbench-unmatched":
+                self.residual[self.selected] = 1
+            elif self.scenario != "retry" or self.pumps != 1:
+                self.remaining.discard(self.selected)
+
+    def preview(self):
+        with self._lock:
+            image = self.background.copy()
+            for index in self.remaining:
+                self.cv2.circle(image, self.centers[index], self.residual.get(index, 7 if self.scenario != "raster" else 52), (18, 18, 205), -1)
+            return image
 
     def capture(self, phase, *, after=None):
+        with self._lock:
+            return self._capture(phase, after=after)
+
+    def _capture(self, phase, *, after=None):
         self.sequence += 1
         self.capture_phases.append(phase)
-        image = self.background.copy()
-        for index in self.remaining:
-            self.cv2.circle(image, self.centers[index], 7 if self.scenario != "raster" else 52, (18, 18, 205), -1)
+        image = self.preview()
         if phase == "post" and self.scenario == "post-quality":
             image[:] = 0
         settings = {"mock_only": True, "fixed_synthetic_view": True, "size": [240, 320]}

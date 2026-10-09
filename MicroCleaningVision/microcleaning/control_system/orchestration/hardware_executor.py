@@ -36,6 +36,8 @@ class CycleExecution:
     returned_at: str | None = None
     used_abs_steps: tuple[int, int] = (0, 0)
     device_probe: dict | None = None
+    outbound_result: Stage2TransmitResult | None = None
+    stop_evidence: dict | None = None
 
     @property
     def receipt(self) -> ExecutionReceipt | None:
@@ -59,6 +61,8 @@ class CycleExecution:
             "return_result": None if self.return_result is None else self.return_result.to_dict(),
             "return_error": None if self.return_error is None else self.return_error.to_dict(),
             "returned_at": self.returned_at, "used_abs_steps": self.used_abs_steps, "device_probe": self.device_probe,
+            "outbound_result": None if self.outbound_result is None else self.outbound_result.to_dict(),
+            "stop_evidence": self.stop_evidence,
         }
 
 
@@ -71,10 +75,16 @@ class HardwareExecutor:
         self.confirm = confirm
         self.pump_duration_ms = pump_duration_ms
         self._motion_uncertain = False
+        self.cancellation = getattr(session, "cancellation", None)
+
+    def _check_cancel(self) -> None:
+        if self.cancellation is not None:
+            self.cancellation.check()
 
     def execute(self, *, geometry: CycleGeometry, observation: Observation,
                 measurement: ContaminationMeasurement, preview: dict,
                 stage: Callable[[str], None]) -> CycleExecution:
+        self._check_cancel()
         state = estimate_state(observation, measurement)
         request = propose_pump_in_place(state, FixedActionPolicy(duration_ms=self.pump_duration_ms, version=PUMP_IN_PLACE_RULE_VERSION))
         if request is None:
@@ -125,6 +135,7 @@ class HardwareExecutor:
             stage("MOVE")
             self._motion_uncertain = True
             sent = self.link.transmit(geometry.outbound, request=geometry.outbound_request, decision=result.motion_decision)
+            result.outbound_result = sent
             position = record_completed(self.position_path, sent.sent_lines, run_id=observation.task_id)
             result.used_abs_steps = _absolute(sent.sent_lines)
             if tuple(sent.sent_lines) != tuple(geometry.outbound.lines) or position.xy() != geometry.execution_position:
@@ -147,6 +158,9 @@ class HardwareExecutor:
             result.return_decision = approve_motion_gate(geometry.return_request, returning, confirmed=True)
             _require_current_return_approval(geometry.return_request, result.return_decision)
             stage("PUMP")
+            # 即使等待 ACK/DONE 中取消，仍保留已完成去程及调用事实；TX/ACK 由 serial.json 证明。
+            result.session_result = F103StepThenPumpResult(self.session.is_open, True, self.session.pump_bytes,
+                False, False, motion_result=sent, pump_reason="OUTPUT_NOT_CONFIRMED")
             receipt = self.controller.execute(request, result.pump_decision)
             output_finished = bool(receipt.success and receipt.controller_state == "DONE")
             stopped = False
@@ -178,9 +192,11 @@ class HardwareExecutor:
         except (Exception, KeyboardInterrupt) as exc:
             if isinstance(exc, Stage2TransmitError):
                 self._motion_uncertain = exc.motion_attempted
-            result.status = "ERROR"
+            result.status = "CANCELLED" if self.cancellation is not None and self.cancellation.event.is_set() else "ERROR"
             result.reasons = ("INTERRUPTED" if isinstance(exc, KeyboardInterrupt) else getattr(exc, "reason_code", str(exc) or type(exc).__name__),)
-            self._stop()
+            result.stop_evidence = self._stop()
+            if isinstance(exc, Stage2TransmitError):
+                result.stop_evidence["motion_stop_confirmed"] = exc.stopped
             if self._motion_uncertain:
                 mark_unknown(self.position_path, run_id=observation.task_id, reason=result.reasons[0])
             self.session.failed = True
@@ -257,6 +273,7 @@ class HardwareExecutor:
             stage("MOVE")
             self._motion_uncertain = True
             sent = self.link.transmit(geometry.outbound, request=geometry.outbound_request, decision=result.motion_decision)
+            result.outbound_result = sent
             position = record_completed(self.position_path, sent.sent_lines, run_id=observation.task_id)
             result.used_abs_steps = _absolute(sent.sent_lines)
             if tuple(sent.sent_lines) != tuple(geometry.outbound.lines) or position.xy() != geometry.execution_position:
@@ -275,9 +292,11 @@ class HardwareExecutor:
             result.returned_at = datetime.now(timezone.utc).isoformat()
             result.status, result.reasons = "MOVED", ("MOTION_COMPLETED_NO_PUMP",)
         except (Exception, KeyboardInterrupt) as exc:
-            result.status = "ERROR"
+            result.status = "CANCELLED" if self.cancellation is not None and self.cancellation.event.is_set() else "ERROR"
             result.reasons = ("INTERRUPTED" if isinstance(exc, KeyboardInterrupt) else getattr(exc, "reason_code", str(exc) or type(exc).__name__),)
-            self._stop()
+            result.stop_evidence = self._stop()
+            if isinstance(exc, Stage2TransmitError):
+                result.stop_evidence["motion_stop_confirmed"] = exc.stopped
             if self._motion_uncertain:
                 mark_unknown(self.position_path, run_id=observation.task_id, reason=result.reasons[0])
             self.session.failed = True
@@ -286,14 +305,19 @@ class HardwareExecutor:
             if result.status != "MOVED":
                 self.session.close()
 
-    def _stop(self) -> None:
+    def _stop(self) -> dict:
+        evidence = {"requested_at": datetime.now(timezone.utc).isoformat(), "pump_stop_confirmed": False,
+                    "serial_was_open": self.session.is_open}
         if self.session.is_open:
             try:
-                self.controller.stop()
-            except Exception:
-                pass
+                done = self.controller.stop()
+                evidence.update(pump_stop_confirmed=done.kind == "DONE" and done.action_id == "STOP",
+                                replies=list(self.controller.stop_replies))
+            except Exception as exc:
+                evidence["error"] = str(exc)
             finally:
                 self.controller.close()
+        return evidence
 
     def close(self) -> None:
         try:

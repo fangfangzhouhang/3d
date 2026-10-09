@@ -9,6 +9,7 @@ STEP 与 MCV1 仍由各自的编码器和解码器处理。本模块只管理这
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -78,17 +79,31 @@ def classify_reply_line(raw: bytes | str) -> str:
 class _GuardedConnection:
     """包住已经打开的串口。清缓存只丢掉横幅，协议回复先被拿走。"""
 
-    def __init__(self, raw: Any) -> None:
+    def __init__(self, raw: Any, cancellation=None, timeout: float = 2.0, on_event=None) -> None:
         self.raw = raw
         self.preserved: list[bytes] = []
         self.finished: list[bytes] = []
         self.pump_bytes = 0
         self.events: list[dict[str, str]] = []
         self._partial = b""
+        self.cancellation, self.timeout = cancellation, timeout
+        self.on_event = on_event
+
+    def _record(self, direction: str, line: bytes) -> None:
+        event = {"at": datetime.now(timezone.utc).isoformat(), "direction": direction,
+                 "line": line.decode("ascii", errors="replace").strip()}
+        self.events.append(event)
+        if self.on_event is not None:
+            try:
+                self.on_event(dict(event))
+            except Exception:
+                pass  # 只读显示回调不能改变协议或授权。
 
     def write(self, data: bytes) -> int:
+        if self.cancellation is not None:
+            self.cancellation.check()
         payload = bytes(data)
-        self.events.append({"at": datetime.now(timezone.utc).isoformat(), "direction": "tx", "line": payload.decode("ascii", errors="replace").strip()})
+        self._record("tx", payload)
         if payload.startswith(b"MCV1|PUMP|"):
             self.pump_bytes += len(payload)
         written = self.raw.write(data)
@@ -100,9 +115,41 @@ class _GuardedConnection:
             flush()
 
     def readline(self) -> bytes:
-        line = self.raw.readline()
+        if self.cancellation is None:
+            line = self.raw.readline()
+        else:
+            # 分段等待保持原总超时和完整行语义；UI 取消至多等待一个 50ms 片段。
+            original = getattr(self.raw, "timeout", self.timeout)
+            budget = self.timeout if original is None else max(0.001, float(original))
+            deadline, chunks = time.monotonic() + budget, []
+            try:
+                while time.monotonic() < deadline:
+                    self.cancellation.check()
+                    if hasattr(self.raw, "timeout"):
+                        self.raw.timeout = min(0.05, max(0.001, deadline - time.monotonic()))
+                    part = _as_bytes(self.raw.readline())
+                    if part:
+                        chunks.append(part)
+                        if part.endswith((b"\n", b"\r")):
+                            break
+                    else:
+                        time.sleep(0.002)
+                line = b"".join(chunks)
+                if line and not line.endswith((b"\n", b"\r")):
+                    self._record("rx_partial", line)
+                    self.preserved.append(line)
+                    raise TimeoutError("RESPONSE_PARTIAL_TIMEOUT")
+            except Exception:
+                partial = b"".join(chunks)
+                if partial and (not self.preserved or self.preserved[-1] != partial):
+                    self._record("rx_partial", partial)
+                    self.preserved.append(partial)
+                raise
+            finally:
+                if hasattr(self.raw, "timeout"):
+                    self.raw.timeout = original
         if line:
-            self.events.append({"at": datetime.now(timezone.utc).isoformat(), "direction": "rx", "line": _as_bytes(line).decode("ascii", errors="replace").strip()})
+            self._record("rx", _as_bytes(line))
         return line
 
     def reset_input_buffer(self) -> None:
@@ -177,12 +224,16 @@ class F103SerialSession:
         timeout: float = 2.0,
         connection: Any = None,
         serial_factory: SerialFactory | None = None,
+        cancellation=None,
+        on_serial_event=None,
     ) -> None:
         if baudrate <= 0 or timeout <= 0:
             raise ValueError("波特率和超时必须为正")
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
+        self.cancellation = cancellation
+        self.on_serial_event = on_serial_event
         self._external_raw = connection
         self._factory = serial_factory
         self._guard: _GuardedConnection | None = None
@@ -225,6 +276,8 @@ class F103SerialSession:
     def acquire(self, owner: str, lease: object) -> _GuardedConnection:
         """让一个命令流独占这条串口。同一个租约可以重入，另一个租约不行。"""
 
+        if self.cancellation is not None:
+            self.cancellation.check()
         with self._lock:
             if self._closed:
                 raise F103SessionBusy("会话已关闭")
@@ -406,7 +459,7 @@ class F103SerialSession:
             if holder is not self:
                 raise F103SessionBusy(f"{self.port} 已由单串口会话占用，拒绝再打开")
         raw, owns = self._create_raw()
-        self._guard = _GuardedConnection(raw)
+        self._guard = _GuardedConnection(raw, self.cancellation, self.timeout, self.on_serial_event)
         self._owns_raw = owns
         self._opened = True
         self._ever_opened = True

@@ -276,7 +276,9 @@ class CameraPreview:
             self.tell(f"路径图已保存：{path}。右边继续显示第一次画面的标注。")
             return
         try:
-            image = self.cv2.imread(str(path), self.cv2.IMREAD_COLOR)
+            from pathlib import Path
+            import numpy as np
+            image = self.cv2.imdecode(np.frombuffer(Path(path).read_bytes(), dtype=np.uint8), self.cv2.IMREAD_COLOR)
             if image is None:
                 print(f"路径图打不开，规划仍继续：{path}", flush=True)
                 self.tell(f"路径图打不开，规划仍继续：{path}")

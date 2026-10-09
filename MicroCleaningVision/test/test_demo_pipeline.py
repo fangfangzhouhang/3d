@@ -447,8 +447,9 @@ class DemoStage2MotionTests(unittest.TestCase):
         self.assertFalse(load_position(self.position).known)
 
     def test_step_cap_cannot_be_raised(self):
+        from microcleaning.control_system.safety.motion_gate import STAGE2_RUN_STEP_CAP
         with self.assertRaises(ValueError):
-            self._run(stage2_max_steps=5000, motion_confirm=lambda request, plan: True)
+            self._run(stage2_max_steps=STAGE2_RUN_STEP_CAP + 1, motion_confirm=lambda request, plan: True)
         self.assertEqual(0, self.opened)
 
     def test_cli_rejects_arming_stage2_outside_stage2_move(self):
@@ -456,6 +457,7 @@ class DemoStage2MotionTests(unittest.TestCase):
         from io import StringIO
 
         from demo.demo_pipeline import main
+        from microcleaning.control_system.safety.motion_gate import STAGE2_RUN_STEP_CAP
 
         with redirect_stderr(StringIO()):
             with self.assertRaises(SystemExit):
@@ -463,7 +465,7 @@ class DemoStage2MotionTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 main(["--generate-sample", "--mode", "stage2-move", "--arm-stage2-xy", "--serial-port", "COM9"])
             with self.assertRaises(SystemExit):
-                main(["--generate-sample", "--stage2-max-steps", "3200"])
+                main(["--generate-sample", "--stage2-max-steps", str(STAGE2_RUN_STEP_CAP + 1)])
 
 
 if __name__ == "__main__":

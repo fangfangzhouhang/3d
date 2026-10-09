@@ -1,5 +1,11 @@
 # EXPERIMENTS｜做过什么，结果怎样
 
+## EXP-SW-WORKBENCH-20261009（E2 软件证据）
+
+本机 `D:\大创\3d\MicroCleaningVision`，`fzh-branch@8c422cf` 加未提交改动，Python3.13.14。3候选、确认S0001/S0002、排除S0003：原分割/编排/授权/协议替身产生2次PUMP，报告保留3行；S0001无前景需复核，S0002去除率约0.623仍有残留，最终FAIL。未用硬编码verification，也未连接相机或COM。任务结束无reports目录，显式导出才创建版本目录。
+
+Tk五页按钮/mainloop心跳贯通；软件等待取消覆盖运动/泵/回程以及DONE后，保留回执、原STOP与位置未知保护。新旧Tk连续测试暴露图片析构线程问题，按主线程生命周期修正；最终读档完成后才发布idle。最终全量399项45.084秒OK；独立可视窗口2项17.645秒OK。固定原档案 `output/workbench_qa/station_20261009_154821_ea60ed96/`，3候选/2输出/3报告行，最终FAIL且读档issues为空；截图在screenshots-final。具体日志见实时进度；本机 `output/workbench_qa/` 被Git忽略，其他机器不能假装持有此证据。历史真实记录只读核对不是本轮物理复验。HTML资产/结构通过软件测试，内置浏览器拒绝file协议，浏览器排版/真实打印未验收。
+
 核对日期：2026-10-05；基线 main `341224f`（PR #24 后），`feat/single-entry-cleaning-v1` worktree 的主机代码/说明改动尚未提交。固件未在此轮修改或重建，真实设备未操作。 各历史实验保留当时日期、版本及证据边界。
 
 ## 1. 证据能带到另一台电脑吗

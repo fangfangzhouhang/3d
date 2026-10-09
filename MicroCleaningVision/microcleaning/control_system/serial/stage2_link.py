@@ -260,6 +260,12 @@ class Stage2SerialLink:
         return last
 
     def _stop_into(self, replies: list[str]) -> bool:
+        from contextlib import nullcontext
+        cancel = getattr(self._session, "cancellation", None)
+        with cancel.stopping() if cancel is not None else nullcontext():
+            return self._stop_without_cancel(replies)
+
+    def _stop_without_cancel(self, replies: list[str]) -> bool:
         try:
             stopped = self._exchange(encode_stop())
             replies.append(stopped.raw)
@@ -332,6 +338,8 @@ class Stage2SerialLink:
 
 
 def _reason_code(exc: BaseException) -> str:
+    if getattr(exc, "reason_code", None):
+        return exc.reason_code
     if isinstance(exc, Stage2ProtocolError):
         return exc.reason_code
     if isinstance(exc, KeyboardInterrupt):
