@@ -85,6 +85,154 @@ def _reviews(root: Path, issues: list[str]) -> list[dict]:
     return result
 
 
+def _cycle_order(path: Path) -> int:
+    try:
+        return int(path.parent.name.removeprefix("cycle_"))
+    except ValueError:
+        return 0
+
+
+def _check_images(root: Path, metadata: dict, prefix: str, issues: list[str]) -> str | None:
+    observation = metadata.get("observation") or metadata
+    if not isinstance(observation, dict):
+        issues.append(prefix + "_INVALID_IMAGE_METADATA")
+        return None
+    if observation.get("raw_image_ref") is not None and not isinstance(observation["raw_image_ref"], str):
+        issues.append(prefix + "_INVALID_IMAGE_REFERENCE")
+        return None
+    reference, error = resolve_asset(root, observation.get("raw_image_ref"), metadata.get("raw_sha256"))
+    if error:
+        issues.append(prefix + "_" + error)
+    return reference
+
+
+def _rechecks(root: Path, cycle_dir: Path, record: dict, pre: dict, post: dict,
+              raw_verification: dict | None, issues: list[str]) -> list[dict]:
+    """各次重拍有独立身份、图像和产物；旧档案保持单次复检兼容。"""
+    entries = record.get("rechecks")
+    if entries is not None and not isinstance(entries, list):
+        issues.append("INVALID_RECHECK_RECORDS")
+        entries = []
+    if not entries and (raw_verification or post or record.get("post_observation")):
+        entries = [{"index": 1, "pre": pre or record.get("pre_observation") or {},
+            "post": post or record.get("post_observation") or {}, "verification": raw_verification,
+            "comparability": record.get("comparability"), "roi_analysis": record.get("roi_analysis"),
+            "roi_evidence": record.get("roi_evidence"), "roi_evidence_sha256": record.get("roi_evidence_sha256"),
+            "decision": record.get("recheck_decision")}]
+    normalized, seen_indexes = [], set()
+    for ordinal, entry in enumerate(entries or [], 1):
+        if not isinstance(entry, dict):
+            issues.append(f"INVALID_RECHECK_RECORD:{ordinal}")
+            continue
+        number = entry.get("index", ordinal)
+        if not isinstance(number, int) or isinstance(number, bool) or number < 1:
+            issues.append(f"INVALID_RECHECK_INDEX:{ordinal}")
+            continue
+        local_issues = []
+        if number in seen_indexes:
+            local_issues.append("DUPLICATE_RECHECK_INDEX:" + str(number))
+        seen_indexes.add(number)
+        check_pre, check_post = entry.get("pre") or pre, entry.get("post") or post
+        if not isinstance(check_pre, dict) or not isinstance(check_post, dict):
+            local_issues.append("INVALID_RECHECK_IMAGE_METADATA")
+            check_pre, check_post = pre, post
+        pre_ref = _check_images(root, check_pre, "PRE", local_issues)
+        post_ref = _check_images(root, check_post, "POST", local_issues)
+        evidence = entry.get("roi_evidence") or {}
+        digests = entry.get("roi_evidence_sha256") or {}
+        if not isinstance(evidence, dict) or not isinstance(digests, dict):
+            local_issues.append("INVALID_ROI_EVIDENCE_REFERENCES")
+            evidence, digests = {}, {}
+        refs = {}
+        metadata = {}
+        for key, value in evidence.items():
+            reference = value.get("path") if isinstance(value, dict) else value
+            digest = value.get("sha256") if isinstance(value, dict) else digests.get(key)
+            if not isinstance(reference, str):
+                local_issues.append("ROI_INVALID_REFERENCE:" + str(key))
+                continue
+            # save_roi_evidence 原返回 basename；接受规范化后的任务相对路径。
+            if not Path(reference).is_absolute() and len(Path(reference).parts) == 1:
+                reference = (cycle_dir / f"recheck_{number:03d}" / "roi" / reference).relative_to(root).as_posix()
+            relative, error = resolve_asset(root, reference, digest)
+            if error:
+                local_issues.append("ROI_" + str(key).upper() + "_" + error)
+            refs[key] = relative
+            if key == "metadata" and relative:
+                metadata = _json(root / relative, local_issues, required=True)
+        # 元数据中的产物摘要可验证旧调用方未包装哈希的 ROI 返回值。
+        artifact_hashes = metadata.get("artifact_sha256") or {}
+        if not isinstance(artifact_hashes, dict):
+            local_issues.append("INVALID_ROI_ARTIFACT_HASHES")
+            artifact_hashes = {}
+        for key, relative in list(refs.items()):
+            if relative and artifact_hashes.get(key):
+                _, error = resolve_asset(root, relative, artifact_hashes[key])
+                if error:
+                    local_issues.append("ROI_" + key.upper() + "_" + error)
+                    refs[key] = None
+        analysis = entry.get("roi_analysis") or metadata or None
+        if analysis is not None and not isinstance(analysis, dict):
+            local_issues.append("INVALID_ROI_ANALYSIS")
+            analysis = None
+        if metadata and analysis:
+            for key in ("valid", "pre_area_px", "post_area_px", "removal_rate", "iou", "dice", "roi"):
+                if key in metadata and key in analysis and metadata[key] != analysis[key]:
+                    local_issues.append("ROI_ANALYSIS_METADATA_CONFLICT:" + key)
+        verification = entry.get("verification") or raw_verification
+        comparability = entry.get("comparability") or record.get("comparability")
+        quality_evidence = entry.get("quality_evidence") or {}
+        decision = entry.get("decision") or entry.get("recheck_decision")
+        for name, value in (("verification", verification), ("comparability", comparability), ("quality_evidence", quality_evidence), ("decision", decision)):
+            if value is not None and not isinstance(value, dict):
+                local_issues.append("INVALID_RECHECK_" + name.upper())
+        verification = verification if isinstance(verification, dict) else None
+        comparability = comparability if isinstance(comparability, dict) else None
+        quality_evidence = quality_evidence if isinstance(quality_evidence, dict) else {}
+        decision = decision if isinstance(decision, dict) else None
+        normalized.append({"index": number, "pre_image": pre_ref, "post_image": post_ref,
+            "verification": verification, "comparability": comparability,
+            "roi_analysis": analysis, "roi_evidence": refs,
+            "quality_evidence": quality_evidence, "decision": decision,
+            "issues": list(dict.fromkeys(local_issues))})
+        issues.extend(local_issues)
+    return normalized
+
+
+def _inline_review(root: Path, attempt: dict | None) -> dict | None:
+    """复检现场的认可仅引用最后一份完整证据，不从“下一块”按钮补造合格。"""
+    if not attempt or not attempt.get("rechecks"):
+        return None
+    check = attempt["rechecks"][-1]
+    review = (check.get("quality_evidence") or attempt.get("quality_evidence") or {}).get("manual_review")
+    if not isinstance(review, dict) or (check.get("decision") or {}).get("choice") != "next":
+        return None
+    comparable = check.get("comparability") or {}
+    analysis = check.get("roi_analysis") or {}
+    alignment, reference = analysis.get("alignment") or {}, analysis.get("reference_alignment") or {}
+    if not isinstance(alignment, dict) or not isinstance(reference, dict) or not isinstance(analysis.get("reason_codes", []), (list, tuple)):
+        return None
+    if not all(comparable.get(key) is True for key in ("same_size", "same_source", "same_settings", "same_policy", "returned_to_overview", "quality_ok", "fresh_after_return", "pair_confirmed")):
+        return None
+    if not alignment.get("valid") or not reference.get("valid") or not (analysis.get("valid") or set(analysis.get("reason_codes") or ()).issubset({"ROI_POST_EMPTY"})):
+        return None
+    allowed = {ref for ref in (check.get("pre_image"), check.get("post_image"), *(check.get("roi_evidence") or {}).values()) if ref}
+    normalized = []
+    values = review.get("evidence_refs")
+    if not isinstance(values, (list, tuple)):
+        return None
+    for value in values:
+        if not isinstance(value, str):
+            return None
+        ref, error = resolve_asset(root, value)
+        if error or ref not in allowed:
+            return None
+        normalized.append(ref)
+    if not normalized:
+        return None
+    return {**review, "evidence_refs": normalized}
+
+
 def read_run(folder: str | Path) -> dict:
     root, issues = Path(folder).resolve(), []
     summary = _json(root / "summary.json", issues, required=True)
@@ -102,7 +250,7 @@ def read_run(folder: str | Path) -> dict:
     workflow = summary.get("workflow_status") or manifest.get("state") or ("COMPLETED" if summary.get("status") == "SUCCESS" else "FAILED" if summary.get("status") else "UNRECORDED")
     records = summary.get("cycles") or []
     if not records:
-        records = [_json(path, issues) for path in sorted(root.glob("cycle_*/cycle.json"))]
+        records = [_json(path, issues) for path in sorted(root.glob("cycle_*/cycle.json"), key=_cycle_order)]
     if not records and (summary.get("observation") or summary.get("execution_receipt")):
         # 旧单帧：它没有人工批准名单，不补造批准或稳定 S 身份。
         episode_ref, episode_error = resolve_asset(root, summary.get("episode_file"))
@@ -128,7 +276,14 @@ def read_run(folder: str | Path) -> dict:
         cycle_dir = root / f"cycle_{number:03d}"
         execution = record.get("execution") or _json(cycle_dir / "execution.json", local_issues)
         raw_verification = record.get("verification") or _json(cycle_dir / "verification.json", local_issues) or None
+        if not isinstance(execution, dict):
+            local_issues.append("INVALID_EXECUTION_RECORD")
+            execution = {}
+        if raw_verification is not None and not isinstance(raw_verification, dict):
+            local_issues.append("INVALID_VERIFICATION_RECORD")
+            raw_verification = None
         pre, post = _json(cycle_dir / "pre.json", local_issues), _json(cycle_dir / "post.json", local_issues)
+        rechecks = _rechecks(root, cycle_dir, record, pre, post, raw_verification, local_issues)
         pre_observation = pre.get("observation") or record.get("pre_observation") or {}
         post_observation = post.get("observation") or record.get("post_observation") or summary.get("post_observation") or {}
         pre_image, err = resolve_asset(root, pre_observation.get("raw_image_ref"), pre.get("raw_sha256"))
@@ -168,6 +323,10 @@ def read_run(folder: str | Path) -> dict:
             episode_refs.append(path.relative_to(root).as_posix())
         attempts.append({"cycle": number, "target_id": record.get("target_id") or "UNRECORDED", "action_id": action_id,
             "execution": execution, "verification": raw_verification, "comparability": record.get("comparability"),
+            "geometry": record.get("geometry") or _json(cycle_dir / "geometry.json", local_issues),
+            "recheck_decision": record.get("recheck_decision"), "roi_analysis": record.get("roi_analysis"),
+            "quality_evidence": record.get("quality_evidence") or {},
+            "roi_evidence": rechecks[-1]["roi_evidence"] if rechecks else {}, "rechecks": rechecks,
             "pump_tx": pump_tx, "pump_ack": ack, "pump_done": done and receipt_done,
             "requested_duration_ms": request.get("duration_ms"), "measured_duration_ms": None,
             "pre_image": pre_image, "post_image": post_image, "pre_mask": f"cycle_{number:03d}/pre_mask.png" if (cycle_dir / "pre_mask.png").is_file() else None,
@@ -188,10 +347,12 @@ def read_run(folder: str | Path) -> dict:
         candidate = candidate if isinstance(candidate, dict) else {}
         related = [attempt for attempt in attempts if attempt["target_id"] == stable]
         last = related[-1] if related else None
+        history_issues = list(dict.fromkeys(issue for attempt in related for issue in attempt["issues"]))
         source = candidate.get("source") or ("algorithm" if candidate.get("instance") else "unrecorded")
+        manual = latest_reviews.get(stable) if stable in latest_reviews else _inline_review(root, last)
         quality = evaluate_target(source=source, execution={} if last is None else last["execution"],
             verification=None if last is None else last["verification"], comparability=None if last is None else last["comparability"],
-            mode=mode, evidence_issues=tuple(issues + ([] if last is None else last["issues"])), manual=latest_reviews.get(stable))
+            mode=mode, evidence_issues=tuple(issues + history_issues), manual=manual)
         executed = any(attempt["pump_done"] for attempt in related)
         failed = any(attempt["execution"].get("status") == "ERROR" for attempt in related)
         row = {"target_id": stable, "source": source, "decision": candidate.get("decision", "UNRECORDED"),
@@ -199,7 +360,7 @@ def read_run(folder: str | Path) -> dict:
                "finished": candidate.get("finished", candidate.get("completed", False)),
                "quality": quality.quality if related else "NOT_ASSESSED", "quality_evidence": quality.to_dict(),
                "instance": deepcopy(candidate.get("instance") or {}), "area_kind": candidate.get("area_kind") or "unrecorded",
-               "initial_image": initial_image, "note": candidate.get("note") or "", "attempts": related, "manual_review": latest_reviews.get(stable)}
+               "initial_image": initial_image, "note": candidate.get("note") or "", "attempts": related, "manual_review": manual}
         rows.append(row)
     quality_status, quality_reasons = final_quality(rows, workflow_status=workflow, mode=mode)
     if issues and quality_status == "PASS":
@@ -213,12 +374,16 @@ def read_run(folder: str | Path) -> dict:
             statistics["algorithm_candidates"] = None
     start = manifest.get("created_at") or next((event.get("at") for event in summary.get("events", []) if event.get("at")), None)
     end = manifest.get("ended_at") or next((event.get("at") for event in reversed(summary.get("events", [])) if event.get("at")), None)
+    evidence_issues = list(dict.fromkeys([*issues, *(f"第{attempt['cycle']}轮：{issue}" for attempt in attempts for issue in attempt["issues"])]))
     return {"schema": "quality-report-v1", "task_id": summary.get("task_id") or summary.get("run_id") or manifest.get("task_id") or "未记录",
             "folder": str(root), "mode": mode, "workflow_status": workflow, "legacy_status": summary.get("status", "未记录"),
             "quality_status": quality_status, "quality_reasons": quality_reasons, "statistics": statistics,
             "targets": rows, "attempts": attempts, "issues": list(dict.fromkeys(issues)), "reviews": reviews,
             "metadata": metadata, "started_at": start, "ended_at": end, "software_version": summary.get("version") or summary.get("demo_version") or "未记录",
             "configuration": config, "policy": manifest.get("policy") or QUALITY_POLICY, "summary_reasons": summary.get("reasons") or [],
+            "recorded_report_ready": summary.get("report_ready") is True,
+            "report_ready": summary.get("report_ready") is True and workflow == "COMPLETED" and not evidence_issues,
+            "evidence_issues": evidence_issues,
             "device_evidence": {"position": summary.get("position"), "firmware_identity": metadata.get("firmware_identity") or "未确认",
                                 "motion_feedback": "READXY 脉冲计数，非编码器位移", "damage_assessment": "未评估"}}
 

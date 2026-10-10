@@ -14,11 +14,12 @@ SCENARIOS = ("success", "retry", "no-target", "decline", "motion-short", "motion
 
 
 class MockFrames:
-    def __init__(self, scenario="success"):
+    def __init__(self, scenario="success", *, roi_mode=False):
         import cv2
         import numpy as np
         self.cv2, self.np, self.scenario = cv2, np, scenario
-        texture = np.random.default_rng(20261005).normal(0, 2.5, (240, 320)).round()
+        self.roi_mode = roi_mode
+        texture = np.random.default_rng(20261005).normal(0, 12 if roi_mode else 2.5, (240, 320)).round()
         gray = np.clip(140 + texture, 0, 255).astype(np.uint8)
         self.background = np.repeat(gray[:, :, None], 3, axis=2)
         self.centers = ((120, 90), (200, 110), (150, 170)) if scenario != "raster" else ((120, 90),)
@@ -39,6 +40,9 @@ class MockFrames:
     def pump_finished(self):
         with self._lock:
             self.pumps += 1
+            if self.roi_mode and self.scenario in {"success", "retry", "workbench-mixed", "workbench-residual"}:
+                self.residual[self.selected] = 6 if self.scenario == "workbench-residual" or (self.scenario == "retry" and self.pumps == 1) else 4
+                return
             if self.scenario == "workbench-residual" or (self.scenario == "workbench-mixed" and self.selected == 1):
                 self.residual[self.selected] = 5
             elif self.scenario == "workbench-unmatched":
@@ -50,7 +54,7 @@ class MockFrames:
         with self._lock:
             image = self.background.copy()
             for index in self.remaining:
-                self.cv2.circle(image, self.centers[index], self.residual.get(index, 7 if self.scenario != "raster" else 52), (18, 18, 205), -1)
+                self.cv2.circle(image, self.centers[index], self.residual.get(index, (12 if self.roi_mode else 7) if self.scenario != "raster" else 52), (18, 18, 205), -1)
             return image
 
     def capture(self, phase, *, after=None):
@@ -61,6 +65,10 @@ class MockFrames:
         self.sequence += 1
         self.capture_phases.append(phase)
         image = self.preview()
+        if self.roi_mode:
+            # 模拟新相机帧的微小像素噪声；固定背景仍可独立追踪。
+            jitter = self.np.random.default_rng(20261010 + self.sequence).integers(-1, 2, image.shape[:2])
+            image = self.np.clip(image.astype(self.np.int16) + jitter[:, :, None], 0, 255).astype(self.np.uint8)
         if phase == "post" and self.scenario == "post-quality":
             image[:] = 0
         settings = {"mock_only": True, "fixed_synthetic_view": True, "size": [240, 320]}

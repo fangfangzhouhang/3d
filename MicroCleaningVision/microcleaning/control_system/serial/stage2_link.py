@@ -134,6 +134,8 @@ class Stage2SerialLink:
         self._read_limit = read_limit
         self._connection: Any = None
         self.on_progress: Callable[[dict[str, str]], None] | None = None
+        self.on_motion_progress: Callable[[dict[str, object]], None] | None = None
+        self._active_segment: dict[str, object] | None = None
 
     @property
     def external_connection(self) -> Any:
@@ -157,6 +159,7 @@ class Stage2SerialLink:
         *,
         request: MotionRequest,
         decision: SafetyDecision,
+        on_completed: Callable[[Stage2TransmitResult], None] | None = None,
     ) -> Stage2TransmitResult:
         """只发已获运动关卡 ALLOW 的行。核对不过时抛 PermissionError，不打开 COM。"""
 
@@ -181,11 +184,16 @@ class Stage2SerialLink:
                 replies.append(hello.raw)
                 if hello.kind != "STEP_OK":
                     raise Stage2ProtocolError("NO_HELLO", hello.raw)
-                for line in dispatch.lines:
+                for segment_index, line in enumerate(dispatch.lines):
                     parts = line.split()  # MOVEXY <nx> <dx> <ny> <dy>
                     x_steps = int(parts[1])
                     y_steps = int(parts[3])
                     payload = encode_move_xy(x_steps, parts[2], y_steps, parts[4])
+                    self._active_segment = {"motion_id": request.request_id,
+                        "segment_index": segment_index, "segment_line": line,
+                        "x_requested": x_steps, "y_requested": y_steps,
+                        "x_direction": parts[2], "y_direction": parts[4]}
+                    self._emit_motion("segment_start", x_sent=0, y_sent=0)
                     in_flight = line
                     motion_attempted = True
                     start = self._exchange(payload)
@@ -206,7 +214,12 @@ class Stage2SerialLink:
                     if (x_steps and idle.x_sent != x_steps) or (y_steps and idle.y_sent != y_steps):
                         raise Stage2ProtocolError("INCOMPLETE_MOTION", idle.raw)
                     sent.append(line)
+                    self._emit_motion("segment_completed", x_sent=x_steps, y_sent=y_steps)
                     in_flight = None
+                # 持久化提交须在连接关闭前进行；提交失败仍由同一串口尝试 STOP。
+                result = Stage2TransmitResult("STEP_OK v0.3", tuple(sent), tuple(replies), False)
+                if on_completed is not None:
+                    on_completed(result)
             except (Exception, KeyboardInterrupt) as exc:
                 stopped = self._stop_into(replies)
                 raise Stage2TransmitError(
@@ -219,8 +232,9 @@ class Stage2SerialLink:
                     motion_attempted=motion_attempted,
                 ) from exc
         finally:
+            self._active_segment = None
             self.close()
-        return Stage2TransmitResult("STEP_OK v0.3", tuple(sent), tuple(replies), False)
+        return result
 
     def close(self) -> None:
         session = self._session
@@ -251,6 +265,9 @@ class Stage2SerialLink:
         last = Stage2Reply("STEP2", "", x_busy=True, y_busy=True)
         while time.monotonic() < deadline:
             last = self._exchange(encode_read_xy())
+            if last.kind == "STEP2":
+                self._emit_motion("segment_feedback", x_sent=last.x_sent, y_sent=last.y_sent,
+                                  x_busy=last.x_busy, y_busy=last.y_busy)
             if last.kind == "STEP2" and not last.x_busy and not last.y_busy:
                 return last
             remaining = deadline - time.monotonic()
@@ -298,6 +315,14 @@ class Stage2SerialLink:
             callback({"phase": phase, "message": message})
         except Exception as exc:
             print(f"[画面] 更新失败，步进继续：{exc}", flush=True)
+
+    def _emit_motion(self, phase: str, **values: object) -> None:
+        if self.on_motion_progress is None or self._active_segment is None:
+            return
+        try:
+            self.on_motion_progress({**self._active_segment, "phase": phase, **values})
+        except Exception as exc:
+            print(f"[画面] 位置显示更新失败：{exc}", flush=True)
 
     def _ensure_connection(self) -> Any:
         if self._connection is not None:

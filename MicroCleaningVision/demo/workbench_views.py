@@ -29,6 +29,59 @@ def button(parent, text, command, *, primary=False):
     return ttk.Button(parent, text=text, command=command, style="Primary.TButton" if primary else "TButton")
 
 
+def motion_chinese(line):
+    """面向操作者解释串口句子；原文仍由 serial.json 保存。"""
+    from microcleaning.control_system.planning.stage2_axes import parse_movexy_line
+    text = str(line).strip()
+    if text.startswith("MOVEXY "):
+        try:
+            dx, dy = parse_movexy_line(text)
+            axis = lambda value: "不移动" if value == 0 else f"{'正向' if value > 0 else '反向'} {abs(value):,} 步"
+            return f"规划移动：X 轴{axis(dx)}；Y 轴{axis(dy)}"
+        except ValueError:
+            return "运动报文格式异常，不能作为有效移动"
+    if text.startswith("STEP2 X="):
+        from microcleaning.control_system.serial.stage2_protocol import parse_stage2_reply
+        try:
+            reply = parse_stage2_reply(text.encode("ascii"))
+            return f"本段已发脉冲：X {reply.x_sent:,} 步（{'移动中' if reply.x_busy else '已停'}）；Y {reply.y_sent:,} 步（{'移动中' if reply.y_busy else '已停'}）"
+        except (ValueError, UnicodeError):
+            return "脉冲回执解析失败"
+    if text.startswith("STEP2_START"):
+        return "控制板接受本段双轴运动，等待脉冲完成回执"
+    if text.startswith("MCV1|PUMP|"):
+        return "请求定点短喷 " + text.rsplit("|", 1)[-1] + " 毫秒，等待控制板确认"
+    if text.startswith("MCV1|STATUS|"):
+        return "设备状态：" + ("急停已激活" if "ESTOP=1" in text else "急停未激活") + "；" + ("泵输出中" if "PUMP=1" in text else "泵已关闭")
+    if text.startswith("MCV1|ACK|"):
+        return "控制板已接受停止请求" if text.endswith("|STOP") else "控制板已接受短喷请求"
+    if text.startswith("MCV1|DONE|"):
+        return "控制板确认停止流程结束" if text.endswith("|STOP") else "控制板确认短喷输出流程结束；清洗效果由复检判断"
+    if text.startswith("MCV1|ERR|") or text.startswith("ERR:"):
+        return "控制板报告错误：" + explain(text.rsplit("|", 1)[-1].removeprefix("ERR:").strip())
+    return {"HELLO": "查询步进协议版本", "STEP_OK v0.3": "步进协议握手通过", "READXY": "查询本段双轴已发脉冲",
+            "STOP": "请求立即停止双轴与泵", "STEP_STOPPED": "控制板确认双轴停止",
+            "MCV1|STOP": "请求停止双轴与泵", "MCV1|PING": "查询喷洗控制器在线状态",
+            "MCV1|PONG": "喷洗控制器在线", "MCV1|STATUS": "查询急停与泵状态"}.get(text, "诊断回执已保存到原始串口记录")
+
+
+def roi_explanation(analysis):
+    if not analysis:
+        return "等待本轮复检。仅比较同一参考坐标区域；前后图偏移未通过核验时不报告有效清洗率。"
+    value = analysis.get("removal_rate")
+    rate = "无法计算" if value is None else f"{value:.2%}"
+    iou = analysis.get("iou")
+    overlap = "未记录" if iou is None else f"{iou:.2%}"
+    shift = analysis.get("alignment_shift_px")
+    displacement = "无法核验" if shift is None else f"ΔX={shift[0]:.3f}、ΔY={shift[1]:.3f} 像素"
+    reasons = "；".join(analysis.get("messages_zh") or [explain(code) for code in analysis.get("reason_codes", ())])
+    return (f"{'位置核验通过' if analysis.get('valid') else '本次计算不具备有效证据'} · 前后位移：{displacement}\n"
+            f"前面积 {analysis.get('pre_area_px', '未知')} 像素；后面积 {analysis.get('post_area_px', '未知')} 像素；重合度 IoU {overlap}\n"
+            f"重合度＝交集 / 并集；清洗率＝（前面积－后面积）/ 前面积＝{rate}。"
+            + ("未检测到有效污渍，显示 0%，不能据此判为洗净。" if value == 0 and not analysis.get("valid") else "")
+            + ("\n" + reasons if reasons else ""))
+
+
 class PixelTransform:
     def __init__(self, image_width, image_height, canvas_width, canvas_height):
         self.w, self.h = image_width, image_height
@@ -300,7 +353,10 @@ class ReviewPage(Page):
         point = "未记录" if not centroid else f"({centroid[0]:.2f}, {centroid[1]:.2f})"
         action = "定点短喷" if plan.get("action") == "CENTER_POINT" else "扫描动作（本版不执行）" if plan.get("action") == "RASTER" else "未记录"
         self.detail.config(text=f"{self.selected} · {label(item.get('source'))}\n原图处理点 {point} px；框 {instance.get('bbox')}\n"
-            f"{action}；请求短喷 {plan.get('pump_duration_ms', '未记录')} ms\n去程 {geometry.get('outbound', {}).get('lines', [])}\n回程 {geometry.get('returning', {}).get('lines', [])}\n{reason}")
+            f"{action}；请求短喷 {plan.get('pump_duration_ms', '未记录')} 毫秒\n"
+            "去程：" + "；".join(motion_chinese(line).removeprefix("规划移动：") for line in geometry.get('outbound', {}).get('lines', []))
+            + "\n回程：" + "；".join(motion_chinese(line).removeprefix("规划移动：") for line in geometry.get('returning', {}).get('lines', []))
+            + f"\n{reason}")
         self.owner.note.set(item.get("note", ""))
 
     def update_task(self, task):
@@ -337,31 +393,158 @@ class MonitorPage(Page):
         heading(self, "03  清洗监控", "左侧保留首次检测参考，右侧持续显示显微画面。当前 S 编号以金色高亮。")
         self.current = tk.Label(self, text="等待执行", bg=PALE, fg=INK, anchor="w", padx=12, pady=10, font=(FONT, 13, "bold"))
         self.current.pack(fill="x", pady=(0, 10))
-        images = tk.Frame(self, bg=CARD)
-        images.pack(fill="both", expand=True)
+        # 正常画面和复检证据在同一页；缩小窗口后可以滚动，确认按钮始终在页外。
+        scroll = tk.Frame(self, bg=CARD)
+        scroll.pack(fill="both", expand=True)
+        self.scroller = tk.Canvas(scroll, bg=CARD, highlightthickness=0, height=390)
+        self.scroller.pack(side="left", fill="both", expand=True)
+        scrollbar = ttk.Scrollbar(scroll, orient="vertical", command=self.scroller.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.scroller.configure(yscrollcommand=scrollbar.set)
+        content = tk.Frame(self.scroller, bg=CARD)
+        item = self.scroller.create_window(0, 0, window=content, anchor="nw")
+        content.bind("<Configure>", lambda _: self.scroller.configure(scrollregion=self.scroller.bbox("all")))
+        self.scroller.bind("<Configure>", lambda event: self.scroller.itemconfigure(item, width=event.width))
+        images = tk.Frame(content, bg=CARD)
+        images.pack(fill="x")
         images.columnconfigure(0, weight=1)
         images.columnconfigure(1, weight=1)
         images.rowconfigure(1, weight=1)
         for column, caption in ((0, "首次检测 · 冻结参考"), (1, "实时显微图 · 设备当前画面")):
             tk.Label(images, text=caption, bg=CARD, fg=MUTED, anchor="w", font=(FONT, 10)).grid(row=0, column=column, sticky="ew", pady=5)
-        self.reference = ImageCanvas(images, height=310)
-        self.live = ImageCanvas(images, height=310)
+        self.reference = ImageCanvas(images, height=250)
+        self.live = ImageCanvas(images, height=250)
         self.reference.grid(row=1, column=0, sticky="nsew", padx=(0, 7))
         self.live.grid(row=1, column=1, sticky="nsew", padx=(7, 0))
-        self.feedback = tk.Label(self, text="计划位置与 READXY 脉冲计数会在这里显示；物理位移需现场验证。", bg=CARD,
-            fg=MUTED, anchor="w", font=(FONT, 10))
+        self.nozzle = tk.Canvas(self.live, bg="#132b30", highlightbackground="#6a8982", highlightthickness=1,
+                                width=220, height=155)
+        self.nozzle.place(relx=1, rely=1, anchor="se", x=-7, y=-7)
+        self.nozzle.bind("<Configure>", lambda _: self._draw_nozzle())
+        self.position_data, self.geometry_data = {}, {}
+        self.position = tk.Label(content, text="XY 位置参考尚未确认；机械边界未知。", bg=PALE, fg=INK,
+                                 anchor="w", justify="left", padx=10, pady=8, font=(FONT, 10))
+        self.position.pack(fill="x", pady=(9, 0))
+        self.position.bind("<Configure>", lambda event: self.position.config(wraplength=max(180, event.width-20)))
+        self.calibration = tk.Label(content, text="喷头中心：没有有效标定文件；不显示对齐估算。", bg=CARD, fg=MUTED,
+                                    anchor="w", justify="left", font=(FONT, 9))
+        self.calibration.pack(fill="x", pady=(6, 0))
+        self.calibration.bind("<Configure>", lambda event: self.calibration.config(wraplength=max(180, event.width-12)))
+        self.feedback = tk.Label(content, text="计划位置与已发脉冲会在这里显示；物理位移需现场验证。", bg=CARD,
+            fg=MUTED, anchor="w", justify="left", font=(FONT, 10))
         self.feedback.pack(fill="x", pady=8)
+        self.feedback.bind("<Configure>", lambda event: self.feedback.config(wraplength=max(180, event.width-12)))
+        comparison = tk.LabelFrame(content, text="本轮复检 · 同一参考位置的放大对比", bg=CARD, fg=INK, font=(FONT, 10, "bold"), padx=8, pady=6)
+        comparison.pack(fill="x", pady=(0, 8))
+        for column, caption in enumerate(("清洗前污渍", "复检后同位置", "绿：减少 · 黄：重合 · 红：新增")):
+            comparison.columnconfigure(column, weight=1)
+            tk.Label(comparison, text=caption, bg=CARD, fg=MUTED, font=(FONT, 9), anchor="w").grid(row=0, column=column, sticky="ew")
+        self.pre_crop, self.post_crop, self.overlay = [ImageCanvas(comparison, height=150) for _ in range(3)]
+        for column, canvas in enumerate((self.pre_crop, self.post_crop, self.overlay)):
+            canvas.configure(width=220)
+            canvas.grid(row=1, column=column, sticky="nsew", padx=3, pady=4)
+        self.calculation = tk.Label(comparison, text=roi_explanation(None), bg=CARD, fg=MUTED, font=(FONT, 10),
+                                    justify="left", anchor="w")
+        self.calculation.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
+        self.calculation.bind("<Configure>", lambda event: self.calculation.config(wraplength=max(180, event.width-16)))
         actions = tk.Frame(self, bg=CARD)
         actions.pack(fill="x")
         button(actions, "← 查看锁定名单", lambda: owner.navigate("review")).pack(side="left")
         self.capture = button(actions, "采集当前前 / 后图  [空格]", owner.capture, primary=True)
         self.capture.pack(side="right")
         self.capture.state(["disabled"])
+        def scroll_wheel(event):
+            self.scroller.yview_scroll(-1 if event.delta > 0 else 1, "units")
+            return "break"
+        def bind_scroll(widget):
+            widget.bind("<MouseWheel>", scroll_wheel)
+            for child in widget.winfo_children():
+                bind_scroll(child)
+        bind_scroll(content)
+        self._draw_nozzle()
+
+    def reset(self):
+        self.position_data, self.geometry_data = {}, {}
+        for canvas in (self.reference, self.live, self.pre_crop, self.post_crop, self.overlay):
+            canvas.set_image(None)
+        self.calculation.config(text=roi_explanation(None), fg=MUTED)
+        self.position.config(text="XY 位置参考尚未确认；机械边界未知。")
+        self.calibration.config(text="喷头中心：没有有效标定文件；不显示对齐估算。")
+        self.scroller.yview_moveto(0)
+        self._draw_nozzle()
+
+    def update_verification(self, payload):
+        analysis = payload.get("roi_analysis")
+        self.calculation.config(text=roi_explanation(analysis), fg=TEAL if analysis and analysis.get("valid") else AMBER)
+        for key, canvas in (("pre_crop", self.pre_crop), ("post_crop", self.post_crop), ("overlay", self.overlay)):
+            canvas.set_image(payload.get(key), placeholder="本次证据图未生成")
+        self.scroller.update_idletasks()
+        self.scroller.yview_moveto(1)
+
+    def update_position(self, payload):
+        self.position_data = dict(payload)
+        status = {"READY": "位置账本可用", "MOVING": "移动中，显示本段脉冲估算", "UNHOMED": "尚未建立参考", "POSITION_UNCERTAIN": "位置不可信，停止普通任务"}.get(payload.get("status"), "位置状态未知")
+        confirmed = payload.get("confirmed_xy_steps")
+        estimated = payload.get("estimated_xy_steps")
+        coord = lambda point: "未知" if point is None else f"X {point[0]:+,} 步 / Y {point[1]:+,} 步"
+        self.position.config(text=f"{status}　|　已提交坐标：{coord(confirmed)}　|　移动估算：{coord(estimated)}\n"
+                             f"预计终点：{coord(payload.get('expected_xy_steps'))}；四向机械余量：未知（未配置实测边界）\n"
+                             f"参考建立：{payload.get('zero_set_at') or '未确认'}；这些数字来自指令与脉冲回执。",
+                             fg=AMBER if payload.get("status") in {"POSITION_UNCERTAIN", "UNHOMED"} else INK)
+        self._draw_nozzle()
+
+    def update_geometry(self, payload):
+        self.geometry_data = dict(payload)
+        offset = payload.get("offset") or {}
+        motor = payload.get("motor_calibration") or {}
+        self.calibration.config(text=f"喷头标定来源：{offset.get('calibration_source') or '未知'}；装配：{offset.get('setup_id') or '未知'}；"
+            f"偏移 {offset.get('scope_to_nozzle_delta_steps')} 步；标定误差 {offset.get('uncertainty_steps')} 步。\n"
+            f"电机标定文件：{motor.get('ref') or '未加载'}；标定文件有效性：{'已核对' if payload.get('calibration_valid') else '未通过'}；"
+            "实际定位精度仍需现场测量。")
+        self._draw_nozzle()
+
+    def _draw_nozzle(self):
+        canvas = self.nozzle
+        canvas.delete("all")
+        w, h = max(220, canvas.winfo_width()), max(155, canvas.winfo_height())
+        geometry = self.geometry_data.get("geometry") or {}
+        offset = self.geometry_data.get("offset") or {}
+        motor = self.geometry_data.get("motor_calibration") or {}
+        calibrated = (self.geometry_data.get("calibration_valid") is True and offset.get("axes_confirmed") is True
+            and offset.get("scope_to_nozzle_delta_steps") is not None and offset.get("calibration_source")
+            and offset.get("uncertainty_steps") is not None
+            and (not self.geometry_data.get("real") or (not offset.get("mock_only")
+                and motor.get("sha256") == offset.get("motor_calibration_sha256"))))
+        status = self.position_data.get("status")
+        current = (self.position_data.get("estimated_xy_steps") if status == "MOVING"
+                   else self.position_data.get("confirmed_xy_steps") if status == "READY" else None)
+        expected = geometry.get("execution_position")
+        self.nozzle_remaining = None
+        title = "标定喷头中心 · 步数投影" if calibrated else "喷头中心尚未有效标定"
+        canvas.create_text(9, 12, text=title, fill="#d8e8e3" if calibrated else "#aabeb8", anchor="w", font=(FONT, 9, "bold"))
+        if not calibrated or current is None or expected is None:
+            canvas.create_text(w/2, h/2, text="未标定 / 位置不可信\n不显示假对齐点", justify="center", fill="#aabeb8", font=(FONT, 9))
+            return
+        remaining = tuple(expected[index] - current[index] for index in (0, 1))
+        self.nozzle_remaining = remaining
+        cx, cy = w/2, 66
+        canvas.create_line(cx-40, cy, cx+40, cy, fill="#dcb062")
+        canvas.create_line(cx, cy-29, cx, cy+29, fill="#dcb062")
+        canvas.create_oval(cx-4, cy-4, cx+4, cy+4, fill="#dcb062", outline="")
+        # 投影按当前计划缩放；数字与标定 uncertainty 才是可核对的量。
+        before = geometry.get("observation_position") or current
+        extent = max(1, *(abs(expected[i]-before[i]) for i in (0, 1)), *(abs(v) for v in remaining))
+        px, py = cx + remaining[0]/extent*48, cy - remaining[1]/extent*29
+        canvas.create_oval(px-4, py-4, px+4, py+4, outline="#7ad6d1", width=2)
+        canvas.create_text(9, 105, text=f"距喷头：ΔX {remaining[0]:+} / ΔY {remaining[1]:+} 步", fill="#c6e0da", anchor="w", font=(FONT, 8))
+        uncertainty = offset["uncertainty_steps"]
+        canvas.create_text(9, 124, text=f"标定误差 ±({uncertainty[0]}, {uncertainty[1]}) 步", fill="#c6e0da", anchor="w", font=(FONT, 8))
+        canvas.create_text(9, 142, text="脉冲估算，不等于台面实测到位", fill="#9db3ae", anchor="w", font=(FONT, 8))
 
 
 class ResultsPage(Page):
     def __init__(self, owner):
         super().__init__(owner)
+        self.attempt_index, self.recheck_index = None, None
         heading(self, "04  结果与报告", "原始记录自动保存。报告由你选择导出或打印；流程结束和清洗质量分别显示。")
         self.summary = tk.Label(self, text="尚无任务结果", bg=PALE, fg=INK, anchor="w", padx=12, pady=9, font=(FONT, 12, "bold"))
         self.summary.pack(fill="x", pady=(0, 8))
@@ -380,10 +563,9 @@ class ResultsPage(Page):
         self.tree.column("quality", width=110)
         self.tree.pack(fill="both", expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.selected)
-        self.detail = tk.Label(left, text="选择目标查看证据", bg=BG, fg=INK, anchor="nw", justify="left", wraplength=330,
-            padx=10, pady=8, font=(FONT, 9))
-        self.detail.pack(fill="x", pady=7)
-        self.detail.bind("<Configure>", lambda event: self.detail.config(wraplength=max(200, event.width - 20)))
+        self.detail = tk.Text(left, height=9, bg=BG, fg=INK, wrap="word", relief="flat",
+                              padx=10, pady=8, font=(FONT, 9), state="disabled")
+        self.detail.pack(fill="both", expand=True, pady=7)
         self.review_options = {"待质量复核": "UNCERTAIN", "人工确认已洗净": "CLEANED", "人工确认有残留": "NOT_CLEANED", "撤销人工结论": "REVOKED"}
         self.review_value = tk.StringVar(value="待质量复核")
         ttk.Combobox(left, textvariable=self.review_value, values=tuple(self.review_options), state="readonly").pack(fill="x")
@@ -393,17 +575,30 @@ class ResultsPage(Page):
         button(left, "保存人工复核 / 撤销记录", owner.quality_review).pack(anchor="w", pady=6)
         right.columnconfigure(0, weight=1)
         right.columnconfigure(1, weight=1)
-        right.rowconfigure(1, weight=1)
+        right.rowconfigure(2, weight=1)
+        rounds = tk.Frame(right, bg=CARD)
+        rounds.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 7))
+        rounds.columnconfigure(1, weight=1)
+        rounds.columnconfigure(3, weight=1)
+        tk.Label(rounds, text="清洗轮次", bg=CARD, fg=MUTED, font=(FONT, 9)).grid(row=0, column=0, padx=(0, 6))
+        self.attempt_value, self.recheck_value = tk.StringVar(), tk.StringVar()
+        self.attempt_select = ttk.Combobox(rounds, textvariable=self.attempt_value, state="readonly", width=17)
+        self.attempt_select.grid(row=0, column=1, sticky="ew", padx=(0, 12))
+        self.attempt_select.bind("<<ComboboxSelected>>", self._attempt_changed)
+        tk.Label(rounds, text="复检轮次", bg=CARD, fg=MUTED, font=(FONT, 9)).grid(row=0, column=2, padx=(0, 6))
+        self.recheck_select = ttk.Combobox(rounds, textvariable=self.recheck_value, state="readonly", width=16)
+        self.recheck_select.grid(row=0, column=3, sticky="ew")
+        self.recheck_select.bind("<<ComboboxSelected>>", self._recheck_changed)
         for column, caption in ((0, "处理前"), (1, "处理后")):
-            tk.Label(right, text=caption, bg=CARD, fg=MUTED, anchor="w", font=(FONT, 10)).grid(row=0, column=column, sticky="ew")
+            tk.Label(right, text=caption, bg=CARD, fg=MUTED, anchor="w", font=(FONT, 10)).grid(row=1, column=column, sticky="ew")
         self.pre, self.post = ImageCanvas(right, height=270), ImageCanvas(right, height=270)
-        self.pre.grid(row=1, column=0, sticky="nsew", padx=(0, 5), pady=5)
-        self.post.grid(row=1, column=1, sticky="nsew", padx=(5, 0), pady=5)
+        self.pre.grid(row=2, column=0, sticky="nsew", padx=(0, 5), pady=5)
+        self.post.grid(row=2, column=1, sticky="nsew", padx=(5, 0), pady=5)
         image_actions = tk.Frame(right, bg=CARD)
-        image_actions.grid(row=2, column=0, columnspan=2, sticky="ew")
+        image_actions.grid(row=3, column=0, columnspan=2, sticky="ew")
         button(image_actions, "全图", lambda: owner.result_images(False)).pack(side="left", padx=(0, 7))
         button(image_actions, "分割 Mask", lambda: owner.result_images(True)).pack(side="left", padx=(0, 7))
-        button(image_actions, "放大当前区域", owner.zoom_result).pack(side="left")
+        button(image_actions, "本轮同位置放大图", lambda: owner.result_images(crop=True)).pack(side="left")
         self.export_state = tk.Label(self, text="尚未导出。可任选格式，不会自动打印。", bg=CARD, fg=MUTED, anchor="w", font=(FONT, 9))
         self.export_state.pack(fill="x", pady=8)
         actions = tk.Frame(self, bg=CARD)
@@ -413,6 +608,7 @@ class ResultsPage(Page):
             control = button(actions, text, lambda formats=formats, printing=printing: owner.export(formats, printing), primary=printing)
             control.pack(side="left", padx=(0, 7))
             self.export_buttons.append(control)
+        self.print_button = self.export_buttons[-1]
         button(actions, "新任务  →", lambda: owner.navigate("cover")).pack(side="right")
         footer = tk.Frame(self, bg=CARD)
         footer.pack(fill="x", pady=(8, 0))
@@ -423,7 +619,7 @@ class ResultsPage(Page):
 
     def update_snapshot(self, snapshot):
         stats = {key: value if value is not None else "未记录" for key, value in snapshot["statistics"].items()}
-        self.summary.config(text=f"{snapshot['quality_status']} · {label(snapshot['quality_status'])}    |    {label(snapshot['workflow_status'])}    |    确认 {stats['approved']} · 输出完成 {stats['executed_targets']} · 通过 {stats['cleaned']} · 残留 {stats['not_cleaned']} · 待复核 {stats['uncertain']}")
+        self.summary.config(text=f"{label(snapshot['quality_status'])}    |    {label(snapshot['workflow_status'])}    |    确认 {stats['approved']} · 输出完成 {stats['executed_targets']} · 通过 {stats['cleaned']} · 残留 {stats['not_cleaned']} · 待复核 {stats['uncertain']}")
         previous = self.selected_id
         for item in self.tree.get_children():
             self.tree.delete(item)
@@ -435,18 +631,93 @@ class ResultsPage(Page):
         else:
             self.pre.set_image(None)
             self.post.set_image(None)
+        self.refresh_exports()
+
+    def print_ready(self):
+        snapshot = self.owner.snapshot or {}
+        return bool(snapshot.get("report_ready", (snapshot.get("summary") or {}).get("report_ready", snapshot.get("quality_status") == "PASS")))
+
+    def refresh_exports(self, *, busy=None):
+        busy = self.owner.runtime.active or (self.owner.runtime.report_busy if busy is None else busy)
         for control in self.export_buttons:
-            control.state(["!disabled"] if not self.owner.runtime.active else ["disabled"])
+            enabled = not busy and (control is not self.print_button or self.print_ready())
+            control.state(["!disabled"] if enabled else ["disabled"])
+        if self.owner.snapshot is not None and not self.print_ready() and not busy:
+            self.export_state.config(text="末目标尚未复检通过：可导出完整档案，正式打印仍未开放。所有清洗与复检轮次保留。")
 
     def selected(self, event=None):
         selected = self.tree.selection()
         if not selected:
             return
+        changed = self.selected_id != selected[0]
         self.selected_id = selected[0]
         target = self.owner.result_target()
         if target is None:
             return
-        evidence = target["quality_evidence"]
-        self.detail.config(text=f"{target['target_id']} · {label(target['source'])}\n自动：{label(evidence['automatic_quality'])}\n有效：{label(target['quality'])}（{label(evidence['effective_source'])}）\n"
-            f"尝试 {len(target['attempts'])} 次；输出 DONE {sum(a['pump_done'] for a in target['attempts'])} 次\n" + "；".join(explain(code) for code in evidence["reasons"]))
+        attempts = target.get("attempts") or []
+        self.attempt_select.config(values=[f"第 {i+1} 次清洗 · 任务轮 {attempt.get('cycle', i+1)}" for i, attempt in enumerate(attempts)])
+        if attempts:
+            index = len(attempts)-1 if changed or self.attempt_index is None else min(self.attempt_index, len(attempts)-1)
+            self.attempt_select.current(index)
+            self._attempt_changed()
+        else:
+            self.attempt_index, self.recheck_index = None, None
+            self.attempt_value.set("没有清洗动作")
+            self.recheck_value.set("没有复检")
+            self._details()
+            self.owner.result_images(False)
+
+    def _attempt_changed(self, event=None):
+        target = self.owner.result_target()
+        if target is None or not target.get("attempts"):
+            return
+        self.attempt_index = max(0, self.attempt_select.current())
+        attempt = target["attempts"][self.attempt_index]
+        checks = attempt.get("rechecks") or []
+        self.recheck_select.config(values=[f"第 {check.get('index', i+1)} 次复检" for i, check in enumerate(checks)])
+        if checks:
+            self.recheck_select.current(len(checks)-1)
+            self.recheck_index = len(checks)-1
+        else:
+            self.recheck_value.set("旧档案单次复检")
+            self.recheck_index = None
+        self._details()
         self.owner.result_images(False)
+
+    def _recheck_changed(self, event=None):
+        self.recheck_index = max(0, self.recheck_select.current())
+        self._details()
+        self.owner.result_images(False)
+
+    def _details(self):
+        target = self.owner.result_target()
+        if target is None:
+            return
+        evidence = target.get("quality_evidence") or {}
+        attempts = target.get("attempts") or []
+        text = (f"{target['target_id']} · {label(target.get('source'))}\n自动：{label(evidence.get('automatic_quality'))}；有效：{label(target.get('quality'))}\n"
+                f"共 {len(attempts)} 次清洗；短喷输出结束 {sum(a.get('pump_done', False) for a in attempts)} 次\n")
+        if attempts and self.attempt_index is not None:
+            attempt = attempts[self.attempt_index]
+            checks = attempt.get("rechecks") or []
+            check = checks[self.recheck_index] if checks and self.recheck_index is not None else attempt
+            text += (f"当前：第 {self.attempt_index+1} 次清洗 / 第 {self.recheck_index+1 if self.recheck_index is not None else 1} 次复检\n"
+                     f"请求短喷 {attempt.get('requested_duration_ms', '未知')} 毫秒；实测时长：未配置测量\n"
+                     f"动作编号：{attempt.get('action_id') or '未记录'}\n")
+            geometry = attempt.get("geometry") or {}
+            for title, key in (("去程", "outbound"), ("回程", "returning")):
+                lines = (geometry.get(key) or {}).get("lines") or []
+                text += title + "：" + "；".join(motion_chinese(line).removeprefix("规划移动：") for line in lines) + "\n"
+            text += roi_explanation(check.get("roi_analysis") or attempt.get("roi_analysis")) + "\n"
+            decision = check.get("decision") or attempt.get("recheck_decision")
+            if decision:
+                choice = decision.get("choice") or decision.get("answer") or decision.get("decision") if isinstance(decision, dict) else str(decision)
+                text += "人工决定：" + {"rewash": "再次清洗", "next": "不复洗，继续或最终确认", "retake": "仅重拍复检", "pause": "暂停并保存"}.get(choice, str(choice)) + "\n"
+                if isinstance(decision, dict):
+                    text += "人工依据：" + str(decision.get("reason") or "未填写") + "\n"
+            text += "；".join(explain(code) for code in (check.get("issues") or ()))
+        text += "\n" + "；".join(explain(code) for code in evidence.get("reasons", ()))
+        self.detail.config(state="normal")
+        self.detail.delete("1.0", "end")
+        self.detail.insert("1.0", text)
+        self.detail.config(state="disabled")

@@ -1,5 +1,18 @@
 # MicroCleaningVision
 
+## 当前交接：2026-10-10
+
+工作台v3已支持复检后人工复洗（无业务次数上限）、仅重拍、下一污渍和暂停；固定首次ROI/分割参数，前后放大及重合图解释清洗率。空前景0%且无效，偏移不作为合格依据。XY pending生命周期和绑定标定的喷头预计图已接入，报告保留每轮清洗与每次复检，由用户选择导出/打印。
+
+```powershell
+cd D:\大创\3d\MicroCleaningVision
+.\.venv\Scripts\python.exe -m demo.closed_loop_station --mock --workbench --algorithm hsv --mock-scenario workbench-residual
+```
+
+最终全量 490 项，111.520 秒，失败/错误/跳过均为 0；此前全量 483 项也通过。 本轮使用合成图、协议串口替身及真实 Tk 控件，证据等级 E2。未连接真实相机或 COM，未操作电机、水泵、固件或打印机；没有获得实物零偏移、喷头精度或清洁效果验收。 详见[操作手册](说明文档/软件组/可视化工作台操作手册.md)及[详细验收](说明文档/软件组/工作台复洗与位置管理验收_2026-10-10.md)。本地 `fzh-branch@23bf6ea173885401c375c51b6865bbc7de7ffb5b` 加本轮未提交改动；只读 GitHub API 核对远端为 `19a2a73bd3817ab8b8aa7b6711a9da3acf3c30fe`。没有拉取、合并、提交或推送。
+
+> 以下保留此前有日期的说明和实验快照。与本节冲突的工作台、复洗、复检、位置和报告规则已被本节替代；历史数字不代表当前验收。
+
 2026-10-09 新工作台：封面 → 实时检测 → 目标审核 → 清洗监控 → 结果与报告。审核并锁定确认子集后才进入原执行链；原图与实时图并列、高亮当前目标、中文解释日志和真实进度。原记录自动保存，报告由用户选择导出/打印。详见 [可视化工作台操作手册](说明文档/软件组/可视化工作台操作手册.md)。
 
 ```powershell
@@ -40,7 +53,7 @@ cd D:\大创\wt-single-entry-cleaning\MicroCleaningVision
 
 `--mock-scenario retry --max-retries-per-target 1 --max-cycles 4` 可验证新帧、新动作和新审批；`motion-short`、`pump-timeout`、`return-timeout` 等失败样例应停在 ERROR，`decline`/`noncomparable` 应停在 HUMAN。退出码：SUCCESS=0、HUMAN=2、ERROR=3。
 
-V1 只执行单块 CENTER_POINT；扫描路径保存预览后交人工。偏移只来自 `scope_to_nozzle_delta_steps=[dx,dy]`，真实未知为 null；主机不再按整份名单的步数合计拦住，也不再按人工零点两侧的步数边界拦住。一条 MOVEXY 仍不能超过固件报文的 20000 步。RETURN 回到第一帧的原观察位，不能只反转喷头偏移。旧直接串口脚本尚未统一整改。
+V1 只执行单块 CENTER_POINT；扫描路径保存预览后交人工。偏移只来自 `scope_to_nozzle_delta_steps=[dx,dy]`，真实未知为 null；主机不再按整份名单的步数合计拦住，也不再按人工零点两侧的步数边界拦住。一条 MOVEXY 仍不能超过固件报文的 20000 步。RETURN 回到第一帧的原观察位，不能只反转喷头偏移。维护居中/尺度标定/短命令脚本现已显式隔离，发令前作废正式参考；外部控制程序不自动受本项目锁管理。
 
 实物参数、偏移格式、每轮大写 YES 和各组验收材料见 [现场可测入口](说明文档/硬件组/现场可测入口.md)，剩余实物阻塞见 [联调差距](说明文档/总流程说明/一条启动命令的实物联调差距.md)，实现/续做记录见 [续做记录](说明文档/进度记录/单入口闭环续做记录.md)。本轮未操作真实相机、COM、电机或泵，未提交/推送。
 

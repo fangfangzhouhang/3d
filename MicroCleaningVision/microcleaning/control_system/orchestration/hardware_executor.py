@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Callable
 from pathlib import Path
@@ -10,7 +10,7 @@ from pathlib import Path
 from microcleaning.contracts import ActionRequest, ExecutionReceipt, Observation, SafetyDecision, SafetyOutcome, StateEstimate
 from microcleaning.control_system.planning.stage2_axes import parse_movexy_line
 from microcleaning.control_system.planning.stage2_geometry import CycleGeometry
-from microcleaning.control_system.planning.stage2_position import load_position, mark_unknown, record_completed
+from microcleaning.control_system.planning.stage2_position import begin_motion, load_position, mark_unknown, record_completed, record_not_started
 from microcleaning.control_system.safety.fixed_rule import DEFAULT_IN_PLACE_DURATION_MS, FixedActionPolicy, PUMP_IN_PLACE_RULE_VERSION, propose_pump_in_place
 from microcleaning.control_system.safety.governor import approve_human_gate, evaluate_action
 from microcleaning.control_system.safety.motion_gate import approve_motion_gate, evaluate_motion, motion_request_digest
@@ -38,6 +38,7 @@ class CycleExecution:
     device_probe: dict | None = None
     outbound_result: Stage2TransmitResult | None = None
     stop_evidence: dict | None = None
+    position_lifecycle: list[dict] = field(default_factory=list)
 
     @property
     def receipt(self) -> ExecutionReceipt | None:
@@ -63,18 +64,24 @@ class CycleExecution:
             "returned_at": self.returned_at, "used_abs_steps": self.used_abs_steps, "device_probe": self.device_probe,
             "outbound_result": None if self.outbound_result is None else self.outbound_result.to_dict(),
             "stop_evidence": self.stop_evidence,
+            "position_lifecycle": self.position_lifecycle,
         }
 
 
 class HardwareExecutor:
     def __init__(self, *, session: F103SerialSession, link: Stage2SerialLink,
                  controller: STM32SerialController, position_path: str | Path,
-                 confirm: Callable[[dict], bool], pump_duration_ms: int = DEFAULT_IN_PLACE_DURATION_MS) -> None:
+                 confirm: Callable[[dict], bool], pump_duration_ms: int = DEFAULT_IN_PLACE_DURATION_MS,
+                 on_position: Callable[[dict], None] | None = None) -> None:
         self.session, self.link, self.controller = session, link, controller
         self.position_path = Path(position_path)
         self.confirm = confirm
         self.pump_duration_ms = pump_duration_ms
         self._motion_uncertain = False
+        self.on_position = on_position
+        self._active_motion: dict | None = None
+        self._position_invalid = False
+        self.link.on_motion_progress = self._motion_progress
         self.cancellation = getattr(session, "cancellation", None)
 
     def _check_cancel(self) -> None:
@@ -133,10 +140,8 @@ class HardwareExecutor:
                 result.reasons = ("POSITION_CHANGED_AFTER_AUTHORIZATION",)
                 return
             stage("MOVE")
-            self._motion_uncertain = True
-            sent = self.link.transmit(geometry.outbound, request=geometry.outbound_request, decision=result.motion_decision)
-            result.outbound_result = sent
-            position = record_completed(self.position_path, sent.sent_lines, run_id=observation.task_id)
+            sent, position = self._tracked_motion(result, geometry.outbound, geometry.outbound_request,
+                                                   result.motion_decision, observation.task_id, "outbound")
             result.used_abs_steps = _absolute(sent.sent_lines)
             if tuple(sent.sent_lines) != tuple(geometry.outbound.lines) or position.xy() != geometry.execution_position:
                 self._motion_uncertain = True
@@ -198,7 +203,7 @@ class HardwareExecutor:
             if isinstance(exc, Stage2TransmitError):
                 result.stop_evidence["motion_stop_confirmed"] = exc.stopped
             if self._motion_uncertain:
-                mark_unknown(self.position_path, run_id=observation.task_id, reason=result.reasons[0])
+                self._invalidate_position(result, observation.task_id, result.reasons[0])
             self.session.failed = True
             self.session.close()
         finally:
@@ -234,15 +239,13 @@ class HardwareExecutor:
         if load_position(self.position_path).xy() != geometry.return_request.position_before_steps:
             self._motion_uncertain = True
             raise RuntimeError("POSITION_CHANGED_BEFORE_RETURN")
-        self._motion_uncertain = True
         try:
-            back = self.link.transmit(geometry.returning, request=geometry.return_request, decision=result.return_decision)
+            back, position = self._tracked_motion(result, geometry.returning, geometry.return_request,
+                                                  result.return_decision, observation.task_id, "return")
         except Stage2TransmitError as exc:
             result.return_error = exc
             self._motion_uncertain = exc.motion_attempted
             raise
-        result.return_result = back
-        position = record_completed(self.position_path, back.sent_lines, run_id=observation.task_id)
         result.used_abs_steps = tuple(a + b for a, b in zip(result.used_abs_steps, _absolute(back.sent_lines)))
         if tuple(back.sent_lines) != geometry.returning.lines or position.xy() != geometry.observation_position:
             raise RuntimeError("RETURN_NOT_COMPLETED_AT_ORIGINAL_OVERVIEW")
@@ -271,25 +274,15 @@ class HardwareExecutor:
         result.return_decision = approve_motion_gate(geometry.return_request, result.return_decision, confirmed=True)
         try:
             stage("MOVE")
-            self._motion_uncertain = True
-            sent = self.link.transmit(geometry.outbound, request=geometry.outbound_request, decision=result.motion_decision)
-            result.outbound_result = sent
-            position = record_completed(self.position_path, sent.sent_lines, run_id=observation.task_id)
+            sent, position = self._tracked_motion(result, geometry.outbound, geometry.outbound_request,
+                                                   result.motion_decision, observation.task_id, "outbound")
             result.used_abs_steps = _absolute(sent.sent_lines)
             if tuple(sent.sent_lines) != tuple(geometry.outbound.lines) or position.xy() != geometry.execution_position:
                 self._motion_uncertain = True
                 raise RuntimeError("EXECUTION_POSITION_MISMATCH")
             self._motion_uncertain = False
             stage("RETURN")
-            self._motion_uncertain = True
-            back = self.link.transmit(geometry.returning, request=geometry.return_request, decision=result.return_decision)
-            result.return_result = back
-            position = record_completed(self.position_path, back.sent_lines, run_id=observation.task_id)
-            result.used_abs_steps = tuple(a + b for a, b in zip(result.used_abs_steps, _absolute(back.sent_lines)))
-            if tuple(back.sent_lines) != tuple(geometry.returning.lines) or position.xy() != geometry.observation_position:
-                raise RuntimeError("RETURN_NOT_COMPLETED_AT_ORIGINAL_OVERVIEW")
-            self._motion_uncertain = False
-            result.returned_at = datetime.now(timezone.utc).isoformat()
+            self._transmit_return(result, geometry, observation)
             result.status, result.reasons = "MOVED", ("MOTION_COMPLETED_NO_PUMP",)
         except (Exception, KeyboardInterrupt) as exc:
             result.status = "CANCELLED" if self.cancellation is not None and self.cancellation.event.is_set() else "ERROR"
@@ -298,7 +291,7 @@ class HardwareExecutor:
             if isinstance(exc, Stage2TransmitError):
                 result.stop_evidence["motion_stop_confirmed"] = exc.stopped
             if self._motion_uncertain:
-                mark_unknown(self.position_path, run_id=observation.task_id, reason=result.reasons[0])
+                self._invalidate_position(result, observation.task_id, result.reasons[0])
             self.session.failed = True
             self.session.close()
         finally:
@@ -319,6 +312,116 @@ class HardwareExecutor:
                 self.controller.close()
         return evidence
 
+    def _tracked_motion(self, result, dispatch, request, decision, task_id, direction):
+        """去/回程共用同一持久化生命周期；提交失败不得继续喷水。"""
+        self._motion_uncertain = False
+        moving = begin_motion(self.position_path, dispatch.lines, run_id=task_id,
+                              motion_id=request.request_id, expected_before=request.position_before_steps)
+        self._motion_uncertain = True
+        self._active_motion = {"pending": moving.pending_motion, "segment_index": None,
+                               "segment_line": None, "estimated_xy": tuple(moving.pending_motion["before_steps"])}
+        result.position_lifecycle.append({"phase": "pending", "direction": direction,
+                                          "position": moving.to_dict()})
+        self._emit_position()
+        try:
+            sent = self.link.transmit(dispatch, request=request, decision=decision)
+        except Stage2TransmitError as exc:
+            if direction == "return":
+                result.return_error = exc
+            if not exc.motion_attempted:
+                record_not_started(self.position_path, run_id=task_id, motion_id=request.request_id)
+                self._motion_uncertain = False
+                self._active_motion = None
+                self._emit_position()
+            raise
+        # 保留完成回执后才写盘：即使提交失败，档案仍能说明运动实际回过什么。
+        if direction == "return":
+            result.return_result = sent
+        else:
+            result.outbound_result = sent
+        position = record_completed(self.position_path, sent.sent_lines, run_id=task_id,
+                                    motion_id=request.request_id)
+        result.position_lifecycle.append({"phase": "committed", "direction": direction,
+                                          "motion_id": request.request_id, "position": position.to_dict()})
+        self._motion_uncertain = False
+        self._active_motion = None
+        self._emit_position()
+        return sent, position
+
+    def _invalidate_position(self, result, task_id, reason):
+        self._position_invalid = True
+        try:
+            position = mark_unknown(self.position_path, run_id=task_id, reason=reason)
+            result.position_lifecycle.append({"phase": "uncertain", "position": position.to_dict()})
+        except Exception as exc:
+            # 已成功写入的 MOVING 仍留在盘上；写失败不能掩盖 STOP 或丢失执行回执。
+            if result.stop_evidence is None:
+                result.stop_evidence = {}
+            result.stop_evidence["position_persistence_error"] = str(exc)
+            result.position_lifecycle.append({"phase": "uncertain_write_failed", "error": str(exc),
+                                              "position": self.position_snapshot})
+        self._emit_position()
+
+    @property
+    def position_snapshot(self) -> dict:
+        position = load_position(self.position_path)
+        active = self._active_motion
+        pending = None if active is None else active["pending"]
+        if pending is None:
+            pending = position.pending_motion
+        confirmed = position.xy()
+        if active is not None and not self._position_invalid:
+            confirmed = tuple(pending["before_steps"])
+        return {"status": "POSITION_UNCERTAIN" if self._position_invalid else position.status,
+            "known": position.known and not self._position_invalid,
+            "confirmed_xy_steps": None if self._position_invalid else confirmed,
+            "estimated_xy_steps": None if self._position_invalid or active is None else active["estimated_xy"],
+            "before_xy_steps": None if pending is None else pending.get("before_steps"),
+            "expected_xy_steps": None if pending is None else pending.get("expected_steps"),
+            "motion_id": None if pending is None else pending.get("motion_id"),
+            "segment_index": None if active is None else active.get("segment_index"),
+            "segment_line": None if active is None else active.get("segment_line"),
+            "reference_epoch": position.reference_epoch or position.zero_set_at,
+            "zero_set_at": position.zero_set_at, "updated_at": position.updated_at,
+            "note": position.note, "evidence": "command_pulses_not_physical_feedback"}
+
+    def _motion_progress(self, event):
+        active = self._active_motion
+        if active is None or event.get("motion_id") != active["pending"]["motion_id"]:
+            return
+        index = event["segment_index"]
+        lines = active["pending"]["lines"]
+        if not isinstance(index, int) or not 0 <= index < len(lines):
+            return
+        active["segment_index"], active["segment_line"] = index, event["segment_line"]
+        # READXY 每段计数会清零；零步轴可能残留上段计数，不能累计原始回复。
+        origin = list(active["pending"]["before_steps"])
+        for line in lines[:index]:
+            dx, dy = parse_movexy_line(line)
+            origin[0] += dx
+            origin[1] += dy
+        delta = parse_movexy_line(lines[index])
+        counts = (event.get("x_sent"), event.get("y_sent"))
+        for axis, signed in enumerate(delta):
+            if signed == 0:
+                continue
+            count = counts[axis]
+            if not isinstance(count, int) or isinstance(count, bool) or not 0 <= count <= abs(signed):
+                active["estimated_xy"] = None
+                self._emit_position()
+                return
+            origin[axis] += count if signed > 0 else -count
+        active["estimated_xy"] = tuple(origin)
+        self._emit_position()
+
+    def _emit_position(self):
+        if self.on_position is None:
+            return
+        try:
+            self.on_position(self.position_snapshot)
+        except Exception as exc:
+            print(f"[画面] 位置显示更新失败：{exc}", flush=True)
+
     def close(self) -> None:
         try:
             self.link.close()
@@ -330,7 +433,7 @@ class HardwareExecutor:
 
     def _same_reference(self, xy, preview) -> bool:
         position = load_position(self.position_path)
-        return position.xy() == xy and position.zero_set_at == preview["position_zero_set_at"]
+        return not self._position_invalid and position.xy() == xy and position.zero_set_at == preview["position_zero_set_at"]
 
 
 def _absolute(lines: tuple[str, ...]) -> tuple[int, int]:

@@ -1,7 +1,7 @@
 # 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
 # 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
-updated_at: 2026-10-09
-current_phase: "当前 fzh-branch@8c422cf 加未提交五页工作台改动。审核锁定子集、原安全执行、双图监控、复检、独立结果页及用户选择报告导出已打通 Mock 3候选/2执行/3记录。固件/标定/B算法/共享contracts未改；本轮未操作实物。最新测试见实时进度及工作台手册。"
+updated_at: 2026-10-10
+current_phase: "fzh-branch@23bf6ea 加未提交工作台v3改动；无限人工复洗、固定ROI/参数/可信比较、全轮次报告、位置pending和维护隔离已实现。全量490项通过，无实物操作；详细交接见2026-10-10验收。"
 
 current_evidence_level:
   overall_hardware: E0
@@ -222,3 +222,31 @@ documentation:
   hardware_group_index: 说明文档/硬件组/README.md
   stm32_contract: 说明文档/硬件组/串口协议与参数.md
   # 结构整理证据入口为说明文档/硬件组/结构整理与验收记录_2026-10-05.md；未提交、未推送、未烧录。
+
+workbench_rewash_20261010:
+  baseline_commit: 23bf6ea173885401c375c51b6865bbc7de7ffb5b
+  changes_committed: false
+  ui_version: workbench-v3-roi
+  interactive_rewash_limit: null
+  legacy_cli_bounded: true
+  recheck_choices: [rewash, next, retake, pause]
+  fixed_initial_roi: true
+  frozen_segmentation_parameters: true
+  measured_alignment_tolerance_px: 0.25
+  tolerance_physically_validated: false
+  empty_foreground_display_rate: 0
+  empty_foreground_auto_pass: false
+  pending_before_motion_write: true
+  physical_position_feedback: false
+  automatic_homing: false
+  soft_boundary_enforcement: false
+  mechanical_remaining_travel_known: false
+  calibrated_nozzle_display: command_pulse_estimate
+  all_washes_and_rechecks_in_report: true
+  automatic_report_export_or_print: false
+  physical_devices_used: false
+  final_regression_tests: 490
+  final_regression_failures: 0
+  final_regression_errors: 0
+  final_regression_skipped: 0
+  acceptance_document: 说明文档/软件组/工作台复洗与位置管理验收_2026-10-10.md

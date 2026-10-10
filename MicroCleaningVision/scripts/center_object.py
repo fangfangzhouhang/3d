@@ -8,7 +8,8 @@
   4. 发 MOVEXY 命令，让载物台移动把物体拉回中央
 
 改进：电机移动在后台线程执行，预览窗口在移动过程中持续刷新。
-居中成功后自动喷水一次（本脚本仍是 300ms。主机闭环短喷许可是 500ms）。
+只用于 --maintenance-mode --no-spray 维护；每次短距运动确认后使正式账本失效。
+居中完成不会喷水，正式清洗使用工作台并重新建立参考位置。
 """
 
 from __future__ import annotations
@@ -42,7 +43,15 @@ def main() -> int:
     parser.add_argument("--algorithm", default="local", choices=["hsv", "otsu", "exg", "exr", "local"])
     parser.add_argument("--max-steps", type=int, default=MAX_STEPS_PER_MOVE)
     parser.add_argument("--no-spray", action="store_true", help="居中后不自动喷水（用于 Gate5 等不含泵的阶段）")
+    parser.add_argument("--maintenance-mode", action="store_true", help="显式维护模式；移动前逐次输入 YES，位置账本失效")
+    parser.add_argument("--position-path", type=Path, default=ROOT / "output/stage2/position.json")
     args = parser.parse_args()
+    if not args.maintenance_mode or not args.no_spray:
+        parser.error("旧居中工具仅允许 --maintenance-mode --no-spray；正式喷洗请使用五页工作台")
+    from microcleaning.control_system.safety.maintenance import authorize_maintenance_move, MAINTENANCE_STEP_CAP
+    from microcleaning.control_system.serial.resource_lease import ResourceLease, device_resources
+    args.max_steps = min(args.max_steps, MAINTENANCE_STEP_CAP)
+    lease = ResourceLease(device_resources(args.serial_port, args.position_path)).acquire()
 
     import cv2
     import numpy as np
@@ -51,7 +60,8 @@ def main() -> int:
     from demo.demo_pipeline import _draw_contamination, segment_demo_image
 
     # 打开串口
-    ser = serial.Serial(
+    try:
+        ser = serial.Serial(
         port=args.serial_port,
         baudrate=args.baudrate,
         bytesize=8,
@@ -59,15 +69,23 @@ def main() -> int:
         stopbits=1,
         timeout=2.0,
         write_timeout=2.0,
-    )
+        )
+    except BaseException:
+        lease.close()
+        raise
     time.sleep(0.3)
     ser.reset_input_buffer()
 
     # 用锁保护串口，避免主线程和移动线程同时读写
     ser_lock = threading.Lock()
+    closing = threading.Event()
 
     def cmd(line: str, wait: float = 0.3) -> list[str]:
+        if line.startswith("MOVEXY "):
+            authorize_maintenance_move(line, args.position_path, enabled=args.maintenance_mode, cancelled=closing.is_set)
         with ser_lock:
+            if closing.is_set() and line != "STOP":
+                raise RuntimeError("维护已关闭，禁止发新命令")
             ser.write((line + "\r\n").encode("ascii"))
             time.sleep(wait)
             out: list[str] = []
@@ -84,6 +102,7 @@ def main() -> int:
     if "STEP_OK v0.3" not in replies:
         print(f"握手失败：{replies}")
         ser.close()
+        lease.close()
         return 1
     print("握手成功 STEP_OK v0.3")
 
@@ -105,7 +124,7 @@ def main() -> int:
             last = replies[0] if replies else ""
             try:
                 parts = dict(tok.split("=") for tok in last.split()[1:] if "=" in tok)
-                if parts.get("BX") == "0" and parts.get("BY") == "0":
+                if parts.get("BX") == "0" and parts.get("BY") == "0" and (not nx or parts.get("X") == str(nx)) and (not ny or parts.get("Y") == str(ny)):
                     return True
             except Exception:
                 pass
@@ -181,9 +200,9 @@ def main() -> int:
                     move_result["message"] = "move failed"
                     return
             else:
-                # 达到迭代上限，按已居中处理（前提是至少检测到过一次目标）
-                move_result["success"] = True
-                spray = detected
+                move_result["success"] = False
+                move_result["message"] = "未达到居中容差；停止维护，不喷水"
+                spray = False
 
             if spray and not args.no_spray:
                 move_result["message"] = "spraying..."
@@ -202,6 +221,7 @@ def main() -> int:
     if not cap.isOpened():
         print(f"无法打开相机 index={args.camera_index}")
         ser.close()
+        lease.close()
         return 1
 
     current_algorithm = args.algorithm
@@ -285,12 +305,18 @@ def main() -> int:
                 last_status = "centering..."
 
     finally:
+        closing.set()
+        try:
+            cmd("STOP", wait=0.1)
+        except Exception:
+            pass
         # 等待移动线程结束
         if move_thread is not None and move_thread.is_alive():
             move_thread.join(timeout=5.0)
         cap.release()
         cv2.destroyAllWindows()
         ser.close()
+        lease.close()
 
     return 0
 

@@ -22,6 +22,7 @@ from microcleaning.control_system.planning.stage2_position import load_position,
 from microcleaning.control_system.serial.f103_session import F103SerialSession
 from microcleaning.control_system.serial.stage2_link import Stage2SerialLink
 from microcleaning.control_system.serial.stm32_serial import STM32SerialController
+from microcleaning.control_system.serial.resource_lease import ResourceLease, device_resources
 from microcleaning.control_system.reporting import export_report, read_run, record_quality_review
 
 
@@ -176,7 +177,8 @@ class WorkbenchRuntime:
             self.git_dirty = None
         project = Path(__file__).resolve().parents[1]
         sources = [*project.joinpath("demo").glob("*.py")]
-        for directory in ("orchestration", "serial", "reporting"):
+        sources.extend(project.joinpath("microcleaning/vision").glob("*.py"))
+        for directory in ("orchestration", "serial", "reporting", "planning", "safety"):
             sources.extend(project.joinpath("microcleaning/control_system", directory).glob("*.py"))
         self.source_hashes = {path.relative_to(project).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(sources)}
 
@@ -206,32 +208,31 @@ class WorkbenchRuntime:
             self.bus.emit("stopping", explanation="正在取消等待并由设备线程收尾。停止是否确认，以回执为准。")
         elif action == "confirm":
             if self.confirmations is not None:
-                self.confirmations.reply(payload["request_id"], payload["answer"])
+                self.confirmations.reply(payload["request_id"], payload["answer"], reason=payload.get("reason", ""))
         else:
             self.commands.put({"action": action, **payload})
 
     def _run_task(self, metadata):
         folder = self.args.output_root / f"station_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
         self.folder = folder.resolve()
-        executor, self.source, self.loop = None, None, None
+        executor, self.source, self.loop, device_lease = None, None, None, None
         metadata.update(git_commit=self.git_commit, sample_id=metadata.get("sample_id") or "未记录",
-            git_dirty=self.git_dirty, ui_version="workbench-v2",
+            git_dirty=self.git_dirty, ui_version="workbench-v3-roi",
             source_sha256=hashlib.sha256(json.dumps(self.source_hashes, sort_keys=True).encode()).hexdigest(),
             source_files_sha256=self.source_hashes,
             operator=metadata.get("operator") or "未记录", firmware_identity="未确认", mode="real" if self.args.real else "mock")
         try:
             folder.mkdir(parents=True)
-            frames = None if self.args.real else MockFrames(self.args.mock_scenario)
+            if self.args.real:
+                device_lease = ResourceLease(device_resources(self.args.serial_port, self.args.position_path)).acquire()
+            frames = None if self.args.real else MockFrames(self.args.mock_scenario, roi_mode=True)
             self.source = CameraBroker(args=self.args, segmenter=self.segmenter, bus=self.bus, cancel=self.cancel, frames=frames)
             if self.args.real:
                 path, factory = self.args.position_path, None
                 current = load_position(path)
-                if self.args.stage2_set_zero or current.xy() is None:
-                    if not self.confirmations.ask("请先人工对齐载物台参考点。确认后仅把当前位置记为人工零点；不会自动回零。", facts={"phase": "position_reference"}):
-                        raise PermissionError("POSITION_REFERENCE_NOT_CONFIRMED")
-                    set_zero(path)
-                elif not self.confirmations.ask(f"位置账本为 {current.xy()} 步。请确认实物仍对应此账本；READXY 不是编码器。", facts={"phase": "position_reference"}):
-                    raise PermissionError("CURRENT_POSITION_NOT_CONFIRMED")
+                if not self.confirmations.ask(f"上次账本参考为 {current.xy()} 步（历史估算）。请确认设备已停止且无故障，再人工把载物台对齐固定参考点。确认后为本任务建立新零点；不会自动回零，也不沿用旧坐标。", facts={"phase": "position_reference"}):
+                    raise PermissionError("POSITION_REFERENCE_NOT_CONFIRMED")
+                set_zero(path)
             else:
                 serial = MockF103Serial(frames, self.args.mock_scenario)
                 path, factory = folder / "mock_position.json", serial.factory
@@ -253,10 +254,12 @@ class WorkbenchRuntime:
             controller = STM32SerialController(session=session,
                 arm_pump=self.args.arm_pump and self.args.confirm_pump if self.args.real else True)
             executor = HardwareExecutor(session=session, link=link, controller=controller,
-                position_path=path, confirm=self.confirm, pump_duration_ms=self.args.pump_duration_ms)
+                position_path=path, confirm=self.confirm, pump_duration_ms=self.args.pump_duration_ms,
+                on_position=lambda data: self.bus.emit("position", **data))
+            self.bus.emit("position", **executor.position_snapshot)
             self.loop = CleaningLoop(output_dir=folder, source=self.source, segmenter=self.segmenter,
                 executor=executor, placeholders=self.placeholders, calibration=self.calibration, offset=self.offset,
-                config=self.config, compare=self.compare, review=self.review, metadata=metadata,
+                config=self.config, compare=self.compare, review=self.review, recheck_decision=self.recheck_decision, metadata=metadata,
                 on_event=lambda event: self.bus.emit(event.pop("kind"), **event))
             result = self.loop.run()
             self.last_status = result["status"]
@@ -276,7 +279,7 @@ class WorkbenchRuntime:
             self.bus.emit("completed", summary=result, folder=str(folder.resolve()), task=None)
         finally:
             errors = []
-            for resource, code in ((executor, "EXECUTOR_CLOSE_FAILED"), (self.source, "FRAME_SOURCE_CLOSE_FAILED")):
+            for resource, code in ((executor, "EXECUTOR_CLOSE_FAILED"), (self.source, "FRAME_SOURCE_CLOSE_FAILED"), (device_lease, "DEVICE_LEASE_CLOSE_FAILED")):
                 if resource is not None:
                     try:
                         resource.close()
@@ -312,7 +315,7 @@ class WorkbenchRuntime:
                 self._active = False
             self.bus.emit("idle")
             if snapshot is not None:
-                self.bus.emit("results", snapshot=snapshot)
+                self.bus.emit("results", snapshot=snapshot, auto_navigate=bool(snapshot.get("report_ready")))
 
     def review(self, task, pre, prepare):
         self.bus.emit("candidates", task=task.to_dict(), image=pre["frame"].image, mask=pre["mask"])
@@ -338,20 +341,22 @@ class WorkbenchRuntime:
                     task.lock()
                 elif action == "begin":
                     task.begin()
-                    self.bus.emit("task", task=task.to_dict())
+                    self.bus.emit("task", task=task.ui_snapshot())
                     return
                 else:
                     continue
-                self.bus.emit("task", task=task.to_dict())
+                self.bus.emit("task", task=task.ui_snapshot())
             except (ValueError, PermissionError, OSError) as exc:
                 self.bus.emit("error", message=str(exc))
 
     def confirm(self, facts):
+        from demo.workbench_views import motion_chinese
         phase, stable = facts.get("phase"), facts.get("target_id", "当前目标")
         geometry = facts.get("geometry") or {}
         duration = (facts.get("pump_request") or {}).get("duration_ms", self.args.pump_duration_ms)
+        planned = "；".join(motion_chinese(line) for line in geometry.get("outbound", {}).get("lines", []))
         prompts = {
-            "move": f"{stable}：批准去程 {geometry.get('outbound', {}).get('lines', [])}。" + ("本次确认仅移动，抵达后仍需单独确认喷洗。" if facts.get("include_pump", True) else "此模式不喷水，批准去程和回程。"),
+            "move": f"{stable}：批准去程。{planned}。" + ("本次确认仅移动，抵达后仍需单独确认喷洗。" if facts.get("include_pump", True) else "此模式不喷水，批准去程和回程。"),
             "align": f"{stable}：去程脉冲计数已完成。请现场确认目标与针头重合；确认后请求短喷 {duration} ms。",
             "return": f"{stable}：收到喷洗 DONE，仅表示输出结束。确认后回到原显微观察位 {geometry.get('observation_position')}。",
             "return_without_spray": f"{stable}：未批准喷洗。确认后仅回到原观察位；拒绝则停在当前位置。",
@@ -366,18 +371,41 @@ class WorkbenchRuntime:
         if task is not None:
             task.state = "WAITING_CONFIRMATION"
             task.persist()
-            self.bus.emit("task", task=task.to_dict())
+            self.bus.emit("task", task=task.ui_snapshot())
         try:
             return self.confirmations.ask(prompts.get(phase, f"请核对本阶段 {phase} 的记录后确认。"), facts=facts)
         finally:
             if task is not None and not self.cancel.event.is_set():
                 task.state = "RUNNING"
                 task.persist()
-                self.bus.emit("task", task=task.to_dict())
+                self.bus.emit("task", task=task.ui_snapshot())
 
     def compare(self, pair):
         self.bus.emit("pair", pre=pair["pre"], post=pair["post"])
         return self.confirmations.ask("请核对前后图是否属于同一视野且可以比较。确认只表示可比较，不表示污渍已经洗净。", facts={"phase": "compare"})
+
+    def recheck_decision(self, facts):
+        target = facts["target_id"]
+        rate = facts["roi_analysis"].get("removal_rate")
+        rate_text = "无有效数值" if rate is None else f"{rate:.1%}"
+        ending = "不复洗将继续下一块。" if facts["next_target_id"] else "只有有效复检通过并认可结果后才进入报告。"
+        prompt = f"{target} 第 {facts['cycle']} 轮复检已完成，清洗率 {rate_text}。{ending}请选择是否复洗；选择复洗后仍需重新采图与逐步授权。"
+        task = self.loop.task
+        task.state = "WAITING_CONFIRMATION"
+        task.persist()
+        self.bus.emit("task", task=task.ui_snapshot())
+        try:
+            answer = self.confirmations.ask_choice(prompt, choices=tuple(facts["choices"]), facts=facts)
+            if answer["choice"] == "next" and facts.get("require_reason") and not answer.get("reason"):
+                self.bus.emit("error", message="人工最终通过必须填写复核理由；当前结果保留，未继续动作。")
+                return {"choice": "pause", "reason": "人工最终复核理由缺失"}
+            return {"choice": answer["choice"], "reason": answer.get("reason") or {"rewash": "人工认为需要继续清洗", "next": "人工选择不复洗并结束本目标",
+                "retake": "人工要求重新采集复检图", "pause": "人工暂停并保留记录"}[answer["choice"]]}
+        finally:
+            if not self.cancel.event.is_set():
+                task.state = "RUNNING"
+                task.persist()
+                self.bus.emit("task", task=task.ui_snapshot())
 
     def pair_images(self, pair):
         def read():
@@ -399,7 +427,7 @@ class WorkbenchRuntime:
     def load_results(self, folder):
         def read():
             try:
-                self.bus.emit("results", snapshot=read_run(folder))
+                self.bus.emit("results", snapshot=read_run(folder), auto_navigate=True)
             except Exception as exc:
                 self.bus.emit("error", message=f"结果读取失败：{exc}")
         threading.Thread(target=read, name="mcv-evidence-reader", daemon=True).start()
@@ -411,6 +439,8 @@ class WorkbenchRuntime:
         self.bus.emit("report_busy", busy=True)
         def write():
             try:
+                if print_after and not read_run(folder).get("report_ready"):
+                    raise PermissionError("末目标尚未通过或证据有问题，当前只允许查看/导出档案")
                 report = export_report(folder, formats=formats)
                 self.bus.emit("report_ready", folder=str(report), formats=formats)
                 if open_after or print_after:
@@ -433,14 +463,18 @@ class WorkbenchRuntime:
                 self.bus.emit("error", message=f"复核记录未保存：{exc}")
         threading.Thread(target=append, name="mcv-quality-review", daemon=True).start()
 
-    def comparison_images(self, folder, target: dict, *, masks=False):
+    def comparison_images(self, folder, target: dict, *, masks=False, attempt_index=-1, recheck_index=-1, nonce=None, crop=False):
         def read():
             import cv2
             import numpy as np
             result = []
-            last = target["attempts"][-1] if target["attempts"] else {}
+            last = target["attempts"][attempt_index] if target["attempts"] else {}
+            checks = last.get("rechecks") or []
+            check = checks[recheck_index] if checks else last
             for phase in ("pre", "post"):
-                reference = last.get(phase + ("_mask" if masks else "_image"))
+                reference = check.get(phase + ("_mask" if masks else "_image")) or last.get(phase + ("_mask" if masks else "_image"))
+                if crop and not masks:
+                    reference = (check.get("roi_evidence") or {}).get(phase + "_crop") or (last.get("roi_evidence") or {}).get(phase + "_crop")
                 if phase == "pre" and not masks and not reference:
                     reference = target.get("initial_image")
                 image = None
@@ -451,7 +485,8 @@ class WorkbenchRuntime:
                     except OSError:
                         pass
                 result.append(image)
-            self.bus.emit("result_images", folder=str(folder), target_id=target["target_id"], pre=result[0], post=result[1])
+            self.bus.emit("result_images", folder=str(folder), target_id=target["target_id"], nonce=nonce,
+                attempt_index=attempt_index, recheck_index=recheck_index, pre=result[0], post=result[1])
         threading.Thread(target=read, name="mcv-comparison-images", daemon=True).start()
 
     def run(self):

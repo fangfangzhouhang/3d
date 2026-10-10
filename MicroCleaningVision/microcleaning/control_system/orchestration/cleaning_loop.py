@@ -5,9 +5,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
+from itertools import count
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -26,6 +27,9 @@ from microcleaning.control_system.replay.episode_store import write_episode
 from microcleaning.data_learning.image_quality import build_observation, measure_image_quality
 from microcleaning.vision.contamination import ContaminationMeasurement
 from microcleaning.vision.target_instance import extract_target_instances, extract_target_mask, match_target_instance, verify_single_target
+from microcleaning.vision.target_instance import TargetVerification
+from microcleaning.vision.roi_verification import build_roi_reference, validate_roi_location, verify_roi_pair, save_roi_evidence, requires_neighbor_confirmation
+from microcleaning.vision.roi_segmentation import FrozenRoiSegmenter
 
 
 VERSION = "single-entry-cleaning-v1"
@@ -87,6 +91,7 @@ class CleaningLoop:
     def __init__(self, *, output_dir: str | Path, source, segmenter, executor,
                  placeholders, calibration, offset, config: LoopConfig = LoopConfig(),
                  compare: Callable[[dict], bool] | None = None, review: Callable | None = None,
+                 recheck_decision: Callable[[dict], dict] | None = None,
                  metadata: dict | None = None, on_event: Callable[[dict], None] | None = None) -> None:
         config.validate()
         self.config = config
@@ -99,6 +104,12 @@ class CleaningLoop:
         self.placeholders, self.calibration, self.offset = placeholders, calibration, offset
         self.compare = compare
         self.review, self.metadata, self.on_event = review, metadata or {}, on_event
+        self.recheck_decision = recheck_decision
+        self.interactive_recheck = recheck_decision is not None
+        self.report_ready = False
+        self._initial_frame = None
+        self._roi_refs = {}
+        self._roi_segmenters = {}
         self.task: TaskModel | None = None
         self.cancellation = getattr(executor, "cancellation", None)
         self.current_target_id: str | None = None
@@ -128,6 +139,10 @@ class CleaningLoop:
     def stage(self, phase: str) -> None:
         event = {"phase": phase, "cycle": self._cycle, "at": now()}
         self.events.append(event)
+        if len(self.events) > 100:
+            self.events.pop(0)
+        with (self.folder / "stage_events.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(event, ensure_ascii=False) + "\n")
         write_json(self.folder / "progress.json", {"task_id": self.task_id, "events": self.events,
             "used_abs_steps": self.used, "completed_cycles": len(self.cycles)})
         print(_STAGE_TEXT.get(phase, phase), flush=True)
@@ -140,7 +155,7 @@ class CleaningLoop:
     def _emit(self, kind: str, **payload) -> None:
         if self.on_event is not None:
             self.on_event({"kind": kind, **payload,
-                "task": None if self.task is None else self.task.to_dict()})
+                "task": None if self.task is None else self.task.ui_snapshot()})
 
     def _check_cancel(self) -> None:
         if self.cancellation is not None:
@@ -153,7 +168,7 @@ class CleaningLoop:
         episode_written = True
         try:
             # 每一轮（含 RETRY）都重新拍前图；不复用旧动作和旧令牌。
-            for number in range(1, self.config.max_cycles + 1):
+            for number in (count(1) if self.interactive_recheck else range(1, self.config.max_cycles + 1)):
                 self._check_cancel()
                 self._cycle = number
                 outcome, pre, post, verification = None, None, None, None
@@ -175,7 +190,7 @@ class CleaningLoop:
                     self._publish_roster(pre)
                     if self.review is not None:
                         self._review_candidates(pre)
-                else:
+                elif not self.interactive_recheck:
                     self._advance_closed(pre["observation"].observation_id, pre["mask"])
                 self.stage("SELECT_TARGET")
                 selected = self._next_roster_id()
@@ -197,13 +212,13 @@ class CleaningLoop:
                 self.current_target_id = selected
                 if self.task is not None:
                     item = self.task.targets[selected]
-                    if item.source == "algorithm":
+                    if item.source == "algorithm" and not self.interactive_recheck:
                         match = match_target_instance(pre_target=instance, pre_mask=self.roster_mask, post_mask=pre["mask"])
                         matched = next((target for target in targets if target.component_label == match.post_label), None)
                         drift = None if matched is None else sum((a - b) ** 2 for a, b in zip(matched.centroid_px, instance.centroid_px)) ** 0.5
                         if match.status != "matched" or matched is None or drift > 2.0:
                             raise TargetIdentityError(f"{selected}:CURRENT_LOCATION_NOT_VERIFIED")
-                    elif number > 1 and not self.executor.confirm({"phase": "manual_location", "target_id": selected,
+                    elif item.source == "manual" and number > 1 and not self.executor.confirm({"phase": "manual_location", "target_id": selected,
                             "centroid_px": instance.centroid_px, "bbox": instance.bbox}):
                         raise TargetIdentityError(f"{selected}:MANUAL_LOCATION_NOT_CONFIRMED")
                     item.execution = "RUNNING"
@@ -211,6 +226,55 @@ class CleaningLoop:
                     self._emit("target")
                 self.stage("PLAN_TARGET")
                 target_mask = self.task.manual_masks[selected] if self.task is not None and selected in self.task.manual_masks else extract_target_mask(self.roster_mask, instance)
+                if self.interactive_recheck:
+                    reference = self._roi_refs.get(selected)
+                    if reference is None:
+                        reference = build_roi_reference(self._initial_frame.image, target_mask,
+                            all_target_mask=self.roster_mask | target_mask, target_id=selected, frame_id=self._initial_frame.frame_id)
+                        frozen = FrozenRoiSegmenter(self.segmenter, self._initial_frame.image, reference.roi, target_mask,
+                            excluded_mask=reference.all_target_mask & ~reference.target_mask)
+                        baseline = frozen.mask(self._initial_frame.image)
+                        baseline.setflags(write=False)
+                        import numpy as np
+                        subject = (baseline > 0) & reference.measurement_domain
+                        subject.setflags(write=False)
+                        all_targets = reference.all_target_mask | subject
+                        all_targets.setflags(write=False)
+                        reference = replace(reference, target_mask=subject, all_target_mask=all_targets,
+                            initial_area_px=int(np.count_nonzero(subject)))
+                        self._roi_segmenters[selected] = frozen
+                        write_json(self.folder / f"roi_reference_{selected}.json", {"roi": reference.roi,
+                            "initial_area_px": reference.initial_area_px, "segmentation": frozen.to_dict()})
+                        write_png(self.folder / f"roi_reference_{selected}_mask.png", baseline)
+                        self._roi_refs[selected] = reference
+                    pre["mask"] = self._roi_segmenters[selected].mask(pre["frame"].image)
+                    write_png(cycle_dir / "pre_mask.png", pre["mask"])
+                    pre["metadata"]["roi_segmentation"] = self._roi_segmenters[selected].to_dict()
+                    pre["metadata"]["initial_scan_measurement"] = pre["metadata"]["measurement"]
+                    import numpy as np
+                    ys, xs = np.nonzero(pre["mask"])
+                    pre["metadata"]["measurement"] = asdict(ContaminationMeasurement(len(xs),
+                        None if not len(xs) else (float(xs.mean()), float(ys.mean())), 1.0 if len(xs) else 0.0,
+                        0.0, str(cycle_dir / "pre_mask.png"), len(extract_target_instances(pre["mask"])), "frozen-roi-segmentation-v1"))
+                    write_json(cycle_dir / "pre.json", pre["metadata"])
+                    location = validate_roi_location(reference, pre["frame"].image, pre["mask"])
+                    write_json(cycle_dir / "location_check.json", asdict(location))
+                    if not location.valid:
+                        raise TargetIdentityError(f"{selected}:ROI_REFERENCE_POSITION_UNCERTAIN:{','.join(location.reason_codes)}")
+                    # 原像素区域不变；本轮规划用当前残留，而不是重放首次动作。
+                    target_mask = (pre["mask"] > 0) & reference.measurement_domain
+                    import numpy as np
+                    target_mask = target_mask.astype(np.uint8) * 255
+                    if not np.any(target_mask):
+                        raise TargetIdentityError(f"{selected}:ROI_PRE_EMPTY:原区域未检出，禁止盲目复喷")
+                    # 不重新配对新的 T 编号；允许污渍减少导致质心在冻结区域内变化。
+                    current = extract_target_instances(target_mask)
+                    if not current:
+                        raise TargetIdentityError(f"{selected}:ROI_FOREGROUND_IDENTITY_UNCERTAIN")
+                    instance = max(current, key=lambda target: target.area_px)
+                    if len(current) > 1:
+                        self._say(f"{selected} 原区域剩余 {len(current)} 片，仍保留同一污渍编号；本轮规划最大残片，复检统计全部残留。")
+                        target_mask = extract_target_mask(target_mask, instance)
                 verification_mask = target_mask if self.task is not None and selected in self.task.manual_masks else self.roster_mask
                 write_png(cycle_dir / "selected_target_mask.png", target_mask)
                 normalized, _ = stage2_placeholders(self.placeholders, self.roster_mask.shape, self.calibration)
@@ -218,7 +282,8 @@ class CleaningLoop:
                 self.stage("BUILD_MOTION")
                 geometry = build_cycle_geometry(plan, base=self.placeholders, calibration=self.calibration,
                     offset=self.offset, observation_position=self.observation_position,
-                    task_id=self.task_id, used_abs_steps=self.used, budget=self.config.step_budget, real=self.config.real)
+                    task_id=self.task_id, used_abs_steps=(0, 0) if self.interactive_recheck else self.used,
+                    budget=self.config.step_budget, real=self.config.real)
                 write_json(cycle_dir / "geometry.json", geometry.to_dict())
                 write_json(cycle_dir / "path_preview.json", geometry.preview.to_dict())
                 write_png(cycle_dir / "path_overlay.png", draw_path_overlay(pre["frame"].image, geometry.preview))
@@ -232,6 +297,9 @@ class CleaningLoop:
                     "offset": self.offset.to_dict(), "position_zero_set_at": self.position_zero_set_at,
                     "path_overlay": str(cycle_dir / "path_overlay.png"), "used_abs_steps_before": self.used}
                 write_json(cycle_dir / "cycle.json", active)
+                self._emit("geometry", geometry=geometry.to_dict(), offset=self.offset.to_dict(),
+                    motor_calibration=None if self.calibration is None else self.calibration.to_dict(),
+                    calibration_valid=not geometry.reasons, real=self.config.real)
                 if hasattr(self.source, "select_target"):
                     self.source.select_target(instance)  # Mock 的图像替身只模拟被选中的目标。
                 measurement = ContaminationMeasurement(instance.area_px, instance.centroid_px,
@@ -269,25 +337,28 @@ class CleaningLoop:
                         active = None
                         status, reasons = "HUMAN", ("HUMAN_DECLINED_RECHECK",)
                         break
-                    self.stage("CAPTURE_POST")
-                    post = self._observe("post", cycle_dir, after=outcome.returned_at)
-                    self.stage("VERIFY_TARGET")
-                    comparable, evidence = self._comparable(pre, post, outcome)
-                    active["comparability"] = evidence
-                    verification = verify_single_target(task_id=self.task_id, pre=pre["observation"], post=post["observation"],
-                        pre_target=instance, pre_mask=verification_mask, post_mask=post["mask"],
-                        receipt=outcome.receipt, images_comparable=comparable)
-                    active["verification"] = asdict(verification)
-                    if self.task is not None:
-                        quality = evaluate_target(source=self.task.targets[selected].source, execution=active["execution"],
-                            verification=active["verification"], comparability=evidence, mode="real" if self.config.real else "mock")
-                        active["quality_evidence"] = quality.to_dict()
-                        self.task.targets[selected].quality = quality.quality
-                        self._emit("verification", target_id=selected, verification=active["verification"],
-                                   quality_evidence=quality.to_dict(), pre=pre["metadata"], post=post["metadata"])
-                    write_json(cycle_dir / "verification.json", asdict(verification))
-                    _say_recheck(self, verification)
-                    route = self._after_recheck(active, verification, entry, post)
+                    if self.interactive_recheck:
+                        post, verification, route = self._interactive_recheck(active, pre, outcome, entry, cycle_dir)
+                    else:
+                        self.stage("CAPTURE_POST")
+                        post = self._observe("post", cycle_dir, after=outcome.returned_at)
+                        self.stage("VERIFY_TARGET")
+                        comparable, evidence = self._comparable(pre, post, outcome)
+                        active["comparability"] = evidence
+                        verification = verify_single_target(task_id=self.task_id, pre=pre["observation"], post=post["observation"],
+                            pre_target=instance, pre_mask=verification_mask, post_mask=post["mask"],
+                            receipt=outcome.receipt, images_comparable=comparable)
+                        active["verification"] = asdict(verification)
+                        if self.task is not None:
+                            quality = evaluate_target(source=self.task.targets[selected].source, execution=active["execution"],
+                                verification=active["verification"], comparability=evidence, mode="real" if self.config.real else "mock")
+                            active["quality_evidence"] = quality.to_dict()
+                            self.task.targets[selected].quality = quality.quality
+                            self._emit("verification", target_id=selected, verification=active["verification"],
+                                       quality_evidence=quality.to_dict(), pre=pre["metadata"], post=post["metadata"])
+                        write_json(cycle_dir / "verification.json", asdict(verification))
+                        _say_recheck(self, verification)
+                        route = self._after_recheck(active, verification, entry, post)
                     failure = None if route in {"next", "retry", "success_done", "cycle_limit"} else ("human_gate", route)
                     self._episode(cycle_dir, pre, post, outcome, verification, failure=failure)
                     episode_written = True
@@ -295,7 +366,7 @@ class CleaningLoop:
                     self.cycles.append(active)
                     if self.task is not None:
                         self.task.update_attempt(selected, active, quality=active["quality_evidence"]["quality"],
-                            finished=route != "retry")
+                            finished=route in {"next", "success_done", "cycle_limit"})
                     write_json(cycle_dir / "cycle.json", active)
                     active = None
                     if route in {"next", "retry"}:
@@ -360,6 +431,8 @@ class CleaningLoop:
                 "initial_target_ids": list(self.task.initial_ids if self.task is not None else self.roster_ids),
                 "ignored_new_components": self.ignored_new_total,
                 "boundary_notice": self.boundary_notice}
+            summary.update(report_ready=self.report_ready and status == "SUCCESS", rewash_limit=None if self.interactive_recheck else self.config.max_retries_per_target,
+                stage_events_ref="stage_events.jsonl", recheck_mode="frozen_roi_human_decision" if self.interactive_recheck else "legacy_bounded_cli")
             if self.task is not None:
                 rows = [item.to_dict() for item in self.task.targets.values()]
                 quality, quality_reasons = final_quality(rows, workflow_status=self.task.state, mode=summary["mode"])
@@ -396,14 +469,27 @@ class CleaningLoop:
         write_png(path, frame.image)
         metrics, quality = measure_image_quality(frame.image)
         observation = build_observation(task_id=self.task_id, frame_id=frame.frame_id, raw_image_ref=str(path), quality=quality, software_version=VERSION)
-        segmentation = self.segmenter(frame.image)
-        write_png(folder / f"{phase}_mask.png", segmentation.mask)
+        if phase == "post" and self.interactive_recheck:
+            # 后图只采用首次冻结阈值与原像素ROI；全图目标扫描仅为可选二次确认。
+            import numpy as np
+            mask = self._roi_segmenters[self.current_target_id].mask(frame.image)
+            area = int(np.count_nonzero(mask))
+            ys, xs = np.nonzero(mask)
+            measurement = ContaminationMeasurement(area, None if not area else (float(xs.mean()), float(ys.mean())),
+                0.0 if not area else 1.0, 0.0, str(folder / f"{phase}_mask.png"),
+                len(extract_target_instances(mask)), "frozen-roi-segmentation-v1")
+        else:
+            segmentation = self.segmenter(frame.image)
+            mask, measurement = segmentation.mask, segmentation.measurement
+        write_png(folder / f"{phase}_mask.png", mask)
         metadata = {"observation": asdict(observation), "captured_at": frame.captured_at, "source_id": frame.source_id,
             "settings": frame.settings, "quality_metrics": asdict(metrics), "quality": asdict(quality),
             "raw_sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "segmentation_sha256": self.policy_hash,
-            "measurement": asdict(segmentation.measurement)}
+            "measurement": asdict(measurement)}
+        if phase == "post" and self.interactive_recheck:
+            metadata["roi_segmentation"] = self._roi_segmenters[self.current_target_id].to_dict()
         write_json(folder / f"{phase}.json", metadata)
-        return {"frame": frame, "observation": observation, "mask": segmentation.mask, "measurement": segmentation.measurement, "metadata": metadata}
+        return {"frame": frame, "observation": observation, "mask": mask, "measurement": measurement, "metadata": metadata}
 
     def _comparable(self, pre, post, outcome):
         a, b = pre["frame"], post["frame"]
@@ -455,8 +541,115 @@ class CleaningLoop:
             return ("HUMAN_STOPPED_AFTER_INCONCLUSIVE_RECHECK",) + result.reason_codes
         return self._finish_stain_and_continue(post, selected, cleaned=False)
 
+    def _interactive_recheck(self, active, pre, outcome, entry, cycle_dir):
+        """每次复检都落盘后才请求人决定；重拍不产生新运动或喷洗。"""
+        selected = active["target_id"]
+        active["rechecks"] = []
+        for index in count(1):
+            self._check_cancel()
+            directory = cycle_dir / f"recheck_{index:03d}"
+            directory.mkdir()
+            self.stage("CAPTURE_POST")
+            post = self._observe("post", directory, after=outcome.returned_at)
+            self.stage("VERIFY_TARGET")
+            comparable, evidence = self._comparable(pre, post, outcome)
+            secondary = None
+            if requires_neighbor_confirmation(self._roi_refs[selected], pre["frame"].image, post["frame"].image):
+                self._say(f"{selected} 周围区域有变化，进行一次全图二次确认；当前污渍面积仍按原固定区域计算。")
+                secondary = self.segmenter(post["frame"].image).mask
+                write_png(directory / "secondary_mask.png", secondary)
+                evidence["secondary_mask_ref"] = (directory / "secondary_mask.png").relative_to(self.folder).as_posix()
+                evidence["secondary_mask_sha256"] = hashlib.sha256((directory / "secondary_mask.png").read_bytes()).hexdigest()
+            roi = verify_roi_pair(reference=self._roi_refs[selected],
+                pre_image=pre["frame"].image, post_image=post["frame"].image,
+                pre_mask=pre["mask"], post_mask=post["mask"],
+                pre_frame_id=pre["frame"].frame_id, post_frame_id=post["frame"].frame_id,
+                pre_quality_flags=pre["observation"].quality_flags, post_quality_flags=post["observation"].quality_flags,
+                secondary_post_mask=secondary)
+            evidence["roi_alignment_valid"] = roi.valid
+            valid = comparable and roi.valid
+            passed = valid and roi.removal_rate is not None and roi.removal_rate >= QUALITY_POLICY["threshold"]
+            reasons = ("REPLAY_THRESHOLD_MET",) if passed else ("REPLAY_RESIDUE_REMAINS",) if valid else tuple(dict.fromkeys((*roi.reason_codes, "ROI_COMPARABILITY_NOT_PROVEN")))
+            result = VerificationResult(self.task_id, pre["observation"].observation_id, post["observation"].observation_id,
+                roi.post_area_px, roi.removal_rate if valid or roi.removal_rate == 0 else None, False,
+                NextRoute.STOP if passed else NextRoute.RETRY if valid else NextRoute.HUMAN, reasons)
+            verification = TargetVerification(selected, roi.pre_area_px, roi.post_area_px, result.removal_rate,
+                roi.alignment_confidence, result, "matched" if valid else "unmatched")
+            raw = asdict(verification)
+            quality = evaluate_target(source=self.task.targets[selected].source, execution=active["execution"],
+                verification=raw, comparability=evidence, mode="real" if self.config.real else "mock")
+            refs = save_roi_evidence(roi, directory / "roi")
+            refs = {name: (directory / "roi" / path).relative_to(self.folder).as_posix() for name, path in refs.items()}
+            hashes = {name: hashlib.sha256((self.folder / path).read_bytes()).hexdigest() for name, path in refs.items()}
+            analysis = {**roi.to_dict(), "segmentation": self._roi_segmenters[selected].to_dict()}
+            check = {"index": index, "pre": pre["metadata"], "post": post["metadata"],
+                "verification": raw, "comparability": evidence, "roi_analysis": analysis,
+                "roi_evidence": refs, "roi_evidence_sha256": hashes, "quality_evidence": quality.to_dict()}
+            active["rechecks"].append(check)
+            active.update(verification=raw, comparability=evidence, roi_analysis=analysis,
+                roi_evidence=refs, roi_evidence_sha256=hashes, quality_evidence=quality.to_dict())
+            self.task.targets[selected].quality = quality.quality
+            # 兼容旧读档键，同时保留每次重拍的独立目录。
+            for name in ("post.png", "post_mask.png", "post.json"):
+                (cycle_dir / name).write_bytes((directory / name).read_bytes())
+            write_json(directory / "verification.json", raw)
+            write_json(cycle_dir / "verification.json", raw)
+            write_json(cycle_dir / "cycle.json", active)
+            self._emit("verification", target_id=selected, verification=raw, quality_evidence=quality.to_dict(),
+                roi_analysis=analysis, pre=pre["metadata"], post=post["metadata"],
+                pre_crop=roi.pre_crop, post_crop=roi.post_crop, overlay=roi.overlay)
+            _say_recheck(self, verification)
+            # 末块不能把未通过的“不复洗”解释为打印许可；仍可暂停留档。
+            manual_accept_allowed = comparable and roi.alignment.valid and roi.reference_alignment.valid and (
+                roi.valid or set(roi.reason_codes).issubset({"ROI_POST_EMPTY"}))
+            choices = ("rewash", "next", "retake", "pause") if self._following_id(selected) or passed or manual_accept_allowed else ("rewash", "retake", "pause")
+            decision = self.recheck_decision({"target_id": selected, "cycle": self._cycle, "recheck_index": index,
+                "verification": raw, "roi_analysis": analysis, "quality_evidence": quality.to_dict(),
+                "next_target_id": self._following_id(selected), "last_target": self._following_id(selected) is None,
+                "choices": choices, "passed": passed, "manual_accept_allowed": manual_accept_allowed,
+                "require_reason": not self._following_id(selected) and not passed})
+            if not isinstance(decision, dict) or decision.get("choice") not in choices:
+                raise ValueError("INVALID_RECHECK_DECISION")
+            self._check_cancel()
+            decision = {**decision, "at": now(), "operator": self.metadata.get("operator", "未记录")}
+            check["decision"] = decision
+            active["recheck_decision"] = decision
+            self.task.audit("recheck_decision", target_id=selected, cycle=self._cycle, recheck_index=index, **decision)
+            write_json(directory / "decision.json", decision)
+            write_json(cycle_dir / "cycle.json", active)
+            if decision["choice"] == "retake":
+                self._say(f"{selected} 仅重拍复检，不移动、不喷水；先确认复位和成像条件。")
+                continue
+            if decision["choice"] == "rewash":
+                entry.retry_count += 1
+                self.task.targets[selected].retry_count = entry.retry_count
+                self.stage("RETRY")
+                self._say(f"人工要求第 {entry.retry_count} 次复洗 {selected}；重新采图、规划及授权。")
+                return post, verification, "retry"
+            if decision["choice"] == "pause":
+                return post, verification, ("HUMAN_PAUSED_AFTER_RECHECK",)
+            human_final_pass = not self._following_id(selected) and manual_accept_allowed and bool(decision.get("reason", "").strip())
+            if not self._following_id(selected) and not passed and not human_final_pass:
+                return post, verification, ("FINAL_RECHECK_NOT_ACCEPTED",)
+            if passed or human_final_pass:
+                # 实物自动标准尚未验证；此处只有明确的人认可才登记人工结论。
+                manual = {"operator": decision["operator"], "reason": decision.get("reason") or "操作员核对本轮固定区域复检后认可结果",
+                    "conclusion": "CLEANED", "evidence_refs": list(refs.values())}
+                quality = evaluate_target(source=self.task.targets[selected].source, execution=active["execution"],
+                    verification=raw, comparability=evidence, mode="real" if self.config.real else "mock", manual=manual)
+                active["quality_evidence"] = quality.to_dict()
+                check["quality_evidence"] = quality.to_dict()
+                self.task.targets[selected].quality = quality.quality
+            if not self._following_id(selected):
+                self.report_ready = passed or human_final_pass
+            return post, verification, self._finish_stain_and_continue(post, selected, cleaned=passed or human_final_pass)
+
     def _finish_stain_and_continue(self, post, selected, *, cleaned: bool):
-        self._advance_closed(post["observation"].observation_id, post["mask"], completed_id=selected if selected in self.ledger.entries else None)
+        if self.interactive_recheck:
+            if selected in self.ledger.entries:
+                self.ledger.entries[selected].completed = True
+        else:
+            self._advance_closed(post["observation"].observation_id, post["mask"], completed_id=selected if selected in self.ledger.entries else None)
         if self.task is not None:
             self.task.targets[selected].finished = True
         self.stage("STAIN_RECORDED")
@@ -468,7 +661,7 @@ class CleaningLoop:
             else:
                 self._say(f"{_ordinal(finished)}污渍的本次处理已结束，规则没有把它记成洗净。编号名单已全部处理。")
             return "success_done"
-        if self._cycle >= self.config.max_cycles:
+        if not self.interactive_recheck and self._cycle >= self.config.max_cycles:
             ending = "已清洗完成" if cleaned else "的本次处理已结束，规则没有把它记成洗净"
             self._say(f"{_ordinal(finished)}污渍{ending}。允许的轮数已经用完，{nxt} 还在名单里，但不会开始。")
             return "cycle_limit"
@@ -509,6 +702,7 @@ class CleaningLoop:
     def _publish_roster(self, pre) -> None:
         self.roster_ids = tuple(self.ledger.entries)
         self.roster_mask = pre["mask"].copy()
+        self._initial_frame = pre["frame"]
         self.roster_plan = {stable: entry.instance for stable, entry in self.ledger.entries.items()}
         if not self.roster_ids:
             return
@@ -597,14 +791,13 @@ def _ordinal(number: int) -> str:
 
 
 def _say_recheck(loop, verification) -> None:
+    from microcleaning.control_system.reporting.quality_report import explain
     result = verification.result
-    rate = "没有算出" if verification.removal_rate is None else f"{verification.removal_rate:.3f}"
-    if verification.removal_rate is None and verification.pre_area_px and verification.post_area_px is not None and verification.pre_area_px > 0:
-        rough = max(0.0, min(1.0, (verification.pre_area_px - verification.post_area_px) / verification.pre_area_px))
-        rate = f"规则没有采用；按前后面积粗算 {rough:.3f}"
+    rate = "无有效数值（请检查复位和成像证据）" if verification.removal_rate is None else f"{verification.removal_rate:.1%}"
+    match = {"matched": "原区域可以比较", "unmatched": "证据不足，不能判定", "ambiguous": "区域对应不唯一"}.get(verification.match_status, "待人工复核")
+    reasons = "；".join(explain(code) for code in result.reason_codes)
     loop._say(
-        f"复检结果：目标 {verification.target_id}，匹配 {verification.match_status}，去除率 {rate}，原因 {result.reason_codes}。"
-        "这不是洗净验收。"
+        f"复检结果：污渍 {verification.target_id}，{match}，清洗率 {rate}。{reasons}。请人工选择复洗或结束本目标。"
     )
 
 

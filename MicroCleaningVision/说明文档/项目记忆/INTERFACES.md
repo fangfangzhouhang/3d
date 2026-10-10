@@ -1,5 +1,20 @@
 # INTERFACES｜模块之间怎样传数据
 
+## 当前交接：2026-10-10
+
+线上MCV1、STEP v0.3与共享contracts/ports未改变。主机局部新增：
+
+- `ConfirmationBroker.ask_choice(prompt, choices, facts) -> {choice, reason}`，允许rewash/next/retake/pause；reply绑定request_id且严格类型，旧ask仍只接bool。
+- `CleaningLoop(recheck_decision=...)`开启人工工作台路由；未提供callback的旧CLI仍有限轮数。summary增加report_ready/recheck_mode/stage_events_ref，原键保留。
+- `cycle.rechecks[]`包含pre/post、verification/comparability、roi_analysis及segmentation、roi_evidence与sha256、quality_evidence、decision；cycle旧post/verification镜像最新一项。
+- 位置JSON兼容旧known/x/y，新增status/pending_motion/reference_epoch；回执不能把故障软件升级为物理定位已验证。
+- on_position快照包括confirmed/estimated/before/expected XY、motion_id/当前段、reference时间，evidence明确command_pulses_not_physical_feedback。
+- 结果图请求携attempt_index/recheck_index/nonce；旧图答复不能覆盖当前轮；read_run顶层report_ready是打印/自动导航依据。
+
+坐标均保留原图ROI，喷头有符号偏移只应用一次。当前F103共同入口急停实际源码读PB12，旧PB2仅历史兼容；烧录身份未知。[本轮详细验收](../软件组/工作台复洗与位置管理验收_2026-10-10.md)。
+
+> 以下保留此前有日期的说明和实验快照。与本节冲突的工作台、复洗、复检、位置和报告规则已被本节替代；历史数字不代表当前验收。
+
 2026-10-09 工作台局部接口补充：`workbench-task-v1` task_manifest 保存全候选/决定/冻结名单/原像素几何/哈希；`review_log.jsonl` 追加编辑及质量复核；`quality-report-v1` 规范化原档案供 UI/HTML/CSV 使用；`workbench-evidence-v1` 解释证据，不改 B 原 verification。事件队列和 request_id 仅用于主机线程通信，串口句子和 mcl-v0.1 contracts/ports 没有改变。serial 会话新增可选 cancellation/on_serial_event，旧调用默认不启用；消费者仅工作台和其测试。summary 保留旧键并增加 workflow/quality、manifest引用、执行子集。版本和路径见手册；以下基线为历史。
 
 核对日期：2026-10-05；基线 main `341224f`（PR #24 后），`feat/single-entry-cleaning-v1` worktree 的主机代码/说明改动尚未提交。固件未在此轮修改或重建，真实设备未操作。 共享 Python 合同 mcl-v0.1、泵 MCV1、步进 v0.3 均未更改。
@@ -72,7 +87,7 @@ execute(request: ActionRequest, decision: SafetyDecision) -> ExecutionReceipt
 
 线上是 `MCV1|PING`、`STATUS`、`PUMP|action_id|duration_ms`、`STOP`；回 `PONG`、`STATUS`、`ACK`、`DONE`、`ERR`。ACK 表示接受，DONE 表示固件动作流程结束，均不能独自证明液体到达目标或污染减少。MCV1 编码器上限 500 ms；主机控制器及新闭环 PUMP_IN_PLACE 许可为 100–500 ms，闭环默认 500 ms。固件 PUMP ON 仍是固定 300 ms。MCU 沿用旧范围 100–2000 ms，不把固件上限当作用户可以直接申请的上限。当前 common/main.c 已接入共享 MCV1，旧 Stage1 兼容构建继续使用同一协议。
 
-当前F103引脚和完整协议只查共同协议文档。PB2在联合入口假设常闭接地，断开高急停；实际接线未确认。不要恢复 F401 PB5/PB12 作为当前板子配置。
+当前F103引脚和完整协议只查共同协议文档。PB12在当前联合入口假设常闭接地，断开高急停；实际接线未确认。不要把旧F401引脚配置套用到当前F103；当前PB12来源于F103共同入口的实际源码。
 
 ## 6. C → Stage 2：受限双轴运动
 

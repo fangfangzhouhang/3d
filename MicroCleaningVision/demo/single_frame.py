@@ -32,6 +32,14 @@ from demo.pump_mode import _arm_pump_episode, _controller_device_facts, _probe_s
 from demo.reporting import _analysis_episode, write_demo_report
 
 
+def _write_image(path, image, cv2):
+    """Windows 中文目录以 Python 写字节，避免 imwrite 的路径编码限制。"""
+    okay, encoded = cv2.imencode(Path(path).suffix or ".png", image)
+    if okay:
+        Path(path).write_bytes(encoded.tobytes())
+    return okay
+
+
 def run_demo(
     *,
     input_path: str | Path | None = None,
@@ -115,7 +123,7 @@ def run_demo(
         source_kind = source_kind_override
     if input_source_override:
         input_source = input_source_override
-    if not cv2.imwrite(str(input_output), image):
+    if not _write_image(input_output, image, cv2):
         raise OSError(f"无法写入Demo输入副本：{input_output}")
 
     inspection = inspect_image_file(input_output)
@@ -134,7 +142,7 @@ def run_demo(
         use_tuned_policy=use_tuned_policy,
     )
     mask_path = run_dir / "mask.png"
-    if not cv2.imwrite(str(mask_path), segmentation.mask):
+    if not _write_image(mask_path, segmentation.mask, cv2):
         raise OSError(f"无法写入mask：{mask_path}")
     measurement = replace(segmentation.measurement, mask_ref=mask_path.relative_to(run_dir).as_posix())
     placeholders = load_path_placeholders(path_placeholders)
@@ -146,8 +154,8 @@ def run_demo(
 
     contamination_overlay = _draw_contamination(image, segmentation.mask, measurement.centroid_px, cv2)
     path_overlay = draw_path_overlay(contamination_overlay, path_preview)
-    cv2.imwrite(str(run_dir / "contamination_overlay.png"), contamination_overlay)
-    cv2.imwrite(str(run_dir / "path_overlay.png"), path_overlay)
+    _write_image(run_dir / "contamination_overlay.png", contamination_overlay, cv2)
+    _write_image(run_dir / "path_overlay.png", path_overlay, cv2)
     (run_dir / "path_narrative.txt").write_text("\n".join(path_preview.narrative) + "\n", encoding="utf-8")
     stage2_dispatch = None
     stage2_outcome: Stage2MotionOutcome | None = None
@@ -183,7 +191,7 @@ def run_demo(
         state, action_target_mm = _build_simulation_state(observation, measurement, plan)
         post_mask = simulate_first_action(segmentation.mask, plan)
         post_mask_path = run_dir / "post_mask.png"
-        cv2.imwrite(str(post_mask_path), post_mask)
+        _write_image(post_mask_path, post_mask, cv2)
         post_observation = build_observation(
             task_id=run_id,
             frame_id="post-simulated",

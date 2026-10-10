@@ -174,3 +174,14 @@ class TaskModel:
 
     def persist(self) -> None:
         atomic_json(self.folder / "task_manifest.json", self.to_dict())
+
+    def ui_snapshot(self) -> dict:
+        """主线程只需要候选与当前状态，避免逐阶段搬运无限复洗的全部档案。"""
+        targets = {}
+        for stable, item in self.targets.items():
+            targets[stable] = {name: deepcopy(value) for name, value in vars(item).items() if name != "attempts" and name != "instance"}
+            targets[stable].update(instance=asdict(item.instance), attempts=[], attempt_count=len(item.attempts),
+                area_kind="segmented_stain_px" if item.source == "algorithm" else "manual_region_px")
+        return {"version": self.VERSION, "task_id": self.task_id, "state": self.state,
+            "initial_ids": self.initial_ids, "execution_ids": self.execution_ids, "targets": targets,
+            "image_shape": self.image_shape, "metadata": deepcopy(self.metadata)}
