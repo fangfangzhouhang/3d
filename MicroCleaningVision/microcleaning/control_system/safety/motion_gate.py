@@ -9,8 +9,8 @@
 复用 ``contracts.SafetyDecision``，共享合同字段不改。``MotionRequest`` 是 C 自己的
 数据类，不进共享合同；运动回执合同化见 mcl-v0.2 提案。
 
-主机不再另设单次步数上限。能不能移动，只看位置账本会不会越出人工零点两侧的边界。
-一条 MOVEXY 仍不能超过固件报文的 20000 步。软限位是计数，不是回零：
+主机不再用整份名单的步数合计、也不用人工零点两侧的步数边界拦住移动。
+一条 MOVEXY 仍不能超过固件报文的 20000 步。位置账本仍是相对人工零点的计数，不是回零：
 丢步或断电后会漂，每次上电都要人重新对位后归零。
 """
 
@@ -181,8 +181,6 @@ def evaluate_motion(request: MotionRequest, limits: MotionLimits = MotionLimits(
             denied.append("CALIBRATION_HAS_WARNINGS")
     if request.position_before_steps is None:
         denied.append("POSITION_UNKNOWN")
-    elif plan.leaves_soft_limits:
-        denied.append("SOFT_LIMIT_EXCEEDED")
     if request.dispatch_truncated:
         human.append("PATH_TRUNCATED_BY_BUDGET")
     human.append("STAGE2_MOTION_REQUIRES_HUMAN")
@@ -199,16 +197,11 @@ def evaluate_motion(request: MotionRequest, limits: MotionLimits = MotionLimits(
 
 
 def format_side_clearance(position: tuple[int, int], limits: MotionLimits = MotionLimits()) -> str:
-    """当前位置离软限位两侧还剩多少步。计数相对人工零点，不是台面实测。"""
+    """账本上的当前计数。主机不再用两侧步数边界拦住移动。"""
 
+    del limits
     x, y = int(position[0]), int(position[1])
-    xmin, ymin = limits.soft_min_steps
-    xmax, ymax = limits.soft_max_steps
-    return (
-        f"账本位置 X={x} 步，Y={y} 步，相对人工零点计数。"
-        f"X 负方向还剩 {x - xmin} 步，正方向还剩 {xmax - x} 步。"
-        f"Y 负方向还剩 {y - ymin} 步，正方向还剩 {ymax - y} 步。"
-    )
+    return f"账本位置 X={x} 步，Y={y} 步，相对人工零点计数。主机不再按步数边界拦住这一步。"
 
 
 def explain_travel_block(
@@ -230,9 +223,10 @@ def explain_travel_block(
         return None
     sentences = ["已拦住，电机不会动，也不会喷水。"]
     if outbound.position_before_steps is None:
-        sentences.append("当前位置未知，离两边还剩多少步也未知，所以不能发移动命令。")
+        sentences.append("当前位置未知，所以不能发移动命令。")
     else:
-        sentences.append(format_side_clearance(outbound.position_before_steps, limits))
+        x, y = int(outbound.position_before_steps[0]), int(outbound.position_before_steps[1])
+        sentences.append(f"账本位置 X={x} 步，Y={y} 步，相对人工零点计数。")
     sentences.extend(_leg_block_sentences("去程", outbound, limits))
     sentences.extend(_leg_block_sentences("回程", returning, limits))
     return "".join(sentences)
@@ -247,27 +241,6 @@ def _leg_block_sentences(label: str, request: MotionRequest, limits: MotionLimit
         sentences.append(
             f"{label}单条有一轴要走 {plan.max_leg_steps} 步，超过固件一条报文能写的 {limits.max_steps_per_leg} 步，没有放进移动命令。"
         )
-    if request.position_before_steps is None or not request.lines:
-        return sentences
-    cursor = (int(request.position_before_steps[0]), int(request.position_before_steps[1]))
-    points = [cursor]
-    for line in request.lines:
-        try:
-            dx, dy = parse_movexy_line(line)
-        except ValueError:
-            continue
-        cursor = (cursor[0] + dx, cursor[1] + dy)
-        points.append(cursor)
-    for index, name, low, high in (
-        (0, "X", limits.soft_min_steps[0], limits.soft_max_steps[0]),
-        (1, "Y", limits.soft_min_steps[1], limits.soft_max_steps[1]),
-    ):
-        highest = max(point[index] for point in points)
-        lowest = min(point[index] for point in points)
-        if highest > high:
-            sentences.append(f"{label}的 {name} 会走到 {highest} 步，正方向边界是 {high} 步，超出 {highest - high} 步。")
-        if lowest < low:
-            sentences.append(f"{label}的 {name} 会走到 {lowest} 步，负方向边界是 {low} 步，超出 {low - lowest} 步。")
     return sentences
 
 

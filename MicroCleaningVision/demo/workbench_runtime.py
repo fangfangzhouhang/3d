@@ -103,6 +103,7 @@ class CameraBroker:
                     self.bus.emit("capture_closed", phase=phase)
         except Exception as exc:
             self.failure = exc
+            self.bus.emit("log", message=f"相机没有画面：{exc}")
             self.bus.emit("device", camera="连接失败", serial="尚未探测")
         finally:
             self.ready.set()

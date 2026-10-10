@@ -278,7 +278,7 @@ class CleaningLoopTests(unittest.TestCase):
         self.assertEqual("SUCCESS", result["status"])
         self.assertGreater(raw.pump_count, 0)
 
-    def test_over_boundary_move_is_stopped_with_a_chinese_notice(self):
+    def test_move_past_the_old_fence_is_not_stopped(self):
         import io
         from contextlib import redirect_stdout
 
@@ -288,13 +288,9 @@ class CleaningLoopTests(unittest.TestCase):
                 budget=STAGE2_RUN_STEP_CAP,
                 offset=replace(mock_offset(), scope_to_nozzle_delta_steps=(0, DEFAULT_SOFT_LIMIT_STEPS + 200)))
         text = buffer.getvalue()
-        self.assertEqual("HUMAN", result["status"])
-        self.assertEqual(0, raw.pump_count)
-        self.assertEqual(0, raw.opens)
-        self.assertIn("已拦住，电机不会动，也不会喷水。", text)
-        self.assertIn("正方向边界是 10000 步", text)
-        self.assertIn(result["boundary_notice"], text)
-        self.assertNotIn("SOFT_LIMIT_EXCEEDED", result["boundary_notice"])
+        self.assertIsNone(result["boundary_notice"])
+        self.assertNotIn("已拦住", text)
+        self.assertGreater(raw.opens, 0)
 
     def test_truncated_offset_and_raster_are_not_executed(self):
         for kwargs in ({"offset": replace(mock_offset(), scope_to_nozzle_delta_steps=(0, DEFAULT_SOFT_LIMIT_STEPS + 200))}, {"scenario": "raster"}):

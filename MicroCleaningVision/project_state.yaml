@@ -103,7 +103,7 @@ software_loop:
   controller: microcleaning/control_system/serial/stm32_serial.py
   fake_controller: microcleaning/control_system/serial/fake_serial.py
   note: "新入口持续同相机/串口、单目标原尺寸Mask、唯一有符号偏移、回原观察位。未武装喷水时一次确认只走去程和回程，不做清洁复检。同时有喷水武装时，去程、针头重合确认、500ms短喷、回原位、复检和下一块各自在同一个窗口确认。第一次画面的编号顺序是清洗顺序，后面不新开；复检对不上时确认仍继续下一块。显微镜窗口标出光心十字和右下角S/N小图。仅CENTER_POINT，扫描HUMAN。旧 demo --live 不发送步进。station_20261008_203402_ed901155 只喷了S0001一次后因TARGET_UNMATCHED停下，S0002未喷。编号顺序的软件修正还没有在COM8上再跑。"
-  budget_rule: "主机不再另设单次步数上限。能否移动只看位置账本，人工零点两侧各10000步。越界时窗口和终端用中文说明当前位置、两侧剩余和超出步数，然后拦住。固件一条报文最多20000步。"
+  budget_rule: "主机不再按整份名单的步数合计拦住，也不再按人工零点两侧的步数边界拦住。一条 MOVEXY 仍不能超过固件报文的 20000 步。位置账本仍记录相对人工零点的计数。"
   nozzle_offset_rule: "scope_to_nozzle_delta_steps实物须实测/方向确认/来源/不确定性/电机标定SHA256绑定；null不等于0；拒绝重复补偿。"
   workbench_note: "Real默认五页工作台；交互Mock加--workbench；旧Mock自动确认CLI保留。首次候选待审、锁定确认子集。运行中新增不入队列；下一目标当前定位未唯一匹配或漂移超过2px则HUMAN。原图/实时并列，MOVE触发监控，结束独立结果页。报告质量INCOMPLETE优先于FAIL/REVIEW_REQUIRED/PASS；0.80仅回放规则、无前景需复核。历史缺字段未记录。"
 
@@ -167,7 +167,7 @@ development_environment:
 
 major_risks:
   - "源码当前PB12，旧资料仍有PB2；必须核对同次烧录和接线。默认ARM按钮非强制，轮询联锁不替代独立断电。"
-  - "名义针头偏移7680步仍未实测确认；当前±10000软边界和20000报文限制不能作为几何验收。TO_SCOPE是相对反向而非回零，主机/固件不得重复补偿。"
+  - "名义针头偏移7680步仍未实测确认。主机不再用步数边界拦住移动。固件一条报文最多20000步，不能作为几何验收。TO_SCOPE是相对反向而非回零，主机/固件不得重复补偿。"
   - "固件限时不能修复center_object尝试耗尽后喷水、补关缺口、相机/标定硬编码；本轮未改这些主机文件。"
   - "Demo运动关卡只覆盖当前主发送器；center_object和calibrate_motor_mm_per_px脚本直接发串口运动，不能宣称所有运动入口都统一授权。"
   - "三人尚无稳定投入时间，采用核心/扩展/备用任务和实际专注时段回填。"

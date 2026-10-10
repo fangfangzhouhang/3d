@@ -510,6 +510,8 @@ class WorkbenchWindow:
         elif kind == "device":
             self.camera_state, self.serial_state = payload["camera"], payload["serial"]
             self._device_update()
+            if "失败" in str(payload["camera"]) or "读不到" in str(payload["camera"]):
+                self.views["detection"].message.config(text="显微镜画面没有读到。看下方日志。关闭本窗口后重新运行。")
         elif kind == "capture_ready":
             self.capture_ready = True
             self._capture_buttons(True)
@@ -641,10 +643,17 @@ class WorkbenchWindow:
                 return
         image = self.runtime.bus.latest_frame()
         if image is not None:
-            if self.current_page == "detection":
-                self.views["detection"].canvas.set_image(image)
-            elif self.current_page == "monitor":
-                self.views["monitor"].live.set_image(image)
+            try:
+                if self.current_page == "detection":
+                    self.views["detection"].canvas.set_image(image)
+                    self.views["detection"].message.config(text="显微画面已打开。确认视野和焦点后按空格采集。")
+                    if self.progress_text.cget("text") == "正在准备显微视野":
+                        self.progress.stop()
+                        self.progress_text.config(text="显微视野已打开")
+                elif self.current_page == "monitor":
+                    self.views["monitor"].live.set_image(image)
+            except Exception:
+                self.write("这一帧没有画上窗口，继续读下一帧。")
         self.root.after(40, self._pump)
 
     def result_target(self):

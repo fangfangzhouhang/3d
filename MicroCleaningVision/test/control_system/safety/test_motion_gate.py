@@ -1,4 +1,4 @@
-"""Stage 2 运动关卡：从不直接 ALLOW；超步数、缺标定、位置未知、出软限位一律 DENY。"""
+"""Stage 2 运动关卡：从不直接 ALLOW；缺标定、位置未知、报文超长一律 DENY。主机不再用步数边界拦住。"""
 
 import unittest
 from dataclasses import replace
@@ -63,18 +63,13 @@ class MotionGateTests(unittest.TestCase):
         self.assertIs(SafetyOutcome.DENY, decision.outcome)
         self.assertIn("POSITION_UNKNOWN", decision.reason_codes)
 
-    def test_boundary_block_names_the_remaining_steps_in_chinese(self):
+    def test_old_step_fence_does_not_block_a_move(self):
         text = format_side_clearance((0, 0))
-        self.assertIn("X 负方向还剩 10000 步，正方向还剩 10000 步", text)
-        self.assertIn("Y 负方向还剩 10000 步，正方向还剩 10000 步", text)
+        self.assertIn("账本位置 X=0 步，Y=0 步", text)
+        self.assertIn("主机不再按步数边界拦住这一步", text)
         outbound = _request(["MOVEXY 300 FWD 0 FWD"], position_before_steps=(9800, 0))
         returning = _request(["MOVEXY 300 REV 0 FWD"], position_before_steps=(10100, 0))
-        blocked = explain_travel_block(outbound, returning)
-        self.assertIsNotNone(blocked)
-        self.assertIn("已拦住，电机不会动，也不会喷水。", blocked)
-        self.assertIn("正方向还剩 200 步", blocked)
-        self.assertIn("去程的 X 会走到 10100 步，正方向边界是 10000 步，超出 100 步。", blocked)
-        self.assertNotIn("SOFT_LIMIT_EXCEEDED", blocked)
+        self.assertIsNone(explain_travel_block(outbound, returning))
         self.assertIsNone(explain_travel_block(_request(["MOVEXY 10 FWD 0 FWD"]), _request(["MOVEXY 10 REV 0 FWD"])))
 
     def test_unknown_position_block_does_not_invent_a_margin(self):
@@ -83,8 +78,7 @@ class MotionGateTests(unittest.TestCase):
         self.assertIn("当前位置未知", text)
         self.assertNotIn("SOFT_LIMIT", text)
 
-    def test_intermediate_excursion_outside_soft_limit_is_denied(self):
-        # 终点回到 9800，但中途到过 10100，超出默认 ±10000。
+    def test_intermediate_excursion_is_not_denied_by_a_step_fence(self):
         request = _request(
             ["MOVEXY 300 FWD 0 FWD", "MOVEXY 300 REV 0 FWD"],
             position_before_steps=(9800, 0),
@@ -92,7 +86,8 @@ class MotionGateTests(unittest.TestCase):
         plan = summarize_motion(request)
         self.assertEqual((9800, 0), plan.position_after)
         decision = evaluate_motion(request)
-        self.assertIn("SOFT_LIMIT_EXCEEDED", decision.reason_codes)
+        self.assertNotIn("SOFT_LIMIT_EXCEEDED", decision.reason_codes)
+        self.assertIs(SafetyOutcome.HUMAN, decision.outcome)
 
     def test_pump_text_or_malformed_line_is_denied(self):
         for line in ("MCV1|PUMP|a|100", "MOVEXY 10 XYZ 0 FWD"):

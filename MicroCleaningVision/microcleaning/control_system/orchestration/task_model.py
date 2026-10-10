@@ -131,9 +131,6 @@ class TaskModel:
             raise ValueError("EMPTY_EXECUTION_LIST")
         if any(self.targets[stable].eligibility_reasons or not self.targets[stable].plan for stable in chosen):
             raise ValueError("INVALID_EXECUTION_GEOMETRY")
-        totals = [sum(self.targets[stable].plan["geometry"]["cycle_abs_steps"][axis] for stable in chosen) for axis in (0, 1)]
-        if max(totals) > self.policy.get("step_budget", 0):
-            raise ValueError("LOCKED_LIST_EXCEEDS_TASK_STEP_BUDGET")
         snapshot = {"task_id": self.task_id, "locked_at": _now(), "execution_ids": chosen,
                     "targets": {stable: item.to_dict() for stable, item in self.targets.items()},
                     "metadata": deepcopy(self.metadata), "references": deepcopy(self.references), "policy": deepcopy(self.policy)}

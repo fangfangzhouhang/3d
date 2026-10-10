@@ -85,7 +85,17 @@ class ImageCanvas(tk.Canvas):
         okay, encoded = cv2.imencode(".png", fitted, [cv2.IMWRITE_PNG_COMPRESSION, 1])
         if not okay:
             return
-        self.photo = tk.PhotoImage(master=self, data=base64.b64encode(encoded.tobytes()))
+        payload = base64.b64encode(encoded.tobytes()).decode("ascii")
+        try:
+            self.photo = tk.PhotoImage(master=self, data=payload)
+        except tk.TclError:
+            rgb = cv2.cvtColor(fitted, cv2.COLOR_BGR2RGB)
+            height, width = rgb.shape[:2]
+            self.photo = tk.PhotoImage(master=self, width=width, height=height)
+            self.photo.put(" ".join(
+                "{" + " ".join(f"#{red:02x}{green:02x}{blue:02x}" for red, green, blue in row) + "}"
+                for row in rgb
+            ))
         self.create_image(w / 2, h / 2, image=self.photo)
         for stable, target in self.targets.items():
             instance = target.get("instance") or {}

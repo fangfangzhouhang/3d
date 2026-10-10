@@ -9,6 +9,7 @@ from microcleaning.control_system.planning.path_preview import PathPlaceholderCo
 from microcleaning.control_system.planning.stage2_axes import parse_movexy_line
 from microcleaning.control_system.planning.stage2_geometry import build_cycle_geometry
 from microcleaning.control_system.planning.work_frame import MotorCalibration, WorkFrameConfig
+from microcleaning.contracts import SafetyOutcome
 from microcleaning.control_system.safety.motion_gate import DEFAULT_SOFT_LIMIT_STEPS, STAGE2_RUN_STEP_CAP, evaluate_motion
 
 
@@ -45,7 +46,8 @@ class CycleGeometryTests(unittest.TestCase):
         self.assertFalse(geometry.outbound.truncated)
         self.assertTrue(any(str(nominal) in line for line in geometry.outbound.lines))
         decision = evaluate_motion(geometry.outbound_request)
-        self.assertIn("SOFT_LIMIT_EXCEEDED", decision.reason_codes)
+        self.assertNotIn("SOFT_LIMIT_EXCEEDED", decision.reason_codes)
+        self.assertIs(SafetyOutcome.HUMAN, decision.outcome)
 
     def test_unknown_or_unconfirmed_offset_is_not_zero(self):
         for offset in (replace(mock_offset(), scope_to_nozzle_delta_steps=None), replace(mock_offset(), axes_confirmed=False)):

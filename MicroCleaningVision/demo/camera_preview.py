@@ -227,6 +227,8 @@ class CameraPreview:
         self.sequence = 0
         self.path_window = "MicroCleaningVision path"
         self.marks = None
+        self._blank_reads = 0
+        self._backend_switched = False
 
     def set_marks(self, marks) -> None:
         self.marks = None if marks is None else dict(marks)
@@ -243,16 +245,18 @@ class CameraPreview:
         print(message, flush=True)
         self.tell(message)
 
-    def refresh(self, status: str = "") -> None:
+    def refresh(self, status: str = "") -> bool:
         """刷新实时画面。画面失败不往外抛，避免挡住已经开始的步进。"""
 
         handle = self.capture_handle
         if handle is None:
-            return
+            return False
         try:
             okay, frame = handle.read()
             if not okay or frame is None or not getattr(frame, "size", 0):
-                return
+                self._recover_unreadable()
+                return False
+            self._blank_reads = 0
             view = frame.copy()
             draw_stage_guides(view, self.cv2, self.marks)
             hud = "".join(ch if ord(ch) < 128 else " " for ch in status)[:88]
@@ -260,8 +264,9 @@ class CameraPreview:
                 _put_hud(view, self.cv2, hud)
             self.show(self.window, view)
             self.wait_key(1)
+            return True
         except Exception:
-            return
+            return False
 
     def tell(self, message: str) -> None:
         if self.panel is not None and hasattr(self.panel, "write"):
@@ -289,6 +294,50 @@ class CameraPreview:
             print(f"路径图没有显示，规划仍继续：{exc}", flush=True)
             self.tell(f"路径图没有显示，规划仍继续：{exc}")
 
+    def _release(self, candidate) -> None:
+        if candidate is None:
+            return
+        release = getattr(candidate, "release", None)
+        if callable(release):
+            try:
+                release()
+            except Exception:
+                pass
+
+    def _readable(self, candidate) -> bool:
+        """真实相机打开后先读几帧。Media Foundation 有时 isOpened 为真，但抓帧一直失败。"""
+
+        import time
+        for _ in range(12):
+            try:
+                okay, frame = candidate.read()
+            except Exception:
+                return False
+            if okay and frame is not None and getattr(frame, "size", 0):
+                return True
+            time.sleep(0.05)
+        return False
+
+    def _recover_unreadable(self) -> None:
+        self._blank_reads += 1
+        if self._blank_reads < 8 or self._backend_switched or self.factory is not self.cv2.VideoCapture:
+            return
+        self._backend_switched = True
+        previous = self.backend
+        nxt = 700 if previous != 700 else 1400
+        print(
+            f"[相机] 后端 {previous} 连续读不到画面，改用后端 {nxt}。相机编号仍是 {self.index}。",
+            flush=True,
+        )
+        self._release(self.capture_handle)
+        self.capture_handle = None
+        self.backend = nxt
+        self._blank_reads = 0
+        try:
+            self._acquire()
+        except Exception as exc:
+            print(f"[相机] 换后端后仍没有画面：{exc}", flush=True)
+
     def _acquire(self):
         if self.capture_handle is not None:
             return self.capture_handle
@@ -301,13 +350,6 @@ class CameraPreview:
             candidate = self.factory(self.index) if backend is None else self.factory(self.index, backend)
             opened = candidate is not None and bool(getattr(candidate, "isOpened", lambda: False)())
             if opened:
-                if backend != self.backend:
-                    print(
-                        f"[相机] 后端 {self.backend} 打不开 index={self.index}，已改用后端 {backend}。相机编号没有换。",
-                        flush=True,
-                    )
-                self.backend = backend
-                self.capture_handle = candidate
                 _apply_resolution(candidate, self.cv2, self.width, self.height)
                 setter = getattr(candidate, "set", None)
                 if setter is not None:
@@ -315,15 +357,23 @@ class CameraPreview:
                         setter(self.cv2.CAP_PROP_BUFFERSIZE, 1)
                     except Exception:
                         pass
+                if real_capture and not self._readable(candidate):
+                    print(
+                        f"[相机] 后端 {backend} 已打开 index={self.index}，但读不到画面，改试下一个后端。",
+                        flush=True,
+                    )
+                    opened = False
+            if opened:
+                if backend != self.backend:
+                    print(
+                        f"[相机] 后端 {self.backend} 打不开或读不到 index={self.index}，已改用后端 {backend}。相机编号没有换。",
+                        flush=True,
+                    )
+                self.backend = backend
+                self.capture_handle = candidate
                 return candidate
-            if candidate is not None:
-                release = getattr(candidate, "release", None)
-                if callable(release):
-                    try:
-                        release()
-                    except Exception:
-                        pass
-        raise USBCameraError(CAMERA_OPEN_FAILED, f"指定相机无法打开 device_index={self.index}")
+            self._release(candidate)
+        raise USBCameraError(CAMERA_OPEN_FAILED, f"指定相机无法打开或读不到画面 device_index={self.index}")
 
     def capture(self, phase, *, after=None):
         from microcleaning.control_system.orchestration.cleaning_loop import CapturedFrame
