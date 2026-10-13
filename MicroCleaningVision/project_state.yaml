@@ -1,7 +1,7 @@
 # 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
 # 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
 updated_at: 2026-10-13
-current_phase: "fzh-branch@769abab6 加未提交覆盖规划P1-P6成果。用户继续p6后完成工作台完整输入绑定、固定输入模拟预览、显式保存与可选报告，专项126/全量616项OK。所有覆盖输出不可执行，软件E2，实物E0。"
+current_phase: "覆盖规划P1-P6已随功能提交b36b505推送origin/fzh-branch并只读核验一致。工作台完整输入绑定、固定输入模拟预览、显式保存与可选报告完成，专项126/全量616项OK。所有覆盖输出不可执行，软件E2，实物E0。"
 
 current_evidence_level:
   overall_hardware: E0
@@ -12,7 +12,12 @@ coverage_planning_v1:
   baseline_branch: fzh-branch
   baseline_commit: 769abab6f65b10104250a7e6f15b8cc306114fba
   local_and_remote_verified_equal: true
-  changes_committed: false
+  changes_committed: true
+  published_code_commit: b36b50544554b60f5952d1a48e00985f164c11ac
+  published_remote: origin
+  published_branch: fzh-branch
+  published_code_remote_verified: true
+  publication_record: 说明文档/进度记录/提交与拉取日志.md
   p1_footprint_model: implemented
   p2_offline_planner_metrics: implemented
   p3_visualization_exports: implemented
