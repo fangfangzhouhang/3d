@@ -13,6 +13,9 @@ data/**
 !data/**/*.jpg
 !data/**/*.jpeg
 
+# 从检查页抽出的合成预览，不入库。规则必须写在上面的图片放行之后。
+data/synthetic_preview_from_html/
+
 # 本地工具链（scripts/bootstrap-zig.ps1 自动下载，可重新生成）
 .tools/
 # 自动调参生效文件（不把一次搜参结果当成仓库默认算法）

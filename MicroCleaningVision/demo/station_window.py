@@ -300,6 +300,8 @@ class WorkbenchWindow:
         style.configure("Horizontal.TProgressbar", background=TEAL, troughcolor=PALE, borderwidth=0)
         self.sample, self.operator, self.note = tk.StringVar(), tk.StringVar(), tk.StringVar()
         self.task, self.snapshot, self.reference = None, None, None
+        from demo.workbench_coverage import WorkbenchCoverageHub
+        self.coverage = WorkbenchCoverageHub(self)
         self.current_page, self.current_phase, self.current_target = "cover", "WELCOME", None
         self.request_id, self.capture_ready = None, False
         self.answer_mode, self.choice_values, self.choice_facts = "confirmation", (), {}
@@ -429,6 +431,7 @@ class WorkbenchWindow:
             self.navigate("review" if self.task is not None and self.task.get("state") in {"DRAFT", "LOCKED"} else "monitor" if self.task is not None else "detection")
             return
         self.task, self.snapshot, self.reference, self.current_target = None, None, None, None
+        self.coverage.reset()
         self.views["review"].selected = None
         self.views["review"].canvas.set_image(None)
         self.views["review"].canvas.manual_enabled = False
@@ -445,6 +448,40 @@ class WorkbenchWindow:
             self.views["cover"].start.config(text="返回当前任务  →")
             self.navigate("detection")
             self.write("开始新任务。请采集首次图像；此时不会发送运动或喷洗指令。")
+
+    def coverage_select(self, target):
+        self.coverage.select(target)
+
+    def coverage_open(self, *, latest=False):
+        target = self.current_target if latest else self.views["review"].selected
+        if target and self.coverage.open(target, latest=latest):
+            self.write(f"{target}：打开模拟覆盖预览，参数与驻点均不会送到执行器。")
+
+    def coverage_changed(self):
+        if not hasattr(self, "views") or self.destroyed:
+            return
+        review, monitor = self.views["review"], self.views["monitor"]
+        if self.reference is not None:
+            review.canvas.set_image(self.reference)
+        for view, target, latest in ((review, review.selected, False), (monitor, self.current_target, True)):
+            source = self.coverage.get(target, latest=latest)
+            view.coverage_button.state(["!disabled"] if source is not None else ["disabled"])
+            view.coverage_text.config(text="模拟覆盖：选择目标后打开，直径需显式输入" if source is None else
+                f"{target} · {source.binding['stage']} · {source.dataset.input.mask_kind} · 仅模拟，尚未预测")
+        preview, source = self.coverage.preview, self.coverage.source
+        if preview is not None and source is not None and preview[0] == source.identity:
+            _, plan, rendered = preview
+            metrics = rendered.metrics
+            rate = "无法预测" if metrics is None or metrics.geometric_coverage_rate is None else f"{metrics.geometric_coverage_rate:.1%}"
+            note = "；输入位置/可比性未通过" if not source.binding["input_valid"] else ""
+            text = (f"{source.binding['stage']} / {source.binding['frame_id']} · 模拟 {plan.model.profile.evidence.status} · 预计几何 {rate} · "
+                f"驻点 {rendered.step_count}/{len(plan.stations)} · 遗漏 {metrics.uncovered_area_px if metrics else '未知'} px{note}")
+            if review.selected == source.binding["target_id"] and source.binding["stage"] == "initial":
+                review.coverage_text.config(text=text)
+                review.canvas.set_image(rendered.image_rgb[..., ::-1])
+            latest = self.coverage.get(self.current_target, latest=True)
+            if latest is not None and latest.identity == source.identity:
+                monitor.coverage_text.config(text=text)
 
     def capture(self):
         if self.capture_ready:
@@ -535,6 +572,10 @@ class WorkbenchWindow:
             self._task_update(payload["task"])
         if kind == "log":
             self.write(payload["message"])
+        elif kind == "coverage_source":
+            self.coverage.ingest(payload["source"])
+        elif kind == "coverage_issue":
+            self.write(payload["message"] + "；旧执行流程继续由原关卡决定。")
         elif kind == "error":
             from microcleaning.control_system.reporting.quality_report import explain
             self.write("操作未完成：" + explain(payload["message"]))
@@ -566,9 +607,11 @@ class WorkbenchWindow:
             self.progress.stop()
             self.progress.configure(mode="determinate", value=0)
             self.write("首次检测完成。全部候选默认为待审核，未确认者不会执行。")
+            self.coverage_changed()
         elif kind == "stage":
             self.current_phase = payload["phase"]
             self.current_target = payload.get("current_target_id")
+            self.coverage_changed()
             self.views["monitor"].current.config(text=f"{self.current_target or '任务'} · {payload['explanation']}")
             if self.task:
                 self.views["monitor"].reference.set_targets(self.task["targets"], active=self.current_target)
@@ -827,6 +870,7 @@ class WorkbenchWindow:
     def _destroy(self):
         import gc
         self.destroyed = True
+        self.coverage.close()
         if self._pump_after is not None:
             self.root.after_cancel(self._pump_after)
             self._pump_after = None

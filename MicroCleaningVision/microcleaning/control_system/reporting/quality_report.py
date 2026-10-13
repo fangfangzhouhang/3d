@@ -24,6 +24,7 @@ LABELS = {
     "COMPLETED": "流程结束", "CANCELLED": "任务取消", "RUNNING": "执行中", "DRAFT": "候选审核中", "LOCKED": "已锁定",
     "WAITING_CONFIRMATION": "等待当步人工确认", "automatic_evidence": "证据规则", "operator_review": "人工复核",
     "rewash": "人工选择复洗", "next": "不复洗，继续下一目标", "pause": "暂停并保留档案", "retake": "重拍后图并再次复检",
+    "hypothetical_plan_was_not_executed": "模拟计划未执行，不能评价清洁效果",
     "real": "实物模式", "mock": "软件模拟", "matched": "已对应", "unmatched": "未对应", "ambiguous": "存在多个对应区域",
     "READY": "位置已建立参考", "UNHOMED": "尚未建立零点", "MOVING": "平台移动中",
     "POSITION_UNCERTAIN": "位置不可信", "FAULT": "设备故障", "SUCCESS": "流程成功结束",
@@ -170,6 +171,13 @@ CSV_HEADERS = {
     "algorithm_candidates": "算法候选数", "manual_candidates": "人工新增数", "excluded": "排除数", "approved": "确认处理数",
     "pending_review": "待审核数", "executed_targets": "喷洗输出结束目标数", "cleaned": "复检通过数", "not_cleaned": "残留数",
     "uncertain": "待质量复核数", "failed_targets": "执行失败数",
+    "preview_stage": "预览输入阶段", "frame_id": "原图帧编号", "mask_kind": "目标掩膜来源",
+    "plan_id": "模拟计划摘要", "diameter": "虚拟喷头直径", "unit": "直径单位",
+    "footprint_evidence": "覆盖参数证据", "station_count": "模拟驻点总数",
+    "full_geometric_coverage_rate": "完整计划预计几何覆盖率", "full_uncovered_area_px": "完整计划预计遗漏_像素",
+    "display_step_count": "当前画面驻点数", "display_geometric_coverage_rate": "当前画面预计几何覆盖率",
+    "comparison_status": "预计覆盖与实际复检关系", "executable": "可执行",
+    "actual_removal_prediction_accuracy": "清除效果预测准确率_未验证", "archive_ref": "模拟预览原始归档",
 }
 
 
@@ -321,6 +329,38 @@ def _attempt_section(root: Path, report: Path, target: dict, attempt: dict, targ
     return '<div class="cleaning-round">' + motion + ''.join(sections) + '</div>', rows
 
 
+def _coverage_section(root, report, snapshot):
+    rows, pictures = [], []
+    for index, preview in enumerate(snapshot.get("coverage_previews") or [], 1):
+        metrics, prefix = preview.get("metrics") or {}, preview.get("view_metrics") or {}
+        profile = preview["profile"]
+        row = {"target_id": preview["target_id"], "cycle": preview["cycle"], "recheck_index": preview["recheck"],
+            "preview_stage": preview["stage"], "frame_id": preview["frame_id"], "mask_kind": preview["mask_kind"],
+            "plan_id": preview["plan_id"], "diameter": profile["diameter"], "unit": profile["unit"],
+            "footprint_evidence": profile["evidence"]["status"], "station_count": preview["station_count"],
+            "full_geometric_coverage_rate": metrics.get("geometric_coverage_rate"),
+            "full_uncovered_area_px": metrics.get("uncovered_area_px"), "display_step_count": preview["step_count"],
+            "display_geometric_coverage_rate": prefix.get("geometric_coverage_rate"),
+            "comparison_status": preview["comparison_status"], "executable": False,
+            "actual_removal_prediction_accuracy": None, "archive_ref": preview["archive_ref"]}
+        rows.append(row)
+        asset = _asset(root, report, preview["overlay_ref"], f"coverage_{index}")
+        description = (f"{row['target_id']} · {row['preview_stage']} · 第 {row['cycle']} 轮 / 复检 {row['recheck_index']} · "
+            f"帧 {row['frame_id']}；{row['diameter']} {row['unit']} ({row['footprint_evidence']})；"
+            f"完整计划预计几何 {_rate(row['full_geometric_coverage_rate'])}，遗漏 {row['full_uncovered_area_px']} px；"
+            f"当前图 {row['display_step_count']}/{row['station_count']} 驻点。")
+        pictures.append('<p>' + _h(description) + '</p>' + _picture(asset, "绑定原图与完整目标 Mask 的模拟覆盖") +
+            '<p class="refs">' + _h(row["archive_ref"]) + '</p>')
+    if not rows and not snapshot.get("coverage_preview_issues"):
+        return "", rows
+    section = ('<section><h2>模拟覆盖预览 · 与实际复检分别记录</h2>'
+        '<p>预计几何覆盖不是清除率。以下多驻点计划未执行；旧定点执行与复检在上方按轮次保留，'
+        '不能据此计算多驻点清洁效果或预测准确率。人工框选为区域覆盖，后续冻结分割才是残留 Mask。'
+        '读取时验证文件/来源绑定与哈希，未在报告读取线程重做规划；SHA256 检测损坏，不构成签名或标定。</p>' +
+        ''.join(pictures) + '<p>可选预览档案问题：' + _h(snapshot.get("coverage_preview_issues") or "无") + '</p></section>')
+    return section, rows
+
+
 def export_report(folder: str | Path, *, formats: tuple[str, ...] = ("html", "csv")) -> Path:
     if not formats or any(format not in {"html", "csv"} for format in formats):
         raise ValueError("SUPPORTED_REPORT_FORMATS: html, csv")
@@ -330,6 +370,7 @@ def export_report(folder: str | Path, *, formats: tuple[str, ...] = ("html", "cs
     report.mkdir(parents=True, exist_ok=False)
     try:
         target_csv, attempt_csv, sections = [], [], []
+        coverage_section, coverage_csv = _coverage_section(root, report, snapshot)
         summary_rows = []
         for target in snapshot["targets"]:
             stable = target["target_id"]
@@ -386,6 +427,8 @@ def export_report(folder: str | Path, *, formats: tuple[str, ...] = ("html", "cs
                 "workflow_status": snapshot["workflow_status"], "quality_status": snapshot["quality_status"], **snapshot["metadata"], **snapshot["statistics"]}])
             _csv(report / "targets.csv", target_csv)
             _csv(report / "attempts.csv", attempt_csv)
+            if coverage_csv:
+                _csv(report / "coverage_previews.csv", coverage_csv)
         if "html" in formats:
             stats = snapshot["statistics"]
             cards = ''.join(f'<div class="stat"><b>{_h(stats[key])}</b><span>{name}</span></div>' for key, name in
@@ -398,13 +441,14 @@ def export_report(folder: str | Path, *, formats: tuple[str, ...] = ("html", "cs
 {printing}<p>任务：{_h(snapshot["task_id"])}；样品：{_h(metadata.get("sample_id"))}；操作员：{_h(metadata.get("operator"))}</p><p>开始：{_h(display_time(snapshot["started_at"]))}；结束：{_h(display_time(snapshot["ended_at"]))}；Git：{_h(metadata.get("git_commit"))}；软件：{_h(snapshot["software_version"])}</p>
 <p>判据：{_h(snapshot["policy"]["version"])}，回放阈值 {_h(_rate(snapshot["policy"].get("threshold")))}，实物科学验收未确认。模拟模式合格只表示合成测试判据通过。流程结束、泵输出完成与质量合格分别统计；READXY 为已发脉冲计数；表面损伤未评估。</p><div class="stats">{cards}</div>
 <h2>完整候选名单</h2><table><thead><tr><th>目标</th><th>来源</th><th>操作决定</th><th>执行</th><th>质量</th><th>尝试</th></tr></thead><tbody>{''.join(summary_rows)}</tbody></table>{''.join(sections)}
-<section><h2>档案与判定依据</h2><p>总体原因：{_h(snapshot["quality_reasons"])}；原流程原因：{_h(snapshot["summary_reasons"])}</p><p>档案问题：{_h(snapshot["issues"] or "无")}</p><p class="refs">原始目录：{_h(root)}</p><details><summary>查看冻结配置与设备证据</summary><pre class="refs">{_h(json.dumps({"configuration":snapshot["configuration"],"device_evidence":snapshot["device_evidence"]}, ensure_ascii=False, indent=2))}</pre></details></section></main></html>'''
+{coverage_section}<section><h2>档案与判定依据</h2><p>总体原因：{_h(snapshot["quality_reasons"])}；原流程原因：{_h(snapshot["summary_reasons"])}</p><p>档案问题：{_h(snapshot["issues"] or "无")}</p><p class="refs">原始目录：{_h(root)}</p><details><summary>查看冻结配置与设备证据</summary><pre class="refs">{_h(json.dumps({"configuration":snapshot["configuration"],"device_evidence":snapshot["device_evidence"]}, ensure_ascii=False, indent=2))}</pre></details></section></main></html>'''
             (report / "index.html").write_text(document, encoding="utf-8")
         manifest = {"report_id": report.name, "created_at": datetime.now().astimezone().isoformat(), "formats": formats,
                     "task_id": snapshot["task_id"], "quality_status": snapshot["quality_status"], "policy": snapshot["policy"],
                     "statistics": snapshot["statistics"], "source_issues": snapshot["issues"],
                     "evidence_issues": snapshot["evidence_issues"], "report_ready": snapshot["report_ready"],
                     "recorded_report_ready": snapshot["recorded_report_ready"], "workflow_status": snapshot["workflow_status"],
+                    "coverage_preview_issues": snapshot.get("coverage_preview_issues", []),
                     "csv_schema": {"attempts": "每次清洗的每次复检一行，保留所有重拍与人工选择", "headers": CSV_HEADERS},
                     "files": {path.relative_to(report).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest() for path in report.rglob("*") if path.is_file()}}
         (report / "report_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

@@ -1,12 +1,149 @@
 # 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
 # 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
-updated_at: 2026-10-10
-current_phase: "fzh-branch@23bf6ea 加未提交工作台v3改动；无限人工复洗、固定ROI/参数/可信比较、全轮次报告、位置pending和维护隔离已实现。全量490项通过，无实物操作；详细交接见2026-10-10验收。"
+updated_at: 2026-10-13
+current_phase: "fzh-branch@769abab6 加未提交覆盖规划P1-P6成果。用户继续p6后完成工作台完整输入绑定、固定输入模拟预览、显式保存与可选报告，专项126/全量616项OK。所有覆盖输出不可执行，软件E2，实物E0。"
 
 current_evidence_level:
   overall_hardware: E0
   software_components: E1
   software_integration: E2
+
+coverage_planning_v1:
+  baseline_branch: fzh-branch
+  baseline_commit: 769abab6f65b10104250a7e6f15b8cc306114fba
+  local_and_remote_verified_equal: true
+  changes_committed: false
+  p1_footprint_model: implemented
+  p2_offline_planner_metrics: implemented
+  p3_visualization_exports: implemented
+  p4_standalone_tk: implemented
+  p5_analysis: implemented
+  p6_workbench_integration: implemented
+  p6_user_requested_pause: false
+  p6_code_changes_started: true
+  p6_validation_run: true
+  p6_new_tests: 18
+  p6_real_tk_mainloop_tests: 2
+  p6_full_residual_observer_default: disabled
+  p6_workbench_observer_explicitly_enabled: true
+  p6_source_cache_per_target: initial_and_latest_only
+  p6_workbench_compute_worker_count: 1
+  p6_binding_schema: workbench-coverage-v1
+  p6_binding_publication: after_complete_archive_and_deterministic_replay
+  p6_quality_policy_changed: false
+  p6_prediction_removal_accuracy: null
+  p6_protected_existing_files: 242
+  p6_protected_hash_mismatches: 0
+  p6_workbench_mock_pump_outputs: 3
+  p6_workbench_bound_archives_replayed: 2
+  p6_ui_source_sha256: 76dc621d1de26765caa12cca049f9417a876883b5c2209566743f68c97b7691d
+  p6_ui_validation_sha256: 2a4d61bf1f36214872c1ea8c5e2779759e73a6fa1705d981a43bc094a98d7ce4
+  p6_ui_validation: D:/大创/work/coverage_p6_20261013/ui_validation.json
+  p6_workbench_task: D:/大创/work/coverage_p6_20261013/mock_tasks/station_20261013_085728_90d6764f/
+  p6_documentation: 说明文档/软件组/智能覆盖规划_P6.md
+  p6_checkpoint_documentation: 说明文档/软件组/智能覆盖规划_P6_续接记录.md
+  p6_local_checkpoint_directory: D:/大创/work/coverage_p6_20261013/
+  p6_prechange_file_hash_count: 259
+  p6_prechange_backup_count: 17
+  p6_pre_pause_hash_mismatches: 0
+  p6_next_step: "P1-P6软件路线完成；A/B提供同条件真实图与真值/完整测量域验证，H1/H2实测足迹与运动误差/边界。真实多驻点执行另提方案及授权。"
+  owner: member_c
+  executable: false
+  feeds_action_request: false
+  send_to_controller: false
+  workbench_consumer_added: true
+  old_largest_residual_execution_selection_changed: false
+  default_real_nozzle_diameter: null
+  real_footprint_physically_validated: false
+  position_error_physically_validated: false
+  physical_devices_used: false
+  evidence_level: E2
+  algorithm_evidence_level: E1
+  standalone_ui_evidence_level: E2
+  analysis_evidence_level: E1
+  source_modules:
+    - microcleaning/control_system/planning/coverage_model.py
+    - microcleaning/control_system/planning/coverage_planner.py
+    - microcleaning/control_system/planning/coverage_metrics.py
+    - microcleaning/control_system/planning/coverage_visualization.py
+    - microcleaning/control_system/planning/coverage_archive.py
+    - microcleaning/control_system/planning/coverage_analysis.py
+    - microcleaning/control_system/planning/coverage_analysis_report.py
+  shared_feasibility_interface: prepare_coverage_domain
+  analysis_requirements: requirements/coverage-analysis.txt
+  analysis_default_candidate_stride_px: 1
+  analysis_default_diameter_scenarios: []
+  fixed_plan_violations_retained_and_unranked: true
+  analysis_ids_exclude_timing: true
+  standalone_demo_sources:
+    - demo/coverage_session.py
+    - demo/coverage_panel.py
+  standalone_owner: demo_integrator
+  coverage_tests: 126
+  coverage_tests_seconds: 16.545
+  p3_p4_new_tests: 31
+  p5_new_tests: 30
+  real_tk_mainloop_tests: 6
+  coverage_tests_failures: 0
+  coverage_tests_errors: 0
+  coverage_tests_skipped: 0
+  planning_tests_in_full_regression: 145
+  final_full_regression_tests: 616
+  final_full_regression_seconds: 75.431
+  final_full_regression_failures: 0
+  final_full_regression_errors: 0
+  final_full_regression_skipped: 0
+  final_full_regression_log: D:/大创/work/coverage_p6_20261013/full_final_validation.txt
+  coverage_tests_log: D:/大创/work/coverage_p6_20261013/coverage_final_validation.txt
+  local_log_directory: D:/大创/work/coverage_p6_20261013/
+  pre_p5_existing_file_snapshot_count: 214
+  p5_approved_existing_file_updates: 2
+  protected_file_hashes_verified: 212
+  protected_file_hash_mismatches: 0
+  frozen_old_plans_unchanged: 15
+  existing_p3_archive_id_unchanged: true
+  original_planner_test_backups: D:/大创/work/coverage_p5_20261012/baseline_sources/
+  offline_report_count: 7
+  offline_analysis_run_count: 363
+  synthetic_shape_count: 5
+  analysis_runs_are_independent_data_samples: false
+  report_directory: D:/大创/work/coverage_p5_20261012/reports_release/
+  benchmark_index: D:/大创/work/coverage_p5_20261012/benchmark_summary.json
+  documentation: 说明文档/软件组/智能覆盖规划_P6.md
+  p5_historical_validation:
+    coverage_tests: 108
+    coverage_tests_seconds: 16.674
+    final_full_regression_tests: 598
+    final_full_regression_seconds: 131.465
+    failures_errors_skipped: 0
+    final_full_regression_log: D:/大创/work/coverage_p5_20261012/full_regression_final.log
+    documentation: 说明文档/软件组/智能覆盖规划_P5.md
+  p3_p4_historical_validation:
+    coverage_tests: 78
+    coverage_tests_seconds: 5.293
+    new_tests: 31
+    real_tk_mainloop_tests: 4
+    final_full_regression_tests: 568
+    final_full_regression_seconds: 95.406
+    failures_errors_skipped: 0
+    protected_file_hashes_verified: 102
+    final_full_regression_log: D:/大创/work/coverage_p3_p4_20261012/full_regression_release.log
+    documentation: 说明文档/软件组/智能覆盖规划_P3_P4.md
+  p1_p2_historical_validation:
+    coverage_tests: 47
+    coverage_tests_seconds: 0.422
+    planning_tests: 96
+    planning_tests_seconds: 1.245
+    initial_full_regression_tests: 537
+    initial_full_regression_errors: 1
+    initial_full_regression_note: "旧取消测试return-timeout未在2秒内进入等待点，随后临时目录清理竞争；旧源码与判据未改，独立1项1.548秒OK。"
+    final_full_regression_tests: 537
+    final_full_regression_seconds: 215.820
+    final_full_regression_failures: 0
+    final_full_regression_errors: 0
+    final_full_regression_skipped: 0
+    final_full_regression_log: D:/大创/work/coverage_p1_p2_20261011/full_regression_retry.txt
+    documentation: 说明文档/软件组/智能覆盖规划_P1_P2.md
 
 team_scope:
   in_scope:
@@ -201,6 +338,7 @@ next_actions:
   - "说明：Agent每次改代码或制定改进计划先完整读六份项目记忆，再核对Git与提交/进度日志。本机main停在2026-09-13，不要用它判断进度。"
 
 documentation:
+  coverage_p1_p2: 说明文档/软件组/智能覆盖规划_P1_P2.md
   workbench_manual: 说明文档/软件组/可视化工作台操作手册.md
   project_memory: 说明文档/项目记忆/PROJECT.md
   architecture_memory: 说明文档/项目记忆/ARCHITECTURE.md
@@ -223,6 +361,7 @@ documentation:
   stm32_contract: 说明文档/硬件组/串口协议与参数.md
   # 结构整理证据入口为说明文档/硬件组/结构整理与验收记录_2026-10-05.md；未提交、未推送、未烧录。
 
+# 历史验收快照：23bf6ea时未提交的工作台实现现已包含在769abab6中。
 workbench_rewash_20261010:
   baseline_commit: 23bf6ea173885401c375c51b6865bbc7de7ffb5b
   changes_committed: false

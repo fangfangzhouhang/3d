@@ -293,6 +293,12 @@ class ReviewPage(Page):
         self.canvas.pack(fill="both", expand=True)
         self.manual = button(left, "人工补框：关闭", self.toggle_manual)
         self.manual.pack(anchor="w", pady=9)
+        self.coverage_button = button(left, "智能覆盖预览（模拟）", owner.coverage_open)
+        self.coverage_button.pack(anchor="w", pady=(0, 4))
+        self.coverage_button.state(["disabled"])
+        self.coverage_text = tk.Label(left, text="模拟覆盖：选择目标后打开，直径需显式输入", bg=CARD, fg=TEAL,
+            font=(FONT, 9), anchor="w", justify="left", wraplength=440)
+        self.coverage_text.pack(fill="x", pady=(0, 6))
         self.tree = ttk.Treeview(right, columns=("source", "area", "decision"), show="tree headings", selectmode="browse", height=7)
         for key, title, width in (("#0", "编号", 85), ("source", "来源", 90), ("area", "像素面积", 90), ("decision", "操作决定", 110)):
             self.tree.heading(key, text=title)
@@ -358,6 +364,7 @@ class ReviewPage(Page):
             + "\n回程：" + "；".join(motion_chinese(line).removeprefix("规划移动：") for line in geometry.get('returning', {}).get('lines', []))
             + f"\n{reason}")
         self.owner.note.set(item.get("note", ""))
+        self.owner.coverage_select(self.selected)
 
     def update_task(self, task):
         targets = task.get("targets") or {}
@@ -393,6 +400,14 @@ class MonitorPage(Page):
         heading(self, "03  清洗监控", "左侧保留首次检测参考，右侧持续显示显微画面。当前 S 编号以金色高亮。")
         self.current = tk.Label(self, text="等待执行", bg=PALE, fg=INK, anchor="w", padx=12, pady=10, font=(FONT, 13, "bold"))
         self.current.pack(fill="x", pady=(0, 10))
+        coverage_bar = tk.Frame(self, bg=CARD)
+        coverage_bar.pack(fill="x", pady=(0, 6))
+        self.coverage_button = button(coverage_bar, "当前完整残留 · 模拟覆盖", lambda: owner.coverage_open(latest=True))
+        self.coverage_button.pack(side="left", padx=(0, 10))
+        self.coverage_button.state(["disabled"])
+        self.coverage_text = tk.Label(coverage_bar, text="尚无完整残留输入", bg=CARD, fg=TEAL, font=(FONT, 9),
+            anchor="w", wraplength=760)
+        self.coverage_text.pack(side="left", fill="x", expand=True)
         # 正常画面和复检证据在同一页；缩小窗口后可以滚动，确认按钮始终在页外。
         scroll = tk.Frame(self, bg=CARD)
         scroll.pack(fill="both", expand=True)
@@ -716,6 +731,16 @@ class ResultsPage(Page):
                 if isinstance(decision, dict):
                     text += "人工依据：" + str(decision.get("reason") or "未填写") + "\n"
             text += "；".join(explain(code) for code in (check.get("issues") or ()))
+        previews = target.get("coverage_previews") or []
+        matching = [preview for preview in previews if not attempts or self.attempt_index is None or (
+            preview["cycle"] == attempts[self.attempt_index]["cycle"] and (
+                preview["stage"] != "post" or self.recheck_index is None or
+                preview["recheck"] == (attempts[self.attempt_index].get("rechecks") or [])[self.recheck_index]["index"]))]
+        text += f"\n模拟覆盖归档：{len(matching)} 份（绑定当前轮次/帧；计划未执行）\n"
+        for preview in matching:
+            metrics = preview.get("metrics") or {}
+            rate = metrics.get("geometric_coverage_rate")
+            text += f"{preview['stage']} / 帧 {preview['frame_id']}：预计几何 {'未知' if rate is None else f'{rate:.1%}'}；{preview['station_count']} 驻点\n"
         text += "\n" + "；".join(explain(code) for code in evidence.get("reasons", ()))
         self.detail.config(state="normal")
         self.detail.delete("1.0", "end")

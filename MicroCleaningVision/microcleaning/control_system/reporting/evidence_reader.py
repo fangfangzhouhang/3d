@@ -362,6 +362,12 @@ def read_run(folder: str | Path) -> dict:
                "instance": deepcopy(candidate.get("instance") or {}), "area_kind": candidate.get("area_kind") or "unrecorded",
                "initial_image": initial_image, "note": candidate.get("note") or "", "attempts": related, "manual_review": manual}
         rows.append(row)
+    from .coverage_evidence import read_coverage_evidence
+    task_id = summary.get("task_id") or summary.get("run_id") or manifest.get("task_id") or "未记录"
+    coverage_previews, coverage_preview_issues = read_coverage_evidence(root, task_id=task_id,
+        targets=[row["target_id"] for row in rows])
+    for row in rows:
+        row["coverage_previews"] = [preview for preview in coverage_previews if preview["target_id"] == row["target_id"]]
     quality_status, quality_reasons = final_quality(rows, workflow_status=workflow, mode=mode)
     if issues and quality_status == "PASS":
         quality_status, quality_reasons = "REVIEW_REQUIRED", ("TASK_EVIDENCE_ISSUES",)
@@ -384,6 +390,7 @@ def read_run(folder: str | Path) -> dict:
             "recorded_report_ready": summary.get("report_ready") is True,
             "report_ready": summary.get("report_ready") is True and workflow == "COMPLETED" and not evidence_issues,
             "evidence_issues": evidence_issues,
+            "coverage_previews": coverage_previews, "coverage_preview_issues": coverage_preview_issues,
             "device_evidence": {"position": summary.get("position"), "firmware_identity": metadata.get("firmware_identity") or "未确认",
                                 "motion_feedback": "READXY 脉冲计数，非编码器位移", "damage_assessment": "未评估"}}
 

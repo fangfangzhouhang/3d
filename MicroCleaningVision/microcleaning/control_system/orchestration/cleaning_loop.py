@@ -92,7 +92,8 @@ class CleaningLoop:
                  placeholders, calibration, offset, config: LoopConfig = LoopConfig(),
                  compare: Callable[[dict], bool] | None = None, review: Callable | None = None,
                  recheck_decision: Callable[[dict], dict] | None = None,
-                 metadata: dict | None = None, on_event: Callable[[dict], None] | None = None) -> None:
+                 metadata: dict | None = None, on_event: Callable[[dict], None] | None = None,
+                 on_coverage_input: Callable[[dict], None] | None = None) -> None:
         config.validate()
         self.config = config
         self.folder = Path(output_dir).resolve()
@@ -105,6 +106,7 @@ class CleaningLoop:
         self.compare = compare
         self.review, self.metadata, self.on_event = review, metadata or {}, on_event
         self.recheck_decision = recheck_decision
+        self.on_coverage_input = on_coverage_input
         self.interactive_recheck = recheck_decision is not None
         self.report_ready = False
         self._initial_frame = None
@@ -259,6 +261,9 @@ class CleaningLoop:
                     write_json(cycle_dir / "pre.json", pre["metadata"])
                     location = validate_roi_location(reference, pre["frame"].image, pre["mask"])
                     write_json(cycle_dir / "location_check.json", asdict(location))
+                    self._coverage_input(pre, (pre["mask"] > 0) & reference.measurement_domain,
+                        selected, stage="pre", cycle=number, valid=location.valid,
+                        reasons=location.reason_codes)
                     if not location.valid:
                         raise TargetIdentityError(f"{selected}:ROI_REFERENCE_POSITION_UNCERTAIN:{','.join(location.reason_codes)}")
                     # 原像素区域不变；本轮规划用当前残留，而不是重放首次动作。
@@ -541,6 +546,31 @@ class CleaningLoop:
             return ("HUMAN_STOPPED_AFTER_INCONCLUSIVE_RECHECK",) + result.reason_codes
         return self._finish_stain_and_continue(post, selected, cleaned=False)
 
+    def _coverage_input(self, observation, mask, selected, *, stage, cycle, recheck=None,
+                        valid=True, reasons=()):
+        """Optional read-only observer, before legacy largest-fragment selection.
+
+        Observer failure cannot authorize, block, or alter an execution decision.
+        Default callers incur no copies and keep the original execution path.
+        """
+        if self.on_coverage_input is None:
+            return
+        try:
+            import numpy as np
+            image_copy, mask_copy = np.array(observation["frame"].image, copy=True), np.array(mask, copy=True)
+            image_copy.setflags(write=False)
+            mask_copy.setflags(write=False)
+            manual = self.task is not None and self.task.targets[selected].source == "manual"
+            self.on_coverage_input({"task_id": self.task_id, "folder": str(self.folder),
+                "target_id": selected, "stage": stage, "cycle": cycle, "recheck": recheck,
+                "frame_id": observation["frame"].frame_id, "image_bgr": image_copy, "mask": mask_copy,
+                "mask_kind": "manual_roi_segmented" if manual else "segmented_stain",
+                "metadata": json.loads(json.dumps(observation["metadata"], ensure_ascii=False)),
+                "input_valid": bool(valid), "input_reasons": tuple(reasons)})
+        except Exception:
+            # This observer supplies a simulation preview, never a control gate.
+            pass
+
     def _interactive_recheck(self, active, pre, outcome, entry, cycle_dir):
         """每次复检都落盘后才请求人决定；重拍不产生新运动或喷洗。"""
         selected = active["target_id"]
@@ -568,6 +598,9 @@ class CleaningLoop:
                 secondary_post_mask=secondary)
             evidence["roi_alignment_valid"] = roi.valid
             valid = comparable and roi.valid
+            self._coverage_input(post, (post["mask"] > 0) & self._roi_refs[selected].measurement_domain,
+                selected, stage="post", cycle=active["cycle"], recheck=index,
+                valid=valid, reasons=roi.reason_codes)
             passed = valid and roi.removal_rate is not None and roi.removal_rate >= QUALITY_POLICY["threshold"]
             reasons = ("REPLAY_THRESHOLD_MET",) if passed else ("REPLAY_RESIDUE_REMAINS",) if valid else tuple(dict.fromkeys((*roi.reason_codes, "ROI_COMPARABILITY_NOT_PROVEN")))
             result = VerificationResult(self.task_id, pre["observation"].observation_id, post["observation"].observation_id,

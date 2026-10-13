@@ -156,7 +156,8 @@ class CameraBroker:
 
 
 class WorkbenchRuntime:
-    def __init__(self, *, args, config, segmenter, placeholders, calibration, offset):
+    def __init__(self, *, args, config, segmenter, placeholders, calibration, offset, coverage_enabled=True):
+        self.coverage_enabled = coverage_enabled
         self.args, self.config, self.segmenter = args, config, segmenter
         self.placeholders, self.calibration, self.offset = placeholders, calibration, offset
         self.bus, self.commands = EventBus(), queue.Queue()
@@ -260,7 +261,8 @@ class WorkbenchRuntime:
             self.loop = CleaningLoop(output_dir=folder, source=self.source, segmenter=self.segmenter,
                 executor=executor, placeholders=self.placeholders, calibration=self.calibration, offset=self.offset,
                 config=self.config, compare=self.compare, review=self.review, recheck_decision=self.recheck_decision, metadata=metadata,
-                on_event=lambda event: self.bus.emit(event.pop("kind"), **event))
+                on_event=lambda event: self.bus.emit(event.pop("kind"), **event),
+                on_coverage_input=self.coverage_input if self.coverage_enabled else None)
             result = self.loop.run()
             self.last_status = result["status"]
         except Exception as exc:
@@ -319,6 +321,7 @@ class WorkbenchRuntime:
 
     def review(self, task, pre, prepare):
         self.bus.emit("candidates", task=task.to_dict(), image=pre["frame"].image, mask=pre["mask"])
+        self._initial_coverage(task, pre)
         while True:
             self.cancel.check()
             try:
@@ -337,6 +340,7 @@ class WorkbenchRuntime:
                     stable = task.add_manual(tuple(command["bbox"]), command.get("reason", ""))
                     prepare(stable)
                     task.persist()
+                    self._initial_coverage(task, pre, target_ids=(stable,))
                 elif action == "lock":
                     task.lock()
                 elif action == "begin":
@@ -348,6 +352,29 @@ class WorkbenchRuntime:
                 self.bus.emit("task", task=task.ui_snapshot())
             except (ValueError, PermissionError, OSError) as exc:
                 self.bus.emit("error", message=str(exc))
+
+    def coverage_input(self, payload):
+        try:
+            from demo.workbench_coverage import freeze_source
+            self.bus.emit("coverage_source", source=freeze_source(**payload))
+        except Exception as exc:
+            self.bus.emit("coverage_issue", message=f"模拟覆盖输入不可用：{type(exc).__name__}: {exc}")
+
+    def _initial_coverage(self, task, pre, target_ids=None):
+        if not self.coverage_enabled:
+            return
+        try:
+            from microcleaning.vision.target_instance import extract_target_mask
+            for stable in task.targets if target_ids is None else target_ids:
+                candidate = task.targets[stable]
+                mask = task.manual_masks[stable] if stable in task.manual_masks else extract_target_mask(pre["mask"], candidate.instance)
+                self.coverage_input({"task_id": task.task_id, "folder": str(self.loop.folder),
+                    "target_id": stable, "stage": "initial", "cycle": 1, "recheck": None,
+                    "frame_id": pre["frame"].frame_id, "image_bgr": pre["frame"].image, "mask": mask,
+                    "mask_kind": "manual_region" if candidate.source == "manual" else "segmented_stain",
+                    "metadata": pre["metadata"]})
+        except Exception as exc:
+            self.bus.emit("coverage_issue", message=f"模拟覆盖输入不可用：{type(exc).__name__}: {exc}")
 
     def confirm(self, facts):
         from demo.workbench_views import motion_chinese
@@ -424,10 +451,10 @@ class WorkbenchRuntime:
             self.bus.emit("pair_images", pre=images[0], post=images[1])
         threading.Thread(target=read, name="mcv-pair-images", daemon=True).start()
 
-    def load_results(self, folder):
+    def load_results(self, folder, *, auto_navigate=True):
         def read():
             try:
-                self.bus.emit("results", snapshot=read_run(folder), auto_navigate=True)
+                self.bus.emit("results", snapshot=read_run(folder), auto_navigate=auto_navigate)
             except Exception as exc:
                 self.bus.emit("error", message=f"结果读取失败：{exc}")
         threading.Thread(target=read, name="mcv-evidence-reader", daemon=True).start()
