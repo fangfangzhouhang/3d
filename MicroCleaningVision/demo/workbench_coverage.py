@@ -73,6 +73,7 @@ class WorkbenchCoverageHub:
         self.profile = FootprintProfile("workbench-virtual-circle-v1", None, "px",
             Evidence("assumed", "explicit-workbench-simulation"))
         self.policy = None
+        self.view_options = None
         self.closed = False
 
     def reset(self, task_id=None):
@@ -134,6 +135,7 @@ class WorkbenchCoverageHub:
         except (ValueError, TypeError):
             self.profile, self.policy = panel.profile, panel.policy
         self.next_generation = max(self.next_generation, panel.generation)
+        self.view_options = panel._options()
 
     def open(self, target, *, latest=False, worker=None):
         source = self.get(target, latest=latest)
@@ -179,7 +181,7 @@ class WorkbenchCoverageHub:
             popup.destroy()
             raise ValueError("COVERAGE_HUB_WORKER_ALREADY_BOUND")
         self.panel = StandaloneCoveragePanel(source.dataset, self.profile, root=popup, worker=self.worker,
-            policy=self.policy or CoveragePolicy(candidate_stride_px=2), input_locked=True,
+            policy=self.policy or CoveragePolicy(candidate_stride_px=2), options=self.view_options, input_locked=True,
             on_view=view, on_invalidate=invalid, on_close=closed, exporter_factory=exporter,
             on_exported=self._saved, initial_generation=self.next_generation, owns_worker=False,
             layout_scale=self.owner.scale,

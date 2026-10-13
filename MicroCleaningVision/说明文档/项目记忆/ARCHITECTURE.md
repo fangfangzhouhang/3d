@@ -1,5 +1,11 @@
 # ARCHITECTURE｜整个系统怎么工作
 
+## 当前交接：2026-10-13，三图显示支路
+
+StandaloneCoveragePanel从同一CoverageDataset读取原RGB/完整Mask，独立绘制并按数据身份/画布尺寸缓存两张输入图；初始化、重算、无模型与缩放均不依赖current_plan。中央继续用原render_coverage。参数移至可滚动右侧，高级项可展开，底部播放/导出优先保留空间。
+
+图层/强度只重绘，临时原图查看用于显示和导出快照，不覆盖普通偏好。Hub关闭重开保存普通Options，原worker/代次/源身份及五页事件路由保持。三图位于既有预览弹窗，未重排五页。[实现与验证](../软件组/覆盖预览三图同屏与导航验收_2026-10-13.md)。
+
 ## 当前交接：2026-10-13，P6 模拟预览接入工作台
 
 新增demo/workbench_coverage：审核首次原图/该S完整Mask、人工矩形，以及CleaningLoop最大残片筛选前/复检的mask & measurement_domain→不可变Source/绑定→既有P1–P4→固定输入Toplevel→审核叠加/监控入口。设备线程只复制发布观察，参数和模拟Plan不进入执行器；on_coverage_input默认关闭且异常隔离。

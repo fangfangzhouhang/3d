@@ -17,6 +17,7 @@ from dataclasses import replace
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+import numpy as np
 from PIL import Image, ImageTk
 
 from demo.coverage_session import (
@@ -26,7 +27,7 @@ from demo.coverage_session import (
 from microcleaning.control_system.planning.coverage_archive import (
     export_coverage_preview, load_coverage_preview, profile_from_dict, scale_from_dict,
 )
-from microcleaning.control_system.planning.coverage_model import Evidence, FootprintProfile
+from microcleaning.control_system.planning.coverage_model import Evidence, FootprintProfile, immutable_array
 from microcleaning.control_system.planning.coverage_planner import CoverageConstraints, CoveragePolicy
 from microcleaning.control_system.planning.coverage_visualization import (
     COLORS, RenderOptions, render_coverage,
@@ -36,13 +37,19 @@ BG, INK, MUTED, TEAL = "#edf3f1", "#173d3e", "#627c79", "#167f77"
 LAYER_LABELS = {"original": "原始图像", "target": "完整目标 Mask", "covered": "预计已覆盖",
     "uncovered": "预计遗漏", "footprints": "覆盖核边界", "overlap": "重复覆盖",
     "conservative": "完整计划保守覆盖", "stations": "驻点编号", "route": "访问顺序虚线"}
+# Fixed v1 badges can obscure an entire small footprint. Keep them opt-in;
+# recorded archives still pass their original options explicitly.
+PREVIEW_OPTIONS = RenderOptions(target=False, stations=False, alpha=0.25)
+MASK_TITLES = {"segmented_stain": "污渍识别结果", "manual_region": "人工框选区域",
+    "manual_roi_segmented": "框选内污渍分割", "reference_annotation": "参考标注",
+    "synthetic": "合成 Mask"}
 
 
 class StandaloneCoveragePanel:
     def __init__(self, dataset: CoverageDataset, profile: FootprintProfile, *, scale=None,
             policy: CoveragePolicy = CoveragePolicy(candidate_stride_px=2),
             constraints: CoverageConstraints | None = None, root=None, worker=None,
-            options: RenderOptions = RenderOptions(), model=None, initial_step_count=None,
+            options: RenderOptions | None = None, model=None, initial_step_count=None,
             input_locked=False, on_view=None, on_invalidate=None, on_close=None,
             exporter_factory=None, on_exported=None, initial_generation=0, owns_worker=True, layout_scale=1.0,
             source_description=""):
@@ -70,6 +77,9 @@ class StandaloneCoveragePanel:
         self._after_ids = set()
         self._debounce_id = self._resize_id = self._play_id = None
         self._photo = None
+        self._photos = {}
+        self._image_sizes = {}
+        self._input_dataset = None
         self._export_results = queue.Queue(maxsize=1)
         self.export_busy = False
         self.export_thread = None
@@ -83,8 +93,12 @@ class StandaloneCoveragePanel:
         self.provenance = tk.StringVar()
         self.export_status = tk.StringVar(value="导出同一份参数、原图、Mask 和计划")
         self.metrics_text = tk.StringVar(value="—")
+        options = PREVIEW_OPTIONS if options is None else options
         self.layers = {key: tk.BooleanVar(value=getattr(options, key)) for key in LAYER_LABELS}
         self.alpha = options.alpha
+        self.alpha_value = tk.DoubleVar(value=self.alpha * 100)
+        self.alpha_text = tk.StringVar(value=f"{self.alpha:.0%}")
+        self.original_only = tk.BooleanVar(value=False)
         self._build()
         self._update_provenance()
         self.diameter.trace_add("write", self._diameter_changed)
@@ -125,39 +139,34 @@ class StandaloneCoveragePanel:
         ttk.Label(self.root, text="预计几何覆盖 ≠ 实际清除率   |   访问虚线 ≠ 平台实际轨迹   |   全程不发送硬件动作", style="Coverage.TLabel").pack(fill="x", padx=26, pady=(0, 10))
         body = ttk.Frame(self.root, style="Coverage.TFrame", padding=(20, 0))
         body.pack(fill="both", expand=True)
-        body.columnconfigure(1, weight=1)
+        body.columnconfigure(0, weight=2)
+        body.columnconfigure(1, weight=5)
         body.rowconfigure(0, weight=1)
-        left = ttk.Frame(body, style="Coverage.TFrame", width=round(228 * self.layout_scale), padding=(6, 4, 18, 0))
+        left = ttk.Frame(body, style="Coverage.TFrame", width=round(260 * self.layout_scale), padding=(0, 4, 8, 0))
         left.grid(row=0, column=0, sticky="nsew")
-        ttk.Label(left, text="虚拟喷头参数", style="Coverage.TLabel", font=("Microsoft YaHei UI", 13, "bold")).pack(anchor="w", pady=(0, 12))
-        ttk.Label(left, text=f"直径（{self.profile.unit}）· 需显式输入", style="Coverage.TLabel").pack(anchor="w")
-        self.diameter_entry = ttk.Entry(left, textvariable=self.diameter, width=18)
-        self.diameter_entry.pack(fill="x", pady=5)
-        maximum = max(80.0, (self.profile.diameter or 0) * 2)
-        self.diameter_slider = ttk.Scale(left, from_=0.5, to=maximum, variable=self.slider_value, command=self._slider_changed)
-        self.diameter_slider.pack(fill="x", pady=(0, 10))
-        if self.profile.diameter is None:
-            self.diameter_slider.state(["disabled"])
-        for title, variable in (("覆盖目标（%）", self.goal), ("驻点上限", self.budget), ("候选网格间隔（px）", self.stride)):
-            ttk.Label(left, text=title, style="Coverage.TLabel").pack(anchor="w", pady=(8, 2))
-            ttk.Entry(left, textvariable=variable, width=18).pack(fill="x")
-        ttk.Label(left, text="输入来源", style="Coverage.TLabel", font=("Microsoft YaHei UI", 12, "bold")).pack(anchor="w", pady=(24, 8))
-        self.sample = tk.StringVar(value="split")
-        self.sample_selector = ttk.Combobox(left, textvariable=self.sample, values=SYNTHETIC_SHAPES, state="readonly", width=16)
-        if not self.input_locked:
-            self.sample_selector.pack(fill="x")
-        self.sample_selector.bind("<<ComboboxSelected>>", self._sample_changed)
-        ttk.Label(left, text="输入绑定工作台目标与帧" if self.input_locked else "切换将使用合成形状，非实拍", style="Coverage.TLabel", foreground=MUTED).pack(anchor="w", pady=4)
-        self.mask_kind = tk.StringVar(value="segmented_stain")
-        if not self.input_locked:
-            ttk.Combobox(left, textvariable=self.mask_kind, values=("segmented_stain", "manual_region", "manual_roi_segmented", "reference_annotation"), state="readonly", width=16).pack(fill="x", pady=(12, 4))
-            ttk.Button(left, text="载入原图 + 二值 Mask", command=self._choose_input, style="Coverage.TButton").pack(fill="x")
-        else:
-            self.sample_selector.state(["disabled"])
-        ttk.Label(left, textvariable=self.provenance, style="Coverage.TLabel", wraplength=round(205 * self.layout_scale), foreground=MUTED).pack(fill="x", pady=12)
+        left.columnconfigure(0, weight=1)
+        left.rowconfigure(1, weight=1)
+        left.rowconfigure(3, weight=1)
+        ttk.Label(left, text="01  原始图像", style="Coverage.TLabel", font=("Microsoft YaHei UI", 12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 6))
+        self.original_canvas = tk.Canvas(left, bg="#e1e9e7", highlightthickness=0,
+            width=round(260 * self.layout_scale), height=round(210 * self.layout_scale))
+        self.original_canvas.grid(row=1, column=0, sticky="nsew")
+        self.mask_title = tk.StringVar()
+        mask_heading = ttk.Label(left, textvariable=self.mask_title, style="Coverage.TLabel", font=("Microsoft YaHei UI", 12, "bold"),
+            wraplength=round(260 * self.layout_scale))
+        mask_heading.grid(row=2, column=0, sticky="ew", pady=(14, 6))
+        mask_heading.bind("<Configure>", lambda event: mask_heading.configure(wraplength=max(round(180 * self.layout_scale), event.width)))
+        self.mask_canvas = tk.Canvas(left, bg="#e1e9e7", highlightthickness=0,
+            width=round(260 * self.layout_scale), height=round(210 * self.layout_scale))
+        self.mask_canvas.grid(row=3, column=0, sticky="nsew")
+        ttk.Label(left, textvariable=self.provenance, style="Coverage.TLabel", wraplength=round(260 * self.layout_scale),
+            foreground=MUTED, font=("Microsoft YaHei UI", 9)).grid(row=4, column=0, sticky="ew", pady=(10, 0))
+        for canvas in (self.original_canvas, self.mask_canvas):
+            canvas.bind("<Configure>", self._resize)
         center = ttk.Frame(body, style="Coverage.TFrame")
         center.grid(row=0, column=1, sticky="nsew", padx=10)
-        self.canvas = tk.Canvas(center, bg="#263c3d", highlightthickness=0, width=round(640 * self.layout_scale), height=round(480 * self.layout_scale))
+        ttk.Label(center, text="03  预计覆盖叠加 · 仅模拟", style="Coverage.TLabel", font=("Microsoft YaHei UI", 13, "bold")).pack(anchor="w", pady=(4, 8))
+        self.canvas = tk.Canvas(center, bg="#e1e9e7", highlightthickness=0, width=round(580 * self.layout_scale), height=round(480 * self.layout_scale))
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<Configure>", self._resize)
         self.playback_label = ttk.Label(center, text="驻点进度 0 / 0", style="Coverage.TLabel")
@@ -165,7 +174,9 @@ class StandaloneCoveragePanel:
         self.step_slider = ttk.Scale(center, from_=0, to=1, command=self._step_changed)
         self.step_slider.pack(fill="x")
         controls = ttk.Frame(center, style="Coverage.TFrame")
-        controls.pack(fill="x", pady=8)
+        controls.pack(side="bottom", fill="x", pady=8, before=self.canvas)
+        self.step_slider.pack(side="bottom", fill="x", before=self.canvas)
+        self.playback_label.pack(side="bottom", anchor="w", pady=(10, 3), before=self.canvas)
         self.previous_button = ttk.Button(controls, text="◀ 上一点", command=lambda: self.show_step(self.step.get() - 1), style="Coverage.TButton")
         self.previous_button.pack(side="left")
         self.play_button = ttk.Button(controls, text="播放 / 暂停", command=self.toggle_play, style="Coverage.TButton")
@@ -174,10 +185,45 @@ class StandaloneCoveragePanel:
         self.next_button.pack(side="left")
         self.full_button = ttk.Button(controls, text="完整计划", command=lambda: self.show_step(len(self.current_plan.stations) if self.current_plan else 0), style="Coverage.TButton")
         self.full_button.pack(side="right")
-        right = ttk.Frame(body, style="Coverage.TFrame", width=round(230 * self.layout_scale), padding=(14, 4, 4, 0))
-        right.grid(row=0, column=2, sticky="nsew")
-        ttk.Label(right, text="当前画面指标", style="Coverage.TLabel", font=("Microsoft YaHei UI", 13, "bold")).pack(anchor="w", pady=(0, 10))
+        controls_frame = ttk.Frame(body, style="Coverage.TFrame", padding=(8, 4, 0, 0))
+        controls_frame.grid(row=0, column=2, sticky="nsew")
+        # Keep every control reachable at the existing minimum size/high DPI.
+        self.controls_canvas = tk.Canvas(controls_frame, bg=BG, highlightthickness=0, width=round(235 * self.layout_scale))
+        scrollbar = ttk.Scrollbar(controls_frame, orient="vertical", command=self.controls_canvas.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.controls_canvas.pack(side="left", fill="both", expand=True)
+        self.controls_canvas.configure(yscrollcommand=scrollbar.set)
+        right = ttk.Frame(self.controls_canvas, style="Coverage.TFrame")
+        control_window = self.controls_canvas.create_window(0, 0, window=right, anchor="nw")
+        right.bind("<Configure>", lambda _event: self.controls_canvas.configure(scrollregion=self.controls_canvas.bbox("all")))
+        self.controls_canvas.bind("<Configure>", lambda event: self.controls_canvas.itemconfigure(control_window, width=event.width))
+        ttk.Label(right, text="覆盖模型参数", style="Coverage.TLabel", font=("Microsoft YaHei UI", 13, "bold")).pack(anchor="w", pady=(0, 8))
+        ttk.Label(right, text=f"覆盖直径（{self.profile.unit}）· 显式参数", style="Coverage.TLabel").pack(anchor="w")
+        self.diameter_entry = ttk.Entry(right, textvariable=self.diameter, width=18)
+        self.diameter_entry.pack(fill="x", pady=5)
+        maximum = max(80.0, (self.profile.diameter or 0) * 2)
+        self.diameter_slider = ttk.Scale(right, from_=0.5, to=maximum, variable=self.slider_value, command=self._slider_changed)
+        self.diameter_slider.pack(fill="x", pady=(0, 8))
+        if self.profile.diameter is None:
+            self.diameter_slider.state(["disabled"])
+        self.advanced_button = ttk.Button(right, text="展开高级规划参数", command=self._toggle_advanced, style="Coverage.TButton")
+        self.advanced_button.pack(fill="x", pady=(0, 8))
+        self.advanced_frame = ttk.Frame(right, style="Coverage.TFrame")
+        for title, variable in (("覆盖目标（%）", self.goal), ("驻点上限", self.budget), ("候选网格间隔（px）", self.stride)):
+            ttk.Label(self.advanced_frame, text=title, style="Coverage.TLabel").pack(anchor="w", pady=(4, 2))
+            ttk.Entry(self.advanced_frame, textvariable=variable, width=18).pack(fill="x")
+        self.metrics_heading = ttk.Label(right, text="当前画面指标", style="Coverage.TLabel", font=("Microsoft YaHei UI", 13, "bold"))
+        self.metrics_heading.pack(anchor="w", pady=(8, 10))
         ttk.Label(right, textvariable=self.metrics_text, style="Coverage.TLabel", justify="left", font=("Microsoft YaHei UI", 11), wraplength=round(215 * self.layout_scale)).pack(anchor="w", pady=(0, 18))
+        alpha_row = ttk.Frame(right, style="Coverage.TFrame")
+        alpha_row.pack(fill="x")
+        ttk.Label(alpha_row, text="区域填色强度", style="Coverage.TLabel").pack(side="left")
+        ttk.Label(alpha_row, textvariable=self.alpha_text, style="Coverage.TLabel").pack(side="right")
+        self.alpha_slider = ttk.Scale(right, from_=0, to=100, variable=self.alpha_value, command=self._alpha_changed)
+        self.alpha_slider.pack(fill="x", pady=(4, 8))
+        self.original_button = ttk.Checkbutton(right, text="主图仅查看原图", variable=self.original_only,
+            command=self._redraw, style="Coverage.TCheckbutton")
+        self.original_button.pack(anchor="w", pady=(0, 8))
         ttk.Label(right, text="图层控制", style="Coverage.TLabel", font=("Microsoft YaHei UI", 12, "bold")).pack(anchor="w", pady=6)
         self.layer_buttons = {}
         for key, label in LAYER_LABELS.items():
@@ -185,16 +231,43 @@ class StandaloneCoveragePanel:
             button.pack(anchor="w", pady=3)
             self.layer_buttons[key] = button
         for key, label in (("covered", "绿色：预计覆盖"), ("uncovered", "红色：预计遗漏"), ("overlap", "紫色：重复覆盖")):
-            ttk.Label(right, text=label, style="Coverage.TLabel", foreground="#%02x%02x%02x" % COLORS[key]).pack(anchor="w", pady=2)
+            ttk.Label(right, text=label, style="Coverage.TLabel").pack(anchor="w", pady=2)
+        ttk.Label(right, text="输入来源", style="Coverage.TLabel", font=("Microsoft YaHei UI", 12, "bold")).pack(anchor="w", pady=(14, 6))
+        self.sample = tk.StringVar(value="split")
+        self.sample_selector = ttk.Combobox(right, textvariable=self.sample, values=SYNTHETIC_SHAPES, state="readonly", width=16)
+        self.sample_selector.bind("<<ComboboxSelected>>", self._sample_changed)
+        self.mask_kind = tk.StringVar(value="segmented_stain")
+        if not self.input_locked:
+            self.sample_selector.pack(fill="x")
+            ttk.Label(right, text="合成样例，非实拍", style="Coverage.TLabel", foreground=MUTED).pack(anchor="w", pady=4)
+            ttk.Combobox(right, textvariable=self.mask_kind, values=("segmented_stain", "manual_region", "manual_roi_segmented", "reference_annotation"), state="readonly", width=16).pack(fill="x", pady=(4, 4))
+            ttk.Button(right, text="载入原图 + 二值 Mask", command=self._choose_input, style="Coverage.TButton").pack(fill="x")
+        else:
+            self.sample_selector.state(["disabled"])
+            ttk.Label(right, text="输入绑定工作台目标与帧", style="Coverage.TLabel", foreground=MUTED).pack(anchor="w")
         footer = ttk.Frame(self.root, style="Coverage.TFrame", padding=(26, 12))
-        footer.pack(fill="x")
+        footer.pack(side="bottom", fill="x", before=body)
         self.export_button = ttk.Button(footer, text="保存本任务模拟预览" if self.exporter_factory else "导出 PNG + 可复现归档", command=self._choose_export, style="Coverage.TButton")
         self.export_button.pack(side="right")
         ttk.Label(footer, textvariable=self.status, style="Coverage.TLabel", wraplength=round(800 * self.layout_scale)).pack(anchor="w")
         ttk.Label(footer, textvariable=self.export_status, style="Coverage.TLabel", foreground=MUTED, wraplength=round(800 * self.layout_scale)).pack(anchor="w", pady=3)
 
+    def _toggle_advanced(self):
+        if self.advanced_frame.winfo_manager():
+            self.advanced_frame.pack_forget()
+            self.advanced_button.configure(text="展开高级规划参数")
+        else:
+            self.advanced_frame.pack(fill="x", before=self.metrics_heading, pady=(0, 6))
+            self.advanced_button.configure(text="收起高级规划参数")
+
+    def _alpha_changed(self, value):
+        self.alpha = max(0.0, min(1.0, float(value) / 100))
+        self.alpha_value.set(self.alpha * 100)
+        self.alpha_text.set(f"{self.alpha:.0%}")
+        self._redraw()
+
     def _update_provenance(self):
-        self.provenance.set(f"{self.dataset.input.target_id}\n{self.dataset.input.mask_kind}\n{self.profile.evidence.status}\n完整 Mask {self.dataset.input.mask.shape[1]} × {self.dataset.input.mask.shape[0]}\n尺度：{'未知' if self.scale is None else self.scale.evidence.status}")
+        self.provenance.set(f"{self.dataset.input.target_id} · {self.dataset.input.frame_id or '帧未提供'}\n{self.dataset.input.mask_kind} · {self.profile.evidence.status}\n完整 Mask {self.dataset.input.mask.shape[1]} × {self.dataset.input.mask.shape[0]}\n尺度：{'未知' if self.scale is None else self.scale.evidence.status}")
         if self.source_description:
             self.provenance.set(self.provenance.get() + "\n" + self.source_description)
 
@@ -213,7 +286,10 @@ class StandaloneCoveragePanel:
         self.playback_label.configure(text="驻点进度 — / —")
         self._set_controls(False)
         self.canvas.delete("all")
-        self.canvas.create_text(20, 24, text="等待最新覆盖计划…", anchor="nw", fill="white", font=("Microsoft YaHei UI", 13))
+        self._photo = None
+        self._photos.pop("plan", None)
+        self.canvas.create_text(20, 24, text="等待最新覆盖计划…", anchor="nw", fill=INK, font=("Microsoft YaHei UI", 13))
+        self._redraw_inputs()
         if self.on_invalidate is not None:
             self.on_invalidate(self)
 
@@ -302,21 +378,51 @@ class StandaloneCoveragePanel:
     def _options(self):
         return RenderOptions(**{key: variable.get() for key, variable in self.layers.items()}, alpha=self.alpha)
 
+    def _display_options(self):
+        options = self._options()
+        if self.original_only.get():
+            return replace(options, **{key: key == "original" for key in self.layers})
+        return options
+
+    def _draw_image(self, canvas, pixels, key):
+        size = (max(1, canvas.winfo_width()), max(1, canvas.winfo_height()))
+        if key != "plan" and self._image_sizes.get(key) == (id(pixels), size):
+            return
+        image = Image.fromarray(pixels)
+        factor = min(size[0] / image.width, size[1] / image.height)
+        image = image.resize((max(1, round(image.width * factor)), max(1, round(image.height * factor))), Image.Resampling.NEAREST)
+        canvas.delete("all")
+        self._photos[key] = ImageTk.PhotoImage(image, master=self.root)
+        self._image_sizes[key] = (id(pixels), size)
+        canvas.create_image(canvas.winfo_width() / 2, canvas.winfo_height() / 2, image=self._photos[key], anchor="center")
+
+    def _redraw_inputs(self):
+        # Inputs remain visible while planning is pending/unavailable. Never
+        # re-segment, crop, select a component or alter the source arrays here.
+        if self._input_dataset is not self.dataset:
+            self._input_dataset = self.dataset
+            self.input_images = {"original": self.dataset.image_rgb}
+            pixels = self.dataset.image_rgb.copy()
+            mask = self.dataset.input.mask
+            pixels[mask] = np.rint(0.75 * pixels[mask] + 0.25 * np.array(COLORS["target"])).astype(np.uint8)
+            self.input_images["mask"] = immutable_array(pixels)
+            title = MASK_TITLES.get(self.dataset.input.mask_kind, "输入 Mask")
+            self.mask_title.set(f"02  {title} · 完整目标")
+        self._draw_image(self.original_canvas, self.input_images["original"], "original")
+        self._draw_image(self.mask_canvas, self.input_images["mask"], "mask")
+
     def _resize(self, _event=None):
         self._cancel(self._resize_id)
         self._resize_id = self._later(80, self._redraw)
 
     def _redraw(self):
+        self._redraw_inputs()
         if self.current_plan is None:
             return
         self.current_view = render_coverage(self.dataset.image_rgb, self.current_plan,
-            options=self._options(), step_count=self.step.get())
-        image = Image.fromarray(self.current_view.image_rgb)
-        factor = min(max(1, self.canvas.winfo_width()) / image.width, max(1, self.canvas.winfo_height()) / image.height)
-        image = image.resize((max(1, round(image.width * factor)), max(1, round(image.height * factor))), Image.Resampling.NEAREST)
-        self._photo = ImageTk.PhotoImage(image, master=self.root)
-        self.canvas.delete("all")
-        self.canvas.create_image(self.canvas.winfo_width() / 2, self.canvas.winfo_height() / 2, image=self._photo, anchor="center")
+            options=self._display_options(), step_count=self.step.get())
+        self._draw_image(self.canvas, self.current_view.image_rgb, "plan")
+        self._photo = self._photos["plan"]
         count, total = self.step.get(), len(self.current_plan.stations)
         self.playback_label.configure(text=f"驻点进度 {count} / {total} · 虚线仅表示访问顺序")
         metrics = self.current_view.metrics
@@ -405,7 +511,7 @@ class StandaloneCoveragePanel:
     def export_to(self, destination):
         if self.current_plan is None or self.export_busy:
             raise ValueError("CURRENT_PREVIEW_REQUIRED_OR_EXPORT_BUSY")
-        snapshot = (self.dataset.image_rgb, self.current_plan, self.constraints, self._options(), self.step.get())
+        snapshot = (self.dataset.image_rgb, self.current_plan, self.constraints, self._display_options(), self.step.get())
         exporter = self.exporter_factory(self) if self.exporter_factory is not None else export_coverage_preview
         self.export_busy = True
         self.export_button.state(["disabled"])
@@ -431,8 +537,11 @@ class StandaloneCoveragePanel:
             self._cancel(identifier)
         if self.owns_worker:
             self.worker.close()
-        self.canvas.delete("all")
+        for canvas in (self.canvas, self.original_canvas, self.mask_canvas):
+            canvas.delete("all")
         self._photo = None
+        self._photos.clear()
+        self._image_sizes.clear()
         if self.on_close is not None:
             self.on_close(self)
         self.root.destroy()
@@ -471,7 +580,8 @@ def main(argv=None):
         profile = profile_from_dict(json.loads(args.profile.read_text(encoding="utf-8"))) if args.profile else FootprintProfile(
             "virtual-circle-v1", args.diameter_px, "px", Evidence("assumed", "explicit-cli-simulation"))
         scale = scale_from_dict(json.loads(args.scale.read_text(encoding="utf-8"))) if args.scale else None
-        policy, constraints, options, step_count = CoveragePolicy(candidate_stride_px=2), CoverageConstraints(), RenderOptions(), None
+        policy, constraints, options, step_count = CoveragePolicy(candidate_stride_px=2), CoverageConstraints(), (
+            RenderOptions() if args.export_only else PREVIEW_OPTIONS), None
         from demo.coverage_session import compute_request
         plan = compute_request(CoverageRequest(1, dataset, profile, scale, policy, constraints)) if args.export_only else None
     if args.export_only:

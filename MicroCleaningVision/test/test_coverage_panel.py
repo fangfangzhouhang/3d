@@ -20,17 +20,18 @@ from demo.coverage_session import CoverageDataset, LatestCoverageWorker, compute
 from microcleaning.control_system.planning.coverage_archive import load_coverage_preview
 from microcleaning.control_system.planning.coverage_model import Evidence, FootprintKernel, FootprintProfile, KernelResult, SprayConditions
 from microcleaning.control_system.planning.coverage_planner import CoverageInput, CoveragePolicy
+from microcleaning.control_system.planning.coverage_visualization import RenderOptions
 
 
 class CoveragePanelTests(unittest.TestCase):
-    def make_panel(self, *, diameter=36, worker=None, profile=None, dataset=None, model=None, initial_step_count=None):
+    def make_panel(self, *, diameter=36, worker=None, profile=None, dataset=None, model=None, initial_step_count=None, options=None):
         try:
             root = tk.Tk()
         except tk.TclError as exc:
             self.skipTest(f"Tk display unavailable: {exc}")
         profile = profile if profile is not None else FootprintProfile("virtual-test", diameter, "px", Evidence("assumed", "explicit-synthetic-test"))
         panel = StandaloneCoveragePanel(dataset if dataset is not None else synthetic_dataset("split"), profile, root=root, worker=worker,
-            policy=CoveragePolicy(max_stations=30, candidate_stride_px=3), model=model, initial_step_count=initial_step_count)
+            policy=CoveragePolicy(max_stations=30, candidate_stride_px=3), model=model, initial_step_count=initial_step_count, options=options)
         if not os.environ.get("MCV_COVERAGE_SCREENSHOTS"):
             root.withdraw()
         self.addCleanup(panel.close)
@@ -231,4 +232,118 @@ class CoveragePanelTests(unittest.TestCase):
                 self.assertEqual(profile.sha256, panel.current_plan.model.profile.parent_sha256)
                 return True
             return False
+        self.drive_loop(panel, drive)
+
+    def test_complete_inputs_remain_visible_before_plan_and_through_invalid_parameter(self):
+        entered, release = threading.Event(), threading.Event()
+        def processor(request):
+            entered.set()
+            release.wait(8)
+            return compute_request(request)
+        worker = LatestCoverageWorker(processor)
+        self.addCleanup(release.set)
+        mask = np.zeros((24, 32), bool)
+        mask[3:7, 4:9], mask[17:19, 24:26] = True, True
+        rgb = np.indices((24, 32, 3)).sum(axis=0).astype(np.uint8) + 40
+        dataset = CoverageDataset(rgb, CoverageInput(mask, "manual-test", "manual_region", "test", frame_id="same-frame"))
+        panel = self.make_panel(diameter=None, worker=worker, dataset=dataset)
+        source_pixels = panel.input_images["original"]
+        mask_pixels = panel.input_images["mask"]
+        self.assertIn("人工框选区域", panel.mask_title.get())
+        self.assertIn("same-frame", panel.provenance.get())
+        np.testing.assert_array_equal(source_pixels, rgb)
+        self.assertEqual(24, np.count_nonzero(np.any(mask_pixels != source_pixels, axis=2)))
+        self.assertTrue(panel.original_canvas.find_all())
+        self.assertTrue(panel.mask_canvas.find_all())
+        state = [0]
+        def drive():
+            if state[0] == 0 and entered.is_set():
+                self.assertIsNone(panel.current_plan)
+                panel._resize()
+                release.set()
+                state[0] = 1
+            elif state[0] == 1 and panel.current_plan is not None:
+                self.assertEqual("MODEL_UNAVAILABLE", panel.current_plan.status)
+                panel.diameter.set("nan")
+                self.assertIsNone(panel.current_plan)
+                state[0] = 2
+            elif state[0] == 2 and panel.status.get().startswith("参数无效"):
+                self.assertIs(panel.input_images["original"], source_pixels)
+                self.assertIs(panel.input_images["mask"], mask_pixels)
+                self.assertTrue(panel.original_canvas.find_all())
+                self.assertTrue(panel.mask_canvas.find_all())
+                self.assertEqual(24, np.count_nonzero(panel.dataset.input.mask))
+                return True
+            return False
+        self.drive_loop(panel, drive)
+
+    def test_light_display_original_toggle_and_export_freeze_without_replanning(self):
+        panel = self.make_panel()
+        self.assertEqual(0.25, panel.alpha)
+        self.assertFalse(panel.layers["target"].get())
+        self.assertFalse(panel.layers["stations"].get())
+        state = [0]
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp) / "original-snapshot"
+            def drive():
+                if state[0] == 0 and panel.current_plan is not None:
+                    submitted = panel.worker.submitted_count
+                    plan = panel.current_plan
+                    metrics = panel.current_view.metrics.to_dict()
+                    original_photo, mask_photo = panel._photos["original"], panel._photos["mask"]
+                    panel.alpha_slider.set(40)
+                    panel._alpha_changed(40)
+                    panel.original_button.invoke()
+                    np.testing.assert_array_equal(panel.dataset.image_rgb, panel.current_view.image_rgb)
+                    self.assertIs(panel.current_plan, plan)
+                    self.assertEqual(submitted, panel.worker.submitted_count)
+                    self.assertEqual(metrics, panel.current_view.metrics.to_dict())
+                    self.assertIs(panel._photos["original"], original_photo)
+                    self.assertIs(panel._photos["mask"], mask_photo)
+                    panel.export_to(destination)
+                    panel.original_button.invoke()
+                    panel._alpha_changed(55)
+                    self.assertEqual(metrics, panel.current_view.metrics.to_dict())
+                    state[0] = 1
+                elif state[0] == 1 and not panel.export_busy:
+                    archive = load_coverage_preview(destination)
+                    self.assertEqual(0.4, archive.options.alpha)
+                    self.assertTrue(archive.options.original)
+                    self.assertFalse(any(getattr(archive.options, key) for key in panel.layers if key != "original"))
+                    np.testing.assert_array_equal(archive.image_rgb, panel.dataset.image_rgb)
+                    self.assertFalse(archive.plan.executable)
+                    self.assertEqual(0.55, panel.alpha)
+                    return True
+                return False
+            self.drive_loop(panel, drive)
+
+    def test_explicit_legacy_options_and_three_view_layout_at_minimum_size(self):
+        panel = self.make_panel(options=RenderOptions(alpha=0.62, target=True))
+        self.assertEqual(0.62, panel.alpha)
+        self.assertTrue(panel.layers["target"].get())
+        panel.root.deiconify()
+        panel.root.geometry("1080x730")
+        def drive():
+            if panel.current_plan is None or not panel.root.winfo_ismapped() or any(
+                    canvas.winfo_width() <= 1 for canvas in (panel.original_canvas, panel.mask_canvas, panel.canvas)):
+                return False
+            # Assert after real WM mapping/configure events in the mainloop.
+            root_bottom = panel.root.winfo_rooty() + panel.root.winfo_height()
+            for canvas in (panel.original_canvas, panel.mask_canvas, panel.canvas):
+                self.assertGreater(canvas.winfo_width(), 150)
+                self.assertGreater(canvas.winfo_height(), 90)
+                self.assertLessEqual(canvas.winfo_rooty() + canvas.winfo_height(), root_bottom)
+            self.assertLess(panel.original_canvas.winfo_rootx(), panel.canvas.winfo_rootx())
+            self.assertLess(panel.original_canvas.winfo_rooty(), panel.mask_canvas.winfo_rooty())
+            self.assertGreater(panel.diameter_entry.winfo_rootx(), panel.canvas.winfo_rootx())
+            self.assertLessEqual(panel.export_button.winfo_rooty() + panel.export_button.winfo_height(), root_bottom)
+            for button in (panel.previous_button, panel.play_button, panel.next_button, panel.full_button):
+                self.assertGreater(button.winfo_height(), 20)
+                self.assertGreaterEqual(button.winfo_rooty(), panel.canvas.winfo_rooty() + panel.canvas.winfo_height())
+                self.assertLessEqual(button.winfo_rooty() + button.winfo_height(), panel.export_button.winfo_rooty())
+            panel.advanced_button.invoke()
+            self.assertEqual("pack", panel.advanced_frame.winfo_manager())
+            panel.advanced_button.invoke()
+            self.assertEqual("", panel.advanced_frame.winfo_manager())
+            return True
         self.drive_loop(panel, drive)

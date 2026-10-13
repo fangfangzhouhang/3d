@@ -1,7 +1,37 @@
 # 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
 # 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
 updated_at: 2026-10-13
-current_phase: "覆盖规划P1-P6已随功能提交b36b505推送origin/fzh-branch并只读核验一致。工作台完整输入绑定、固定输入模拟预览、显式保存与可选报告完成，专项126/全量616项OK。所有覆盖输出不可执行，软件E2，实物E0。"
+current_phase: "覆盖预览三图同屏/单一参数/25%浅叠加完成，最终全量620项190.614秒OK，五页导航及预览路由已验证。本批基线1107267，尚未提交/推送；此前P1-P6已发布。所有覆盖输出不可执行，软件E2，实物E0。"
+
+coverage_preview_ui_v1:
+  baseline_commit: 1107267a9e3036c2fd069e5e23a5fb5a2071c5b5
+  status: implemented_and_software_validated
+  changes_committed: false
+  layout_scope: existing_coverage_preview_window
+  source_views: same_frozen_frame_and_complete_target_mask
+  profile_structure: existing_FootprintProfile
+  default_real_nozzle_diameter: null
+  nozzle_recommendation_added: false
+  new_ui_fill_alpha: 0.25
+  new_ui_target_underfill: false
+  new_ui_station_badges: false
+  recorded_render_options_preserved: true
+  render_archive_schema_changed: false
+  five_page_navigation_changed: false
+  five_page_routes_tested: true
+  preview_save_forces_navigation: false
+  new_real_tk_tests: 4
+  full_regression_tests: 620
+  full_regression_seconds: 190.614
+  failures: 0
+  errors: 0
+  skipped: 0
+  coverage_cases_in_full_regression: 130
+  coverage_real_tk_cases_in_full_regression: 10
+  log: D:/大创/work/coverage_ui_20261013/full_release_validation.log
+  evidence_directory: D:/大创/work/coverage_ui_20261013/
+  physical_devices_used: false
+  documentation: 说明文档/软件组/覆盖预览三图同屏与导航验收_2026-10-13.md
 
 current_evidence_level:
   overall_hardware: E0

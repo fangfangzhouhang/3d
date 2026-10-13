@@ -1,5 +1,13 @@
 # EXPERIMENTS｜做过什么，结果怎样
 
+## EXP-SW-THREE-VIEW-20261013：E2三图与导航
+
+基线fzh-branch@1107267，2份demo源码/2份测试增量；未提交/推送/实物操作。最终全量620项190.614秒OK，失败/错误/跳过0，含130项覆盖相关及10项覆盖真实Tk。新增4项Tk测试检查同帧完整输入、重算/无效时输入保留、强度不规划/导出快照、旧Options/最小布局、五页守卫/预览重开/MOVE/复检/结果路由。
+
+实际Mock五页走通、两份绑定归档重放、可选HTML/CSV保存成功，质量FAIL保留；最小1080×730窗口与工作台高DPI布局做自身窗口截图检查。早期播放时序、布局首次1px映射及全量620首跑单项失败保留，输入缓存/空间保留/标题合理最小换行及等待WM映射修复后通过；旧断言未放宽。
+
+本机证据D:/大创/work/coverage_ui_20261013/：full_release_validation.log、panel_mapping_validation.log、navigation_validation.log、visual_release.log、end_to_end_final.log及对应JSON/own-HWND PNG。此前130项专项40.089秒为早期UI版本，最终判据以上述620全量为准。[命令/保护/回滚](../软件组/覆盖预览三图同屏与导航验收_2026-10-13.md)。软件E2，实物E0；不证明真实喷痕、物理位移或清洁效果。
+
 ## EXP-SW-COVERAGE-P6-20261013：E2工作台模拟绑定
 
 用户“继续p6”恢复批准范围；fzh-branch@769abab6加未提交成果，开工远端同SHA。最终覆盖专项126项16.545秒、全量616项75.431秒OK，失败/错误/跳过0；新18项含真实Tk2，全部覆盖相关真实Tk共6。242保护文件SHA相同，63份firmware及旧测试未改。早期新fixture/QA驱动失败日志保留，未放宽原视觉或旧测试判据。
