@@ -18,9 +18,11 @@ from microcleaning.contracts import StateEstimate
 from microcleaning.contracts import VerificationResult
 from microcleaning.control_system.planning.stage2_axes import Stage2Dispatch
 from microcleaning.control_system.planning.stage2_position import Stage2Position
+from microcleaning.control_system.planning.stage2_position import begin_motion
 from microcleaning.control_system.planning.stage2_position import load_position
 from microcleaning.control_system.planning.stage2_position import mark_unknown
 from microcleaning.control_system.planning.stage2_position import record_completed
+from microcleaning.control_system.planning.stage2_position import record_not_started
 from microcleaning.control_system.planning.work_frame import MotorCalibration
 from microcleaning.control_system.serial.stage2_link import Stage2SerialLink
 from microcleaning.control_system.serial.stage2_link import Stage2TransmitError
@@ -159,22 +161,36 @@ def _stage2_move(
         armed=True,
         serial_factory=serial_factory,
     )
+    def commit_completed(sent):
+        nonlocal result, position_after
+        result = sent
+        position_after = record_completed(position_path, sent.sent_lines, run_id=run_id,
+                                          motion_id=request.request_id)
     try:
-        result = link.transmit(dispatch, request=request, decision=decision)
-        position_after = record_completed(position_path, result.sent_lines, run_id=run_id)
+        begin_motion(position_path, dispatch.lines, run_id=run_id, motion_id=request.request_id,
+                     expected_before=request.position_before_steps)
+        result = link.transmit(dispatch, request=request, decision=decision, on_completed=commit_completed)
         status = "sent"
     except Stage2TransmitError as exc:
         error = exc
         status = "failed"
         if exc.motion_attempted:
-            position_after = mark_unknown(
-                position_path,
-                run_id=run_id,
-                reason=f"发送失败 {exc.reason_code}：位置不可信，人重新对位后执行 --stage2-set-zero",
-            )
+            try:
+                position_after = mark_unknown(
+                    position_path,
+                    run_id=run_id,
+                    reason=f"发送失败 {exc.reason_code}：位置不可信，人重新对位后执行 --stage2-set-zero",
+                )
+            except Exception:
+                # 持久写盘错误时原 MOVING 仍保留；回执不能被第二次写盘异常吞掉。
+                position_after = load_position(position_path)
+        else:
+            position_after = record_not_started(position_path, run_id=run_id, motion_id=request.request_id)
     except PermissionError:
         # 链路在打开 COM 前拒绝了审批：没有发出任何东西，位置不变。
         status = "refused_by_link"
+        # ALLOW 校验发生在串口打开之前，确认没有发送运动即可撤销 PENDING。
+        position_after = record_not_started(position_path, run_id=run_id, motion_id=request.request_id)
         raise
     except BaseException:
         status = "aborted"
@@ -184,6 +200,8 @@ def _stage2_move(
             pass
         raise
     finally:
+        # 写盘失败时也保留盘上的 PENDING/未知状态，而不是把旧 READY 写进回执。
+        position_after = load_position(position_path)
         _write_json(
             run_dir / "stage2_receipt.json",
             {
@@ -284,8 +302,8 @@ def _cli_motion_confirm(request: MotionRequest, plan: dict) -> bool:
     print("========== Stage 2 运动确认 ==========")
     print(f"将发送 {plan['line_count']} 条 MOVEXY；X 累计 |步|={abs_x}，Y 累计 |步|={abs_y}")
     print(
-        f"位置账本（相对人工零点，不是绝对坐标）：{plan['position_before']} → {plan['position_after']}；"
-        f"软限位 {plan['soft_min_steps']}～{plan['soft_max_steps']}"
+        f"位置账本（相对人工零点的步数估算）：{plan['position_before']} → {plan['position_after']}；"
+        "机械边界尚未配置，不显示剩余实际行程"
     )
     print(f"标定：{request.calibration_ref}；起点：{request.start_reference}")
     print(f"路径叠加图：{plan['path_overlay']}")

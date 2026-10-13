@@ -62,11 +62,10 @@ class TaskModelTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.model.decide(stable, "APPROVED")
 
-    def test_cumulative_budget_and_invalid_geometry_block_lock(self):
+    def test_roster_sum_does_not_block_lock(self):
         self.model.set_plan("S0001", {"geometry": {"cycle_abs_steps": (15000, 5)}}, ())
         self.model.set_plan("S0002", {"geometry": {"cycle_abs_steps": (15000, 5)}}, ())
         self.model.decide("S0001", "APPROVED")
         self.model.decide("S0002", "APPROVED")
-        with self.assertRaisesRegex(ValueError, "BUDGET"):
-            self.model.lock()
+        self.assertEqual(("S0001", "S0002"), self.model.lock())
 

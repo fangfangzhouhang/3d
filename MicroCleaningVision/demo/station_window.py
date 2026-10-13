@@ -281,9 +281,9 @@ class WorkbenchWindow:
         self.scale = scale
         self.root.tk.call("tk", "scaling", 4 / 3 * scale)
         self.root.title("MicroCleaningVision · 显微清洗工作台")
-        width, height = int(min(1420*scale, self.root.winfo_screenwidth()-70)), int(min(960*scale, self.root.winfo_screenheight()-170))
+        width, height = int(min(1420*scale, self.root.winfo_screenwidth()-70)), int(min(980*scale, self.root.winfo_screenheight()-70))
         self.root.geometry(f"{width}x{height}+30+20")
-        self.root.minsize(int(min(1100*scale, width)), int(min(760*scale, height)))
+        self.root.minsize(int(min(960*scale, width)), int(min(680*scale, height)))
         self.root.configure(bg=BG)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         style = ttk.Style(self.root)
@@ -300,13 +300,19 @@ class WorkbenchWindow:
         style.configure("Horizontal.TProgressbar", background=TEAL, troughcolor=PALE, borderwidth=0)
         self.sample, self.operator, self.note = tk.StringVar(), tk.StringVar(), tk.StringVar()
         self.task, self.snapshot, self.reference = None, None, None
+        from demo.workbench_coverage import WorkbenchCoverageHub
+        self.coverage = WorkbenchCoverageHub(self)
         self.current_page, self.current_phase, self.current_target = "cover", "WELCOME", None
         self.request_id, self.capture_ready = None, False
+        self.answer_mode, self.choice_values, self.choice_facts = "confirmation", (), {}
+        self.choice_reason = tk.StringVar()
+        self.result_image_nonce = 0
         self.camera_state, self.serial_state, self.pump_state = "尚未连接", "尚未探测", "尚未探测"
         self.closing, self.restart_requested = False, False
         self.pair_window, self.last_report, self.result_image_id = None, None, None
         self.heartbeat_count = 0
         self.destroyed = False
+        self._pump_after = None
         outer = tk.Frame(self.root, bg=BG, padx=20, pady=12)
         outer.pack(fill="both", expand=True)
         outer.rowconfigure(3, weight=1)
@@ -315,7 +321,7 @@ class WorkbenchWindow:
         header.grid(row=0, column=0, sticky="ew")
         tk.Label(header, text="MicroCleaningVision", bg=BG, fg=INK, font=("Segoe UI", 19, "bold")).pack(side="left")
         mode = "REAL · 实物模式" if runtime.args.real else "MOCK · 软件模拟"
-        tk.Label(header, text=f"  WORKBENCH v2   /   {mode}", bg=BG, fg=TEAL, font=(FONT, 10)).pack(side="left", padx=12)
+        tk.Label(header, text=f"  WORKBENCH v3   /   {mode}", bg=BG, fg=TEAL, font=(FONT, 10)).pack(side="left", padx=12)
         self.stop = button(header, "停止 / 取消任务  [Q]", lambda: runtime.submit("cancel"))
         self.stop.pack(side="right")
         self.stop.state(["disabled"])
@@ -346,11 +352,26 @@ class WorkbenchWindow:
             view.grid(row=0, column=0, sticky="nsew")
         self.confirm_card = tk.Frame(outer, bg="#fff2d9", padx=12, pady=9)
         self.confirm_text = tk.Label(self.confirm_card, text="", bg="#fff2d9", fg=INK, anchor="w", justify="left", font=(FONT, 11), wraplength=1020)
-        self.confirm_text.pack(side="left", fill="x", expand=True)
-        self.confirm_yes = button(self.confirm_card, "确认这一步", lambda: self.answer(True), primary=True)
+        self.confirm_text.pack(fill="x", expand=True)
+        self.confirm_text.bind("<Configure>", lambda event: self.confirm_text.config(wraplength=max(200, event.width-8)))
+        self.normal_confirmation = tk.Frame(self.confirm_card, bg="#fff2d9")
+        self.normal_confirmation.pack(fill="x", pady=(5, 0))
+        self.confirm_yes = button(self.normal_confirmation, "确认这一步", lambda: self.answer(True), primary=True)
         self.confirm_yes.pack(side="right", padx=(7, 0))
-        self.confirm_no = button(self.confirm_card, "拒绝这一步", lambda: self.answer(False))
+        self.confirm_no = button(self.normal_confirmation, "拒绝这一步", lambda: self.answer(False))
         self.confirm_no.pack(side="right")
+        self.choice_frame = tk.Frame(self.confirm_card, bg="#fff2d9")
+        self.choice_buttons = {}
+        for column, (value, caption) in enumerate((("rewash", "再洗一次"), ("next", "不复洗，继续下一污渍"),
+                                                  ("retake", "仅重拍复检"), ("pause", "暂停并保存"))):
+            self.choice_frame.columnconfigure(column, weight=1)
+            control = button(self.choice_frame, caption, lambda value=value: self.answer(value), primary=value == "rewash")
+            control.grid(row=0, column=column, sticky="ew", padx=3, pady=4)
+            self.choice_buttons[value] = control
+        self.choice_reason_label = tk.Label(self.choice_frame, text="人工复核原因（最终人工通过时必填）", bg="#fff2d9", fg=INK, font=(FONT, 9))
+        self.choice_reason_label.grid(row=1, column=0, columnspan=2, sticky="w", padx=3)
+        self.choice_reason_entry = ttk.Entry(self.choice_frame, textvariable=self.choice_reason)
+        self.choice_reason_entry.grid(row=1, column=2, columnspan=2, sticky="ew", padx=3, pady=4)
         log_area = tk.Frame(outer, bg=BG)
         log_area.grid(row=5, column=0, sticky="ew", pady=(10, 0))
         log_bar = tk.Frame(log_area, bg=BG)
@@ -410,12 +431,12 @@ class WorkbenchWindow:
             self.navigate("review" if self.task is not None and self.task.get("state") in {"DRAFT", "LOCKED"} else "monitor" if self.task is not None else "detection")
             return
         self.task, self.snapshot, self.reference, self.current_target = None, None, None, None
+        self.coverage.reset()
         self.views["review"].selected = None
         self.views["review"].canvas.set_image(None)
         self.views["review"].canvas.manual_enabled = False
         self.views["review"].manual.config(text="人工补框：关闭")
-        self.views["monitor"].reference.set_image(None)
-        self.views["monitor"].live.set_image(None)
+        self.views["monitor"].reset()
         self.views["detection"].canvas.set_image(None)
         self.views["detection"].message.config(text="相机准备中…")
         self.progress.stop()
@@ -427,6 +448,40 @@ class WorkbenchWindow:
             self.views["cover"].start.config(text="返回当前任务  →")
             self.navigate("detection")
             self.write("开始新任务。请采集首次图像；此时不会发送运动或喷洗指令。")
+
+    def coverage_select(self, target):
+        self.coverage.select(target)
+
+    def coverage_open(self, *, latest=False):
+        target = self.current_target if latest else self.views["review"].selected
+        if target and self.coverage.open(target, latest=latest):
+            self.write(f"{target}：打开模拟覆盖预览，参数与驻点均不会送到执行器。")
+
+    def coverage_changed(self):
+        if not hasattr(self, "views") or self.destroyed:
+            return
+        review, monitor = self.views["review"], self.views["monitor"]
+        if self.reference is not None:
+            review.canvas.set_image(self.reference)
+        for view, target, latest in ((review, review.selected, False), (monitor, self.current_target, True)):
+            source = self.coverage.get(target, latest=latest)
+            view.coverage_button.state(["!disabled"] if source is not None else ["disabled"])
+            view.coverage_text.config(text="模拟覆盖：选择目标后打开，直径需显式输入" if source is None else
+                f"{target} · {source.binding['stage']} · {source.dataset.input.mask_kind} · 仅模拟，尚未预测")
+        preview, source = self.coverage.preview, self.coverage.source
+        if preview is not None and source is not None and preview[0] == source.identity:
+            _, plan, rendered = preview
+            metrics = rendered.metrics
+            rate = "无法预测" if metrics is None or metrics.geometric_coverage_rate is None else f"{metrics.geometric_coverage_rate:.1%}"
+            note = "；输入位置/可比性未通过" if not source.binding["input_valid"] else ""
+            text = (f"{source.binding['stage']} / {source.binding['frame_id']} · 模拟 {plan.model.profile.evidence.status} · 预计几何 {rate} · "
+                f"驻点 {rendered.step_count}/{len(plan.stations)} · 遗漏 {metrics.uncovered_area_px if metrics else '未知'} px{note}")
+            if review.selected == source.binding["target_id"] and source.binding["stage"] == "initial":
+                review.coverage_text.config(text=text)
+                review.canvas.set_image(rendered.image_rgb[..., ::-1])
+            latest = self.coverage.get(self.current_target, latest=True)
+            if latest is not None and latest.identity == source.identity:
+                monitor.coverage_text.config(text=text)
 
     def capture(self):
         if self.capture_ready:
@@ -459,11 +514,25 @@ class WorkbenchWindow:
             self.write("结束当前草稿并留档；设备释放后创建新的采集轮次。")
 
     def answer(self, value):
+        if self.answer_mode == "recheck_choice":
+            if value not in self.choice_values or self.choice_buttons[value].instate(["disabled"]):
+                return
+            if value == "next" and self.choice_facts.get("require_reason") and not self.choice_reason.get().strip():
+                self.write("最终人工通过需要填写中文复核依据；未提交决定，也不会发送动作。")
+                self.choice_reason_entry.focus_set()
+                return
+        elif not isinstance(value, bool):
+            return
         identity, self.request_id = self.request_id, None
         if identity:
-            self.runtime.submit("confirm", request_id=identity, answer=value)
+            arguments = {"request_id": identity, "answer": value}
+            if self.answer_mode == "recheck_choice":
+                arguments["reason"] = self.choice_reason.get().strip()
+            self.runtime.submit("confirm", **arguments)
             self.confirm_yes.state(["disabled"])
             self.confirm_no.state(["disabled"])
+            for control in self.choice_buttons.values():
+                control.state(["disabled"])
 
     def write(self, message):
         from datetime import datetime
@@ -503,6 +572,10 @@ class WorkbenchWindow:
             self._task_update(payload["task"])
         if kind == "log":
             self.write(payload["message"])
+        elif kind == "coverage_source":
+            self.coverage.ingest(payload["source"])
+        elif kind == "coverage_issue":
+            self.write(payload["message"] + "；旧执行流程继续由原关卡决定。")
         elif kind == "error":
             from microcleaning.control_system.reporting.quality_report import explain
             self.write("操作未完成：" + explain(payload["message"]))
@@ -510,6 +583,8 @@ class WorkbenchWindow:
         elif kind == "device":
             self.camera_state, self.serial_state = payload["camera"], payload["serial"]
             self._device_update()
+            if "失败" in str(payload["camera"]) or "读不到" in str(payload["camera"]):
+                self.views["detection"].message.config(text="显微镜画面没有读到。看下方日志。关闭本窗口后重新运行。")
         elif kind == "capture_ready":
             self.capture_ready = True
             self._capture_buttons(True)
@@ -532,9 +607,11 @@ class WorkbenchWindow:
             self.progress.stop()
             self.progress.configure(mode="determinate", value=0)
             self.write("首次检测完成。全部候选默认为待审核，未确认者不会执行。")
+            self.coverage_changed()
         elif kind == "stage":
             self.current_phase = payload["phase"]
             self.current_target = payload.get("current_target_id")
+            self.coverage_changed()
             self.views["monitor"].current.config(text=f"{self.current_target or '任务'} · {payload['explanation']}")
             if self.task:
                 self.views["monitor"].reference.set_targets(self.task["targets"], active=self.current_target)
@@ -550,11 +627,37 @@ class WorkbenchWindow:
         elif kind == "confirmation":
             self.phase_animation.stop()
             self.request_id = payload["request_id"]
+            self.answer_mode = "confirmation"
+            self.log.config(height=4)
+            self.choice_frame.pack_forget()
+            self.normal_confirmation.pack(fill="x", pady=(5, 0))
             self.confirm_text.config(text=payload["prompt"])
             self.confirm_card.grid(row=4, column=0, sticky="ew", pady=(9, 0))
             self.confirm_yes.state(["!disabled"])
             self.confirm_no.state(["!disabled"])
             self.write("等待人工确认：" + payload["prompt"])
+        elif kind == "recheck_choice":
+            self.phase_animation.stop()
+            self.request_id, self.answer_mode = payload["request_id"], "recheck_choice"
+            self.choice_values = tuple(payload.get("choices") or ())
+            self.choice_facts = dict(payload.get("facts") or {})
+            self.choice_reason.set("")
+            self.log.config(height=2)
+            self.normal_confirmation.pack_forget()
+            self.confirm_yes.state(["disabled"])
+            self.confirm_no.state(["disabled"])
+            self.choice_frame.pack(fill="x", pady=(5, 0))
+            last = self.choice_facts.get("last_target")
+            self.choice_buttons["next"].config(text="不复洗，人工确认通过" if last else "不复洗，继续下一污渍")
+            for key, control in self.choice_buttons.items():
+                allowed = key in self.choice_values
+                if key == "next" and last and not self.choice_facts.get("passed") and not self.choice_facts.get("manual_accept_allowed"):
+                    allowed = False
+                control.state(["!disabled"] if allowed else ["disabled"])
+            self.confirm_text.config(text=payload["prompt"])
+            self.confirm_card.grid(row=4, column=0, sticky="ew", pady=(9, 0))
+            self.navigate("monitor")
+            self.write("复检结果已出，请人工选择复洗、继续、重拍或暂停。每次复洗仍重新授权移动与短喷。")
         elif kind == "confirmation_closed":
             if self.request_id in {None, payload["request_id"]}:
                 self.request_id = None
@@ -564,17 +667,25 @@ class WorkbenchWindow:
                 self.pair_window.destroy()
                 self.pair_window = None
         elif kind == "motion":
+            from demo.workbench_views import motion_chinese
             message = payload["message"]
-            self.views["monitor"].feedback.config(text=("发送请求：" if payload["phase"] == "tx" else "板子回复：") + message + "   （脉冲计数，非编码器）")
+            translated = motion_chinese(message)
+            self.views["monitor"].feedback.config(text=translated + "   （由脉冲估算，物理位移需验证）")
             if payload["phase"] == "rx":
                 self.serial_state = "已收到 STEP 协议回复"
                 self._device_update()
             if message.startswith("MOVEXY") or message in {"STEP_STOPPED", "STOP"}:
-                self.write("运动：" + message)
+                self.write(translated)
+        elif kind == "position":
+            self.views["monitor"].update_position(payload)
+            self._device_update()
+        elif kind == "geometry":
+            self.views["monitor"].update_geometry(payload)
         elif kind == "serial":
+            from demo.workbench_views import motion_chinese
             line = payload["line"]
             if payload["direction"] == "rx_partial":
-                self.write("收到不完整串口字节（未作为成功回执）：" + line)
+                self.write("收到不完整串口字节，不能作为成功回执；原字节保留在诊断记录。")
                 return
             if line.startswith("MCV1|PUMP|"):
                 self.pump_state = "请求短喷，等待回执"
@@ -584,20 +695,23 @@ class WorkbenchWindow:
                 self.pump_state = "急停生效" if "ESTOP=1" in line else "STATUS 急停未激活"
                 self.serial_state = "已收到 MCV1 STATUS"
             self._device_update()
-            self.write(("发送请求：" if payload["direction"] == "tx" else "收到回执：") + line)
+            self.write(motion_chinese(line))
         elif kind == "verification":
             from microcleaning.control_system.reporting.quality_report import label
-            self.write(f"{payload['target_id']} 复检：{label(payload['quality_evidence']['quality'])}；原算法去除率 {payload['verification'].get('removal_rate')}。")
+            self.views["monitor"].update_verification(payload)
+            rate = (payload.get("roi_analysis") or {}).get("removal_rate", payload["verification"].get("removal_rate"))
+            self.write(f"{payload['target_id']} 复检：{label(payload['quality_evidence']['quality'])}；同位置区域清洗率 {'无法计算' if rate is None else f'{rate:.2%}'}。")
         elif kind == "pair":
             self.runtime.pair_images(payload)
         elif kind == "pair_images":
             self._comparison_popup(payload["pre"], payload["post"], "前后视野确认 · 确认按钮仍在主窗口")
         elif kind == "stopping":
-            self.progress_text.config(text="STOPPING · 正在收尾，停止回执待确认")
+            self.progress_text.config(text="正在收尾，停止回执待确认")
             self.stop.state(["disabled"])
             self.write(payload["explanation"])
         elif kind == "completed":
-            self.write(f"任务结束：{payload['summary']['status']}；原始记录：{payload['folder']}。报告等待你选择导出。")
+            from microcleaning.control_system.reporting.quality_report import label
+            self.write(f"任务结束：{label(payload['summary']['status'])}；原始记录：{payload['folder']}。报告等待你选择导出。")
         elif kind == "idle":
             self.stop.state(["disabled"])
             self.views["cover"].start.config(text="开始新任务  →")
@@ -608,19 +722,24 @@ class WorkbenchWindow:
                 self._destroy()
                 return
         elif kind == "results":
-            if self.restart_requested or self.runtime.active:
+            if self.restart_requested:
                 return
             self.snapshot = payload["snapshot"]
             self.views["results"].update_snapshot(self.snapshot)
-            self.navigate("results")
+            if payload.get("auto_navigate", True) and not self.runtime.active:
+                self.navigate("results")
+            else:
+                self._refresh_nav()
+                self.write("末目标尚未复检通过或任务暂停；保留监控页。可显式打开结果页查看完整档案。")
         elif kind == "result_images":
-            if self.snapshot and payload["folder"] == self.snapshot["folder"] and payload["target_id"] == self.views["results"].selected_id:
+            if (self.snapshot and payload["folder"] == self.snapshot["folder"]
+                and payload["target_id"] == self.views["results"].selected_id
+                and payload.get("nonce") == self.result_image_nonce):
                 self.views["results"].pre.set_image(payload["pre"])
                 self.views["results"].post.set_image(payload["post"])
         elif kind == "report_busy":
             self.views["results"].export_state.config(text="正在后台生成报告…" if payload["busy"] else "已导出：" + self.last_report if self.last_report else "报告操作已结束。原始记录保留。")
-            for control in self.views["results"].export_buttons:
-                control.state(["disabled"] if payload["busy"] else ["!disabled"])
+            self.views["results"].refresh_exports(busy=payload["busy"])
             if self.closing and not payload["busy"] and not self.runtime.active:
                 self._destroy()
         elif kind == "report_ready":
@@ -629,7 +748,9 @@ class WorkbenchWindow:
             self.write("报告已导出：" + self.last_report)
 
     def _device_update(self):
-        self.device.config(text=f"相机：{self.camera_state}　|　COM：{self.serial_state}　|　XY：READXY 脉冲计数　|　泵：{self.pump_state}")
+        status = self.views["monitor"].position_data.get("status")
+        xy = {"READY": "累计步数账本可用", "MOVING": "移动估算中", "POSITION_UNCERTAIN": "位置不可信", "UNHOMED": "参考待建立"}.get(status, "人工参考待确认")
+        self.device.config(text=f"相机：{self.camera_state}　|　COM：{self.serial_state}　|　XY：{xy}　|　泵：{self.pump_state}")
 
     def _pump(self):
         if self.destroyed:
@@ -641,11 +762,18 @@ class WorkbenchWindow:
                 return
         image = self.runtime.bus.latest_frame()
         if image is not None:
-            if self.current_page == "detection":
-                self.views["detection"].canvas.set_image(image)
-            elif self.current_page == "monitor":
-                self.views["monitor"].live.set_image(image)
-        self.root.after(40, self._pump)
+            try:
+                if self.current_page == "detection":
+                    self.views["detection"].canvas.set_image(image)
+                    self.views["detection"].message.config(text="显微画面已打开。确认视野和焦点后按空格采集。")
+                    if self.progress_text.cget("text") == "正在准备显微视野":
+                        self.progress.stop()
+                        self.progress_text.config(text="显微视野已打开")
+                elif self.current_page == "monitor":
+                    self.views["monitor"].live.set_image(image)
+            except Exception:
+                self.write("这一帧没有画上窗口，继续读下一帧。")
+        self._pump_after = self.root.after(40, self._pump)
 
     def result_target(self):
         if self.snapshot is None:
@@ -653,10 +781,15 @@ class WorkbenchWindow:
         identity = self.views["results"].selected_id
         return next((row for row in self.snapshot["targets"] if row["target_id"] == identity), None)
 
-    def result_images(self, masks=False):
+    def result_images(self, masks=False, *, crop=False):
         target = self.result_target()
         if target:
-            self.runtime.comparison_images(self.snapshot["folder"], target, masks=masks)
+            self.result_image_nonce += 1
+            self.views["results"].pre.set_image(None, placeholder="正在读取本轮前图")
+            self.views["results"].post.set_image(None, placeholder="正在读取本轮后图")
+            self.runtime.comparison_images(self.snapshot["folder"], target, masks=masks, crop=crop,
+                attempt_index=self.views["results"].attempt_index, recheck_index=self.views["results"].recheck_index,
+                nonce=self.result_image_nonce)
 
     def quality_review(self):
         target = self.result_target()
@@ -670,6 +803,9 @@ class WorkbenchWindow:
 
     def export(self, formats, printing=False):
         if self.snapshot is not None and not self.runtime.active:
+            if printing and not self.views["results"].print_ready():
+                self.write("末目标尚未复检通过，不能打印完成报告；可以导出全部原始档案。")
+                return
             self.runtime.report(self.snapshot["folder"], formats, open_after="html" in formats, print_after=printing)
 
     def choose_history(self):
@@ -734,6 +870,11 @@ class WorkbenchWindow:
     def _destroy(self):
         import gc
         self.destroyed = True
+        self.coverage.close()
+        if self._pump_after is not None:
+            self.root.after_cancel(self._pump_after)
+            self._pump_after = None
+        self.progress.stop()
         self.phase_animation.stop()
         self._release_photos(self.root)
         self.root.destroy()
