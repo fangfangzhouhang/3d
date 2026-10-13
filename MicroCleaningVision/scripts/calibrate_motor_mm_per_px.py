@@ -1,13 +1,14 @@
 """电机已知位移标定真实 mm/px（离线，不喷水）。
 
-原理：让 X/Y 各走一段精确脉冲数（固件计数可靠，5mm/圈、320步/mm），
+原理：让 X/Y 各输出一段脉冲（假设无丢步，5mm/圈、320步/mm），
 对比画面里同一个固定特征点移动了多少像素，反推：
 
     mm_per_px = (steps / 320.0) / abs(pixel_shift)
 
 步骤：抓帧f0 → 只走X → 抓帧f1 → 只走Y → 抓帧f2 → 模板匹配跟踪特征。
 结果写入 JSON 证据文件；feeds_action_request 始终为 false。
-这一步只标定尺度，不修改规划规则，也不写工作台绝对坐标。
+这一步只估计尺度，不修改规划规则；维护运动前使工作台位置失效。
+脉冲回执不等于实测物理位移，结果不能代替完整坐标/喷头标定。
 
 标定期间保持预览窗口打开，可以看到电机转动过程。
 """
@@ -42,25 +43,38 @@ def _load_deps():
 
 
 class Motor:
-    def __init__(self, serial_mod, port: str, baudrate: int, timeout: float):
-        self.ser = serial_mod.Serial(
-            port=port,
-            baudrate=baudrate,
-            bytesize=8,
-            parity="N",
-            stopbits=1,
-            timeout=timeout,
-            write_timeout=timeout,
-        )
+    def __init__(self, serial_mod, port: str, baudrate: int, timeout: float, *, position_path=None, maintenance_mode=False):
+        from microcleaning.control_system.serial.resource_lease import ResourceLease, device_resources
+        if not maintenance_mode or position_path is None:
+            raise PermissionError("MAINTENANCE_MODE_REQUIRED")
+        self.position_path, self.maintenance_mode = position_path, maintenance_mode
+        self.lease = ResourceLease(device_resources(port, position_path)).acquire()
+        self.errors = {}
+        self.closed = False
+        self.lock = threading.RLock()
+        try:
+            self.ser = serial_mod.Serial(port=port, baudrate=baudrate, bytesize=8, parity="N", stopbits=1,
+                timeout=timeout, write_timeout=timeout)
+            time.sleep(0.3)
+            self.ser.reset_input_buffer()
+        except BaseException:
+            if hasattr(self, "ser"):
+                self.ser.close()
+            self.lease.close()
+            raise
         self.speed_hz = 500
-        time.sleep(0.3)
-        self.ser.reset_input_buffer()
 
     def set_speed(self, hz: int) -> None:
         self._cmd(f"SPEED {hz}")
         self.speed_hz = hz
 
     def _cmd(self, line: str, wait: float = 0.3) -> list[str]:
+        with self.lock:
+            if self.closed and line != "STOP":
+                raise RuntimeError("维护连接已关闭，不允许新动作")
+            return self._exchange(line, wait)
+
+    def _exchange(self, line, wait):
         self.ser.write((line + "\r\n").encode("ascii"))
         time.sleep(wait)
         out: list[str] = []
@@ -80,6 +94,8 @@ class Motor:
     def move_async(self, nx: int, dx: str, ny: int, dy: str) -> threading.Thread:
         """异步移动，返回线程对象"""
         def _move():
+            from microcleaning.control_system.safety.maintenance import authorize_maintenance_move
+            authorize_maintenance_move(f"MOVEXY {nx} {dx} {ny} {dy}", self.position_path, enabled=self.maintenance_mode, cancelled=lambda: self.closed)
             replies = self._cmd(f"MOVEXY {nx} {dx} {ny} {dy}")
             if not any(r.startswith("STEP2_START") for r in replies):
                 raise RuntimeError(f"未收到 STEP2_START：{replies}")
@@ -90,17 +106,35 @@ class Motor:
                 replies = self._cmd("READXY", wait=0.12)
                 last = replies[0] if replies else ""
                 parts = dict(tok.split("=") for tok in last.split()[1:] if "=" in tok)
-                if parts.get("BX") == "0" and parts.get("BY") == "0":
+                if parts.get("BX") == "0" and parts.get("BY") == "0" and (not nx or parts.get("X") == str(nx)) and (not ny or parts.get("Y") == str(ny)):
                     return
                 time.sleep(0.05)
             raise TimeoutError(f"电机在时限内未空闲：{last}")
 
-        thread = threading.Thread(target=_move, daemon=True)
+        def checked():
+            try:
+                _move()
+            except BaseException as exc:
+                self.errors[thread] = exc
+                try:
+                    self._cmd("STOP", wait=0.1)
+                except Exception:
+                    pass
+        thread = threading.Thread(target=checked, daemon=True)
         thread.start()
         return thread
 
     def close(self) -> None:
-        self.ser.close()
+        self.closed = True
+        try:
+            self.ser.close()
+        finally:
+            self.lease.close()
+
+    def check_completed(self, thread):
+        thread.join()
+        if thread in self.errors:
+            raise self.errors[thread]
 
 
 def wait_live(cap, cv2, np, timeout_s: float = 8.0) -> bool:
@@ -148,7 +182,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--template-half", type=int, default=40, help="跟踪模板半边长 px")
     parser.add_argument("--min-score", type=float, default=0.6, help="模板匹配最低可信度")
     parser.add_argument("--output-dir", type=Path, default=Path("output") / "calibration")
+    parser.add_argument("--maintenance-mode", action="store_true")
+    parser.add_argument("--position-path", type=Path, default=PROJECT_ROOT / "output/stage2/position.json")
     args = parser.parse_args(argv)
+    if not args.maintenance_mode or not 1 <= args.steps <= 1000:
+        parser.error("需要 --maintenance-mode；单次标定限制为 1–1000 步，逐次输入 YES")
 
     cv2, np, serial_mod = _load_deps()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -220,11 +258,13 @@ def main(argv: list[str] | None = None) -> int:
             if state == 0 and key == ord(" "):
                 # 开始对位确认，抓 f0
                 f0 = frame.copy()
-                cv2.imwrite(str(out_dir / "f0.png"), f0)
+                from demo.single_frame import _write_image
+                _write_image(out_dir / "f0.png", f0, cv2)
                 print(f"f0 已抓：{out_dir/'f0.png'}")
 
                 # 启动电机 X 移动
-                motor = Motor(serial_mod, args.serial_port, args.baudrate, args.serial_timeout)
+                motor = Motor(serial_mod, args.serial_port, args.baudrate, args.serial_timeout,
+                    position_path=args.position_path, maintenance_mode=args.maintenance_mode)
                 motor.hello()
                 print("握手成功 STEP_OK v0.3")
                 motor.set_speed(args.speed)
@@ -237,11 +277,12 @@ def main(argv: list[str] | None = None) -> int:
             elif state == 1:
                 # 等待 X 移动完成
                 if motor_thread and not motor_thread.is_alive():
+                    motor.check_completed(motor_thread)
                     time.sleep(0.3)  # 稳定
                     ok2, f1 = cap.read()
                     if ok2:
                         f1 = f1.copy()
-                        cv2.imwrite(str(out_dir / "f1_after_x.png"), f1)
+                        _write_image(out_dir / "f1_after_x.png", f1, cv2)
                         print(f"f1 已抓：{out_dir/'f1_after_x.png'}")
 
                         # 启动 Y 移动
@@ -254,11 +295,12 @@ def main(argv: list[str] | None = None) -> int:
             elif state == 2:
                 # 等待 Y 移动完成
                 if motor_thread and not motor_thread.is_alive():
+                    motor.check_completed(motor_thread)
                     time.sleep(0.3)  # 稳定
                     ok2, f2 = cap.read()
                     if ok2:
                         f2 = f2.copy()
-                        cv2.imwrite(str(out_dir / "f2_after_y.png"), f2)
+                        _write_image(out_dir / "f2_after_y.png", f2, cv2)
                         print(f"f2 已抓：{out_dir/'f2_after_y.png'}")
 
                         # 计算结果
@@ -296,6 +338,13 @@ def main(argv: list[str] | None = None) -> int:
 
     finally:
         if motor:
+            motor.closed = True
+            try:
+                motor._cmd("STOP", wait=0.1)
+            except Exception:
+                pass
+            if motor_thread and motor_thread.is_alive():
+                motor_thread.join(timeout=3)
             try:
                 motor.set_speed(500)
             except Exception:

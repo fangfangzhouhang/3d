@@ -1,5 +1,73 @@
 # EXPERIMENTS｜做过什么，结果怎样
 
+## EXP-SW-THREE-VIEW-20261013：E2三图与导航
+
+基线fzh-branch@1107267，2份demo源码/2份测试增量；未提交/推送/实物操作。最终全量620项190.614秒OK，失败/错误/跳过0，含130项覆盖相关及10项覆盖真实Tk。新增4项Tk测试检查同帧完整输入、重算/无效时输入保留、强度不规划/导出快照、旧Options/最小布局、五页守卫/预览重开/MOVE/复检/结果路由。
+
+实际Mock五页走通、两份绑定归档重放、可选HTML/CSV保存成功，质量FAIL保留；最小1080×730窗口与工作台高DPI布局做自身窗口截图检查。早期播放时序、布局首次1px映射及全量620首跑单项失败保留，输入缓存/空间保留/标题合理最小换行及等待WM映射修复后通过；旧断言未放宽。
+
+本机证据D:/大创/work/coverage_ui_20261013/：full_release_validation.log、panel_mapping_validation.log、navigation_validation.log、visual_release.log、end_to_end_final.log及对应JSON/own-HWND PNG。此前130项专项40.089秒为早期UI版本，最终判据以上述620全量为准。[命令/保护/回滚](../软件组/覆盖预览三图同屏与导航验收_2026-10-13.md)。软件E2，实物E0；不证明真实喷痕、物理位移或清洁效果。
+
+## EXP-SW-COVERAGE-P6-20261013：E2工作台模拟绑定
+
+用户“继续p6”恢复批准范围；fzh-branch@769abab6加未提交成果，开工远端同SHA。最终覆盖专项126项16.545秒、全量616项75.431秒OK，失败/错误/跳过0；新18项含真实Tk2，全部覆盖相关真实Tk共6。242保护文件SHA相同，63份firmware及旧测试未改。早期新fixture/QA驱动失败日志保留，未放宽原视觉或旧测试判据。
+
+全残留83px进入规划，旧执行仍用最大48px，邻居未混入；预览开/关/异常的Mock MOVEXY/PUMP/STOP序列（归一化随机action_id）一致，retake只重拍。测试覆盖过期目标/帧/代次、同worker关闭重开、点击快照、无直径、篡改/路径/不完整/旧档案与质量隔离。
+
+最终320×240 local未tuned Mock任务3目标3次输出，主窗口心跳88；绑定归档两份重算一致：显式16px/stride2/95%，首次896px→6点95.2009%、遗漏43px；后残留359px→4点97.2145%、遗漏10px。原复检约59.9%，流程COMPLETED、质量FAIL保留，多点没有执行，不是97.2%清除。原图/报告与窗口自身截图位于D:/大创/work/coverage_p6_20261013/，仅本机未共享；ui_validation.json SHA 2a4d61bf1f36214872c1ea8c5e2779759e73a6fa1705d981a43bc094a98d7ce4。最终源码指纹76dc621d1de26765caa12cca049f9417a876883b5c2209566743f68c97b7691d；命令/全部日志/限制见[P6验收交接](../软件组/智能覆盖规划_P6.md)。未获得物理喷痕/尺度/定位/清洁证据。
+
+## EXP-SW-COVERAGE-P5-20261012：E1几何比较与重放
+
+`fzh-branch@769abab6f65b10104250a7e6f15b8cc306114fba` 加前序P1–P4及批准的P5未提交成果；本地/跟踪引用/只读GitHub API一致。Python3.13.14、NumPy2.5.2、OpenCV4.14.0、Pillow12.3.0、Matplotlib3.11.1、Tk8.6，环境未安装升级，无设备动作。现有独立Tk回归仍E2，整体实物E0。
+
+- 最终专项：`python -B -m unittest discover -s test -p 'test_coverage*.py' -v`，108项16.674秒OK，新增30项；失败/错误/跳过0，含原4项真实Tk mainloop。
+- 最终全量：`python -B -m unittest discover -s test -p 'test*.py' -v`，598项131.465秒OK，含145项planning，失败/错误/跳过0。此前同轮598项133.282秒也通过；只调整缺指标图的横轴为实际情景后再次验收，原日志保留，没有改旧测试判据。
+- 独立像素集合核验：三方法并集/重叠、共享误差外包可行域；完整分裂残片、非法质心/粗网格原因、固定方案越界/不可用时保留点、毫米尺度未知、空/人工语义、非圆核拒绝偷换、超限raster生成前拒绝、稳定ID不含耗时。归档覆盖实际Agg PNG、CSV/NPZ/数值篡改、巨大NPY声明、新目录不覆盖和中断无完成标记。
+- 五类合成原图/完整Mask，均360×240，虚拟36px assumed、stride1、step16、95%目标、预算64。中心/扫描/贪心：圆1/55/19点及7.60/95.52/95.75%；长条1/36/13及11.00/97.40/96.25%；凹形1/44/14及8.91/96.15/96.29%；分裂3/56/17及21.74/95.16/95.78%；图像边界1/21/11及16.50/76.04/95.04%。边界扫描13提案违规被过滤。
+- 分裂贪心17点的访问连线1581.39px，扫描56点1131.86px；一次计算约0.12512s与0.02116s（不是统计结论/真实设备耗时）。更少驻点并不证明路程或总体效率最优。
+- 分裂36→24px，固定17点仅58.93%，重规划34点95.11%；36→48px，固定17点100%，重规划11点95.33%。图像边界固定48px虽99.90%覆盖，5点违规不排名；重新8合规点96.07%。
+- 另冻结同输入/显式0px参考误差，2px情景的nominal目标重规划17点名义95.78%、条件保守85.33%；conservative目标22点名义99.32%、条件保守95.30%。误差及保守百分比都是条件模型，非实测误差/物理成功率。
+- 7份完整报告、363 run全部实际重算一致；不是363独立数据样本。circle/strip/concave各18、split234、border33、split_nominal/conservative各21；split analysis_id=`ea7bdbf38ce14a935f9eee8eacdac322ee766c0ae3b11ce7f6dc7a59542ae139`。主对比/敏感性/边界/保守目标图已目视核验。
+- 开始前214份文件，仅批准的planner与其测试两份改变，其他212份SHA相同；15份旧完整Plan（五形状×未知/0/2px）及既有P3归档ID未变。两个原文件副本SHA与开始前相同，支持仅撤销本轮提取；不依赖整仓reset。
+
+本机证据目录 `D:/大创/work/coverage_p5_20261012/`：`coverage_tests_final.log`、`full_regression_final.log`（首轮release日志保留）、`reports_release/`、`inputs/`、`benchmark_summary.json/csv`（最终未提交源码指纹/报告清单SHA）、`release_protection.json`、`baseline_sources/`、`split_export_release.log`/`split_verify_release.log`/`remaining_benchmarks_release.log`/`robustness_release.log`。英文TEMP沿用P3/P4；日志和原始图在仓库外，未自动共享。接口/完整条件/命令/回滚见 [P5交接](../软件组/智能覆盖规划_P5.md)。不能推出实际清除、损伤、能耗、定位、STOP延迟或真实多驻点已验收。
+
+## EXP-SW-COVERAGE-20261012：P3/P4 软件与独立Tk证据
+
+基线`fzh-branch@769abab6f65b10104250a7e6f15b8cc306114fba`加前序P1/P2与本轮未提交改动。Python3.13.14、numpy2.5.2、OpenCV4.14.0、Pillow12.3.0、Tk8.6。新渲染/归档为E1，独立UI联动为E2；实物E0，没有连接真实设备。
+
+- 最终覆盖专项：`python -m unittest discover -s test -p 'test_coverage*.py' -v`，78项5.293秒OK；原47项+本轮31项，失败/错误/跳过0。像素分区/独立前缀坐标并集、非圆核、完整残片/约束重放、损坏/篡改/超大数组/重复目录拒绝、CLI无隐式尺寸及无硬件依赖均覆盖。
+- 4项实际Tk mainloop检查：阻塞后台仍有心跳；快速直径防抖与旧结果丢弃；图层不重新规划；逐点/播放；导出同时改直径仍保留点击快照；未知/非法输入恢复；仅改Policy保持measured与精确核；关闭取消after。无显示跳过0。真实截图已目视检查，Windows200%屏幕缩放时先映射Tk坐标再截取全窗。
+- 最终全量：`python -m unittest discover -s test -p 'test*.py' -v`，568项95.406秒OK，失败/错误/跳过0；包含全部115项planning用例。原取消/STOP/工作台判据未改；本轮未出现前序记录的等待点超时。
+- 实际CLI四件归档生成并读档重算：合成split360×240、虚拟36px、stride2、目标95%、预算64；完整目标11295px，18驻点，覆盖10836px，遗漏459px，几何0.9593625498007968，重叠4134px。保守率/毫米面积None，executable=false。PlanID=`89e17eaf47effe9e0c128e48ddc02c900323c22a92dada259d419d9de7ea16de`；报告PNG已目视检查。
+- 102份受保护旧文件与本轮开始前SHA256快照一致，含P1/P2源码/测试、原demo/编排/视觉/固件及既有.gitignore；无旧行为改写。新增文件语法/空白与同步链接另行检查。
+
+本机原始证据在`D:/大创/work/coverage_p3_p4_20261012/`：`coverage_tests_release.log`、`full_regression_release.log`、`baseline_hashes.json`、`screenshots/coverage_panel.png`、`preview_split_d36/`。英文TEMP为`C:/Users/16149/AppData/Local/Temp/mcv_coverage_p3_p4`；不靠更改旧测试绕过Unicode夹具问题。日志/图片位于仓库外，未自动共享；[操作和接口](../软件组/智能覆盖规划_P3_P4.md)。不能由上述合成/UI结果推出喷痕、定位、实际清洁或硬件多驻点验收。
+
+## EXP-SW-COVERAGE-20261011：P1/P2 离线软件证据
+
+基线 `fzh-branch@769abab6f65b10104250a7e6f15b8cc306114fba`，本轮新增未提交。Python3.13.14/numpy2.5.2/OpenCV4.14.0；没有连接实物相机、COM、电机或泵。新增模块证据为 E1；旧工作台的 Mock/Tk 回归仍是软件证据，整体硬件 E0 不变。
+
+- 新覆盖专项：`python -B -m unittest discover -s test/control_system/planning -p 'test_coverage*.py' -q`，47项、0.422秒，OK；规划目录96项、1.245秒，OK。随机并集20例、非对称锚点贪心25例和非对称误差盒16例与独立坐标集合枚举一致；另覆盖完整分裂残留、边界、禁喷/中心域、单位/来源、未知/空/资源限制、不可变和禁止实物打开。
+- 文档离线例子实际运行：完整目标174px且含另一小残留；虚拟直径6px为12驻点、10px为7驻点，均几何覆盖1.0且executable=False。原Profile未变。此例不证明真实喷头尺寸或实际清除率。
+- 初次全量537项、225.898秒，FAILED(errors=1)：旧`test_workbench_events`取消测试的return-timeout子场景未在2秒内进入等待点，随后临时目录清理与工作线程竞争。原判据/源码未改；单独复跑该旧测试1项、1.548秒OK。失败原始日志保留为`D:/大创/work/coverage_p1_p2_20261011/full_regression.txt`，重跑另存日志，未覆盖失败记录。
+- 最终全量复跑：`python -B -m unittest discover -s test -p 'test*.py' -q`，537项、215.820秒，OK，失败/错误/跳过均0。原始日志`D:/大创/work/coverage_p1_p2_20261011/full_regression_retry.txt`。没有改变旧取消/STOP判据；首跑显示既有测试存在时序敏感性，独立通过和全量复跑通过不能抹掉该记录。
+- 默认沙箱虚拟TEMP曾造成旧位置测试写入/清理权限失败；改用`C:/Users/16149/AppData/Local/Temp/mcv_coverage_p1_p2`后规划目录通过，没有修改旧测试或权限逻辑。命令与可复现例子见[P1/P2交接](../软件组/智能覆盖规划_P1_P2.md)。日志位于本机仓库外，未自动共享；共享代码中的测试可独立重跑。
+
+最终三份源文件SHA256（本机字节快照；Git换行转换后可不同）：coverage_model=`893022f296a7feb61653b2b3b806d3aa0782901b1ac1c01a861df64e41fe185e`；coverage_metrics=`81b844ad31dff25d725dd47833f2fe6ab110fc7c67446c4413cf33379b88a2b0`；coverage_planner=`b6e809a425d7ce13b567770ffa23d7ba1dd0db1213675979992f15a85111d03d`。相关三份新测试见`test/control_system/planning/test_coverage_*.py`，无需真实数据或串口。
+
+## 当前交接：2026-10-10
+
+### EXP-SW-REWASH-20261010：E2软件回归
+
+本地 `fzh-branch@23bf6ea173885401c375c51b6865bbc7de7ffb5b` 加本轮未提交改动；只读 GitHub API 核对远端为 `19a2a73bd3817ab8b8aa7b6711a9da3acf3c30fe`。没有拉取、合并、提交或推送。 最终全量 490 项，111.520 秒，失败/错误/跳过均为 0；此前全量 483 项也通过。 针对复检多选5项与维护隔离8项通过；完整Tk主事件循环覆盖五页、复洗/重拍/切目标/末块有理由认可，多次复跑。12次额外复洗有13个新动作/帧，所有轮次导出；3px偏移阻止末块认可；0空前景不自动合格。
+
+日志`D:/大创/tmp/mcv_impl_20261010/final_results.txt/json`。固定合成档案`output/workbench_qa/rewash_20261010_601fb173/`，显式验收导出`output/workbench_qa/rewash_20261010_601fb173/reports/report_20261010_192655_4493ae79/`：3候选/2执行/3清洗/4复检，SUCCESS但质量FAIL且report_ready=True，先前残留未被覆盖。索引`output/workbench_qa/rewash_validation_20261010.json`含源码哈希。本机output被忽略，需另共享原始包才能在他机复查。
+
+本轮使用合成图、协议串口替身及真实 Tk 控件，证据等级 E2。未连接真实相机或 COM，未操作电机、水泵、固件或打印机；没有获得实物零偏移、喷头精度或清洁效果验收。 浏览器分页/真实打印尚未验收，未绕过此前本地文件预览策略。旧Unicode临时测试夹具问题用英文TEMP复跑辨别，未包装成算法故障。[本轮详细验收](../软件组/工作台复洗与位置管理验收_2026-10-10.md)。
+
+> 以下保留此前有日期的说明和实验快照。与本节冲突的工作台、复洗、复检、位置和报告规则已被本节替代；历史数字不代表当前验收。
+
 ## EXP-SW-WORKBENCH-20261009（E2 软件证据）
 
 本机 `D:\大创\3d\MicroCleaningVision`，`fzh-branch@8c422cf` 加未提交改动，Python3.13.14。3候选、确认S0001/S0002、排除S0003：原分割/编排/授权/协议替身产生2次PUMP，报告保留3行；S0001无前景需复核，S0002去除率约0.623仍有残留，最终FAIL。未用硬编码verification，也未连接相机或COM。任务结束无reports目录，显式导出才创建版本目录。

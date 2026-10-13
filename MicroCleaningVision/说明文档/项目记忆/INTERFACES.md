@@ -1,5 +1,70 @@
 # INTERFACES｜模块之间怎样传数据
 
+## 当前交接：2026-10-13，显示选项兼容
+
+StandaloneCoveragePanel.options可省略/为None：新UI采用RenderOptions(target=False, stations=False, alpha=0.25)。显式Options原样使用；旧归档CLI传archive.options，headless export-only保留原默认。Profile/Kernel/Plan/Renderer/归档schema、共享合同与串口均未改。
+
+三图共用image_rgb/input.mask和原frame_id/mask_kind；标题区分分割污渍、人工框、框内分割、参考标注和合成Mask。_options读取普通偏好，_display_options在临时原图查看时返回纯原图Options；导出冻结后者。Hub.view_options仅用于显示，不进入Profile/Policy/Plan ID。[字段和边界](../软件组/覆盖预览三图同屏与导航验收_2026-10-13.md)。
+
+## 当前交接：2026-10-13，P6 可选观察与证据绑定
+
+CleaningLoop新增可选on_coverage_input=None；WorkbenchRuntime明确接入。payload有task/target、folder、stage(pre/post)、cycle/recheck、frame、原尺寸BGR、完整同域Mask、mask_kind、metadata、input_valid/reasons；图/Mask/metadata是独立副本，回调异常不影响执行。首次/补框由runtime直接冻结，同样不修改task_model或共享contracts/ports。
+
+WorkbenchCoverageSource持CoverageDataset(RGB+既有CoverageInput)、folder及不可变binding_json；identity内容摘要。binding schema=workbench-coverage-v1，含任务/目标/阶段/轮次/独立复检、observation/frame、原图文件SHA/RGB像素SHA、Mask/分割/ROI策略SHA、Plan ID、generation、输入状态、validation、comparison_status。所有executable/feeds_action_request/send_to_controller=false。初始manual_region与后续manual_roi_segmented区别保留。
+
+station_*/coverage_previews/<uuid>/archive仍为原固定四文件；上层binding.json最后发布。read_run的quality-report-v1增加可选coverage_previews/coverage_preview_issues及目标对应列表，旧缺失为[]，不变原质量/打印许可。HTML独立模拟区；CSV有完整预览才新增coverage_previews.csv，整计划与播放前缀分列，清除预测准确率null。P4可选通用hooks/worker代次/布局不破坏独立默认接口。[完整字段与输入输出](../软件组/智能覆盖规划_P6.md)。
+
+## 当前交接：2026-10-12，覆盖规划 P5
+
+共享contracts/ports、串口、旧Plan及P3/P4接口保持。新增仅C离线 `coverage-analysis-v1`、`coverage-analysis-report-v1`：
+
+- `prepare_coverage_domain(input,model,policy,constraints) -> CoverageDomain`：READY的只读feasible/candidate Mask、conservative_kernel_mask|None、candidate_count；无模型/缺条件/资源超限时Mask为None并返回原因，不是硬件授权。
+- `AnalysisSpec`：升序预算、目标/网格/起点/basis、独立raster_step_px、显式直径情景（Profile单位，默认空）、误差情景/单位（默认空）。默认网格1px，粗网格不匹配独立记原因；无隐式喷头尺寸。
+- `analyze_coverage(CoverageInput,KernelResult|FootprintKernel,spec,constraints) -> CoverageAnalysis`：原完整Mask与模型/约束、spec、runs、稳定analysis_id和另列耗时。run记录method/phase/参数/source_run_id、实际/提案点、拒绝/违规、所有Metrics/数组、原PlanID、路线/状态/来源与单次耗时。非法基线raw前缀只审计，不排名；fixed失去新模型时保留点但指标None。
+- `analysis_csv(analysis) -> UTF-8 BOM bytes`；`export_analysis_report(verified_archive,analysis,new_directory,include_figures=True) -> Path`：输入须同完整Mask/模型/约束，新目录，input四件归档+CSV/NPZ+可选PNG+最后发布JSON。
+- `load_analysis_report(directory) -> AnalysisReport`：固定文件/false标志/hash/大小/NPY声明校验，原P3输入重放，再逐run重算比对，恢复记录耗时并核对CSV/实际数组。输出archive/analysis/environment_json/include_figures。
+
+所有分析结果的三项硬件标志固定False；坐标原尺寸image_px，点/锚为(x,y)，shape为(h,w)。固定/重规划、未知/空目标、manual_region面积、measured父Profile与显式非圆核语义保留；不能将非圆核换成圆做直径扫描。哈希不是来源认证或签名；耗时是一次本地调用，几何访问连线非实际XY轨迹。完整字段、CLI和资源限制见 [P5交接](../软件组/智能覆盖规划_P5.md)。
+
+## 当前交接：2026-10-12，覆盖规划 P3/P4
+
+共享contracts/ports与串口不变。新增仅离线的 `coverage-visualization-v1`、`coverage-preview-v1`；原P1/P2字段未改。
+
+- `render_coverage(image_rgb, plan, options, step_count) -> CoverageVisualization`：同尺寸RGBuint8，输出只读RGB/当前前缀Metrics/plan_id/图层/像素哈希/坐标语义；step是0到N，未知模型metrics=None，前缀保守率None。
+- `render_report(plan, view) -> PIL.Image`：模拟/尺寸来源/几何指标/图例报告；显示缩放不改原算法坐标。
+- `export_coverage_preview(image_rgb,plan,new_directory,constraints,options,step_count) -> Path`：同一快照四件归档，JSON最后写，存在目录拒绝。约束非默认时要求原始Mask以便重放。
+- `load_coverage_preview(directory) -> CoverageArchive`：校验固定文件/false发送标志/大小/hash，恢复完整目标、精确核、尺度/约束/Policy，原算法与图像重算比对；输出RGB、Plan、Constraints、Options和step。
+- `CoverageDataset/Request/Response` 与 `LatestCoverageWorker.submit/poll/close`：本地输入和递增generation；没有新增工作台事件类型，也没有ActionRequest。
+- `StandaloneCoveragePanel`：调用上述离线接口。文件Mask须明确来源，`manual_region`只显示人工区域面积；改measured直径变assumed，单改Policy保留原测量与显式核。
+
+尺寸/驻点继续为 `(h,w)` / `(x,y)`、frame=image_px；虚线是访问顺序。PNG报告像素与原图像素分开，完整Plan与前缀视图分别存储；参数/原始文件/归档像素哈希各自保留。资源边界、字段和CLI见 [P3/P4交接](../软件组/智能覆盖规划_P3_P4.md)。
+
+## 当前交接：2026-10-11，覆盖规划 P1/P2
+
+新增仅 C 模块内部的 `footprint-profile-v1` / `footprint-kernel-v1` / `coverage-plan-v1`，共享 `mcl-v0.1`、contracts/ports 和串口协议均未改。
+
+- `build_kernel(FootprintProfile, PixelScale|None) -> KernelResult`：直径无默认值，单位 px/mm、来源 assumed/measured。未知直径/mm缺尺度等有 reason_codes；错误参数抛 ValueError。实测湿痕必须带完整喷洗条件，不等于去除率。
+- `CoverageInput(mask,target_id,mask_kind,source_ref,frame_id/image_ref/图像及分割sha可选)` 保存只读原尺寸二维 bool/uint8二值 Mask，完整残片均参与；manual_region 保留区域面积语义。
+- `plan_coverage(input, model, policy=..., constraints=...) -> CoveragePlan`：完整足迹/误差外包盒检查喷湿域与禁喷域，收缩核作条件下保守覆盖；指标空值与失败原因显式。
+- 输出 `points_px/stations`、覆盖/遗漏/重叠/次数/可选保守 Mask、覆盖率/面积/几何距离；`to_dict()` 产生可序列化结构、plan_id和来源/Mask哈希，不写 PNG/JSON 文件。数据格式只读，executable 和两项硬件发送标志固定 False。
+
+尺寸 `(h,w)`，锚点/驻点 `(x,y)`，frame=image_px；不存在隐式 ROI 平移、毫米/脉冲转换。几何比例非实际清除率；空目标比例 None，模型不可用 metrics/Mask None。默认图像域和未知定位误差保留 warning，不能当实测安全。全部字段及失败状态见 [P1/P2 交接](../软件组/智能覆盖规划_P1_P2.md)。
+
+## 当前交接：2026-10-10
+
+线上MCV1、STEP v0.3与共享contracts/ports未改变。主机局部新增：
+
+- `ConfirmationBroker.ask_choice(prompt, choices, facts) -> {choice, reason}`，允许rewash/next/retake/pause；reply绑定request_id且严格类型，旧ask仍只接bool。
+- `CleaningLoop(recheck_decision=...)`开启人工工作台路由；未提供callback的旧CLI仍有限轮数。summary增加report_ready/recheck_mode/stage_events_ref，原键保留。
+- `cycle.rechecks[]`包含pre/post、verification/comparability、roi_analysis及segmentation、roi_evidence与sha256、quality_evidence、decision；cycle旧post/verification镜像最新一项。
+- 位置JSON兼容旧known/x/y，新增status/pending_motion/reference_epoch；回执不能把故障软件升级为物理定位已验证。
+- on_position快照包括confirmed/estimated/before/expected XY、motion_id/当前段、reference时间，evidence明确command_pulses_not_physical_feedback。
+- 结果图请求携attempt_index/recheck_index/nonce；旧图答复不能覆盖当前轮；read_run顶层report_ready是打印/自动导航依据。
+
+坐标均保留原图ROI，喷头有符号偏移只应用一次。当前F103共同入口急停实际源码读PB12，旧PB2仅历史兼容；烧录身份未知。[本轮详细验收](../软件组/工作台复洗与位置管理验收_2026-10-10.md)。
+
+> 以下保留此前有日期的说明和实验快照。与本节冲突的工作台、复洗、复检、位置和报告规则已被本节替代；历史数字不代表当前验收。
+
 2026-10-09 工作台局部接口补充：`workbench-task-v1` task_manifest 保存全候选/决定/冻结名单/原像素几何/哈希；`review_log.jsonl` 追加编辑及质量复核；`quality-report-v1` 规范化原档案供 UI/HTML/CSV 使用；`workbench-evidence-v1` 解释证据，不改 B 原 verification。事件队列和 request_id 仅用于主机线程通信，串口句子和 mcl-v0.1 contracts/ports 没有改变。serial 会话新增可选 cancellation/on_serial_event，旧调用默认不启用；消费者仅工作台和其测试。summary 保留旧键并增加 workflow/quality、manifest引用、执行子集。版本和路径见手册；以下基线为历史。
 
 核对日期：2026-10-05；基线 main `341224f`（PR #24 后），`feat/single-entry-cleaning-v1` worktree 的主机代码/说明改动尚未提交。固件未在此轮修改或重建，真实设备未操作。 共享 Python 合同 mcl-v0.1、泵 MCV1、步进 v0.3 均未更改。
@@ -72,7 +137,7 @@ execute(request: ActionRequest, decision: SafetyDecision) -> ExecutionReceipt
 
 线上是 `MCV1|PING`、`STATUS`、`PUMP|action_id|duration_ms`、`STOP`；回 `PONG`、`STATUS`、`ACK`、`DONE`、`ERR`。ACK 表示接受，DONE 表示固件动作流程结束，均不能独自证明液体到达目标或污染减少。MCV1 编码器上限 500 ms；主机控制器及新闭环 PUMP_IN_PLACE 许可为 100–500 ms，闭环默认 500 ms。固件 PUMP ON 仍是固定 300 ms。MCU 沿用旧范围 100–2000 ms，不把固件上限当作用户可以直接申请的上限。当前 common/main.c 已接入共享 MCV1，旧 Stage1 兼容构建继续使用同一协议。
 
-当前F103引脚和完整协议只查共同协议文档。PB2在联合入口假设常闭接地，断开高急停；实际接线未确认。不要恢复 F401 PB5/PB12 作为当前板子配置。
+当前F103引脚和完整协议只查共同协议文档。PB12在当前联合入口假设常闭接地，断开高急停；实际接线未确认。不要把旧F401引脚配置套用到当前F103；当前PB12来源于F103共同入口的实际源码。
 
 ## 6. C → Stage 2：受限双轴运动
 

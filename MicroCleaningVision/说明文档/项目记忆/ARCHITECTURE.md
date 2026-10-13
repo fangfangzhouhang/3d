@@ -1,5 +1,53 @@
 # ARCHITECTURE｜整个系统怎么工作
 
+## 当前交接：2026-10-13，三图显示支路
+
+StandaloneCoveragePanel从同一CoverageDataset读取原RGB/完整Mask，独立绘制并按数据身份/画布尺寸缓存两张输入图；初始化、重算、无模型与缩放均不依赖current_plan。中央继续用原render_coverage。参数移至可滚动右侧，高级项可展开，底部播放/导出优先保留空间。
+
+图层/强度只重绘，临时原图查看用于显示和导出快照，不覆盖普通偏好。Hub关闭重开保存普通Options，原worker/代次/源身份及五页事件路由保持。三图位于既有预览弹窗，未重排五页。[实现与验证](../软件组/覆盖预览三图同屏与导航验收_2026-10-13.md)。
+
+## 当前交接：2026-10-13，P6 模拟预览接入工作台
+
+新增demo/workbench_coverage：审核首次原图/该S完整Mask、人工矩形，以及CleaningLoop最大残片筛选前/复检的mask & measurement_domain→不可变Source/绑定→既有P1–P4→固定输入Toplevel→审核叠加/监控入口。设备线程只复制发布观察，参数和模拟Plan不进入执行器；on_coverage_input默认关闭且异常隔离。
+
+Tk主线程持每目标initial/latest两份输入，整个工作台共用一个有界LatestCoverageWorker，跨弹窗generation单调且检查源/窗口身份。图层/播放只渲染；改变输入/直径/策略重算。关闭重开保留有效待提交参数，高DPI面板适配工作台尺度；无第二个mainloop或grab。
+
+用户点击→后台完整P3导出/重放→独立binding最后发布。reporting/coverage_evidence有限资源哈希读档，不在动作/Tk/报告读档线程重做规划；可选问题与原质量证据隔离，旧报告兼容。清洗Loop仍选择最大残片作旧单点执行，预览保留全残留。[文件/线程与入口](../软件组/智能覆盖规划_P6.md)。
+
+## 当前交接：2026-10-12，覆盖规划 P5
+
+离线分析支路：`P3 CoverageArchive（完整原图/Mask/核/约束） → AnalysisSpec → coverage_analysis.analyze_coverage → CoverageAnalysis/Runs → coverage_analysis_report → input归档 + CSV/NPZ/科学PNG + 最后发布的JSON → 校验并完整重算`。纯分析无文件/UI/硬件依赖；报告使用Matplotlib Agg，不导入pyplot/Tk/串口/工作台。两个模块及测试归C，demo消费者与事件通信未改。
+
+P2公共 `prepare_coverage_domain` 提供完整几何可行域、候选网格交集和可选保守核；P2与P5基线共用误差外扩/禁喷规则，避免复制两套私有安全定义。仅做该入口提取，15份冻结旧Plan、旧P3归档及212份受保护文件保持一致。
+
+三个方法每run共享完整输入/核/约束/目标/起点/预算；中心按连通块，扫描复用旧点列但仅离线驻点模拟。提案保留审计、非法点不挪位；fixed严格保留原点（不可算也保留坐标），违规不排名；replan在新条件下调用原算法。基于nominal/conservative目标的差异是条件几何优化，非清除率或物理可靠性。耗时不进入稳定ID；文件资源限制和NPY预检先于解压分配。P6仍需工作台完整Mask适配与身份绑定。[字段/限制](../软件组/智能覆盖规划_P5.md)。
+
+## 当前交接：2026-10-12，覆盖规划 P3/P4
+
+离线支路增加：`CoverageDataset/Request → LatestCoverageWorker → 原P1/P2 CoveragePlan → coverage_visualization → StandaloneCoveragePanel`；导出支路 `coverage_archive → PNG + 原图 + 完整Mask/核/约束NPZ + JSON → 校验后原算法重算`。两份新 planning 模块归 C，两份独立 demo 模块归集成人；本轮没有改既有工作台或它的事件/执行器。
+
+主线程独占Tk/PhotoImage/after，后台一份运行、一份可替换待处理、一份最新响应；调参立即清空旧结果并以generation双重检查，160ms防抖。运行中算法完成后丢弃过期结果，不宣称强制中断。导出抓取同一份不可变快照，异步编码不会拿后来参数替换先前图片。关闭取消全部Tk回调，后台不操作已销毁窗口。
+
+图层/窗口变化只重绘；播放用精确核计算驻点前缀并集，完整Plan不变。部分播放保守率未知，完整计划复用P2结果。归档保存完整数据而非仅哈希，恢复显式非圆核也不替换成圆。所有输出不可执行且无硬件依赖。[接口与图示](../软件组/智能覆盖规划_P3_P4.md)。P6工作台完整目标适配尚未实施。
+
+## 当前交接：2026-10-11，覆盖规划 P1/P2
+
+新增 C 所有的离线支路：`coverage_model.FootprintProfile + PixelScale → build_kernel → FootprintKernel`；调用者冻结完整二值目标为 `coverage_planner.CoverageInput`，结合 `CoveragePolicy/Constraints → plan_coverage → CoveragePlan`；`coverage_metrics.evaluate_coverage` 输出只读预计覆盖、遗漏、重叠与可选保守覆盖 Mask。
+
+此支路不导入 orchestration/serial/demo，不生成 ActionRequest，不修改旧规划类型或执行链；不改变 planning 包的旧导出。所有 CoveragePlan 固定 `executable=False`。圆盘直径改变只重建核/候选/规划/指标，输入与消费者结构不变。图像范围只是默认模拟域，未宣称物理边界。JSON 只提供结构和 Mask 哈希，完整归档/渲染在 P3。
+
+本次未修改 `demo/`、Tk 事件协议及工作台 Mask 适配；后续由集成人在筛选前冻结完整原尺寸目标，避免只收到最大残片。当前旧执行选择和现有五页流程保留。接口和坐标约定见 [P1/P2 交接](../软件组/智能覆盖规划_P1_P2.md)。基线为 `fzh-branch@769abab6` 加本轮未提交模块。
+
+## 当前交接：2026-10-10
+
+新增主机链：`WorkbenchWindow`的复检四选项→`ConfirmationBroker.ask_choice`→`CleaningLoop._interactive_recheck`；rewash回新前帧/位置验算/新规划，retake仅新后帧，next保留结果并切目标，pause停止留档。物理动作继续使用布尔授权，不接受复洗字符串当True。
+
+视觉层新增`roi_verification`固定ROI、背景位置/质量门、面积与重合图；`FrozenRoiSegmenter`冻结首次参数和排邻居测量域。位置层`begin_motion`→串口分段脉冲估计→`record_completed`；未完成重启未知。正式工作台/维护`ResourceLease`按COM与账本互斥，维护先作废参考。
+
+记录`cycle_NNN.rechecks[]`保存每次后图/决定/验算，`stage_events.jsonl`保存全部阶段；UI只取轻量快照和最新实时帧。报告按数字读取所有轮次、验证全部ROI/图片哈希，末块认可+无档案问题才提供打印。长期无限复洗仍受磁盘/内存等有限资源约束，没有虚构无限存储能力。[本轮详细验收](../软件组/工作台复洗与位置管理验收_2026-10-10.md)。
+
+> 以下保留此前有日期的说明和实验快照。与本节冲突的工作台、复洗、复检、位置和报告规则已被本节替代；历史数字不代表当前验收。
+
 2026-10-09 当前新增链：`closed_loop_station` → 五页 `WorkbenchWindow/workbench_views` → `workbench_runtime`（主线程只收事件，相机线程独占VideoCapture，设备线程独占串口）→ `TaskModel` 全名单/审核/不可变锁定 → 原 `CleaningLoop/HardwareExecutor/serial` → 原 Episode + 补充 task_manifest/review_log → `result_evidence` → reporting。锁定只选已确认目标；不修改共享八对象，UI答复不是硬件命令。实际 MOVE 跳监控、结束跳结果；原记录自动保存、导出由用户选择。旧 StationPanel 和不加 workbench 的 Mock 保留，以下旧快照只代表当时版本。
 
 核对日期：2026-10-05；基线 main `341224f`（PR #24 后），`feat/single-entry-cleaning-v1` worktree 的主机代码/说明改动尚未提交。固件未在此轮修改或重建，真实设备未操作。 目标见 [PROJECT](PROJECT.md)，接口见 [INTERFACES](INTERFACES.md)。
@@ -116,7 +164,7 @@ cd "D:\大创\3d\MicroCleaningVision"
 
 ## 5. 运动执行与错误传播
 
-Demo 先规划，再按位置账本检查会不会越出人工零点 ±10000 步，缺标定/有警告/位置未知时拒发。主机不再另设单次步数上限。去程和回程不相加。全部满足仍先给 HUMAN；人在场输入 YES 后才获得短时一次性 ALLOW，发送器核对内容摘要与武装状态再打开 COM。
+Demo 先规划，缺标定、标定带警告或位置未知时拒发。主机不再按整份名单的步数合计拦住，也不再按人工零点两侧的步数边界拦住。去程和回程不相加。一条 MOVEXY 仍不能超过固件报文的 20000 步。全部满足仍先给 HUMAN；人在场输入 YES 后才获得短时一次性 ALLOW，发送器核对内容摘要与武装状态再打开 COM。
 
 协议先确认 `STEP_OK v0.3`，按段发送 MOVEXY，轮询 READXY，两轴都停且每个非零轴已发计数等于申请才发下一段。两轴频率相同、步数不同，较短轴先停；**没有按比例插补斜线**。对角路线的图上预览和真实轨迹可能不同，应实测。
 

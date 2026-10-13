@@ -33,3 +33,6 @@ MicroCleaningVision/firmware/nucleo_f401re/**/*.elf
 MicroCleaningVision/firmware/nucleo_f401re/**/*.hex
 MicroCleaningVision/firmware/nucleo_f401re/**/*.bin
 MicroCleaningVision/firmware/nucleo_f401re/.tools/
+
+# 本机云盘缓存，不入库。必须写相对路径，绝对路径不会生效。
+ShareCache/

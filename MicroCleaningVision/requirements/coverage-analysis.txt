@@ -1,0 +1,4 @@
+# Optional offline P5 scientific reports. Never needed by hardware execution.
+-r perception-opencv.txt
+Pillow>=10,<13
+matplotlib>=3.8,<4
