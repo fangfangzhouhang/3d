@@ -136,6 +136,25 @@ class WorkbenchCoverageHub:
             self.profile, self.policy = panel.profile, panel.policy
         self.next_generation = max(self.next_generation, panel.generation)
         self.view_options = panel._options()
+        self._publish_execution(panel)
+
+    def _publish_execution(self, panel):
+        runtime = getattr(self.owner, "runtime", None)
+        publish = getattr(runtime, "set_coverage_execution", None)
+        if publish is None or panel is None:
+            return
+        try:
+            profile, policy = panel.parameter_snapshot()
+        except (ValueError, TypeError):
+            return
+        if profile.diameter is None:
+            publish(None)
+            return
+        publish({
+            "profile_id": profile.profile_id, "diameter": profile.diameter, "unit": profile.unit,
+            "evidence_ref": profile.evidence.source_ref, "target_coverage": policy.target_coverage,
+            "max_stations": policy.max_stations, "candidate_stride_px": policy.candidate_stride_px,
+        })
 
     def open(self, target, *, latest=False, worker=None):
         source = self.get(target, latest=latest)
@@ -156,6 +175,7 @@ class WorkbenchCoverageHub:
         def view(panel):
             if current(panel) and panel.current_plan is not None:
                 self.preview = (identity, panel.current_plan, panel.current_view)
+                self._publish_execution(panel)
                 self._notify()
         def invalid(panel):
             if current(panel):

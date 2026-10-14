@@ -303,6 +303,7 @@ class WorkbenchWindow:
         from demo.workbench_coverage import WorkbenchCoverageHub
         self.coverage = WorkbenchCoverageHub(self)
         self.current_page, self.current_phase, self.current_target = "cover", "WELCOME", None
+        self.current_route, self.following_id = None, None
         self.request_id, self.capture_ready = None, False
         self.answer_mode, self.choice_values, self.choice_facts = "confirmation", (), {}
         self.choice_reason = tk.StringVar()
@@ -362,7 +363,7 @@ class WorkbenchWindow:
         self.confirm_no.pack(side="right")
         self.choice_frame = tk.Frame(self.confirm_card, bg="#fff2d9")
         self.choice_buttons = {}
-        for column, (value, caption) in enumerate((("rewash", "再洗一次"), ("next", "不复洗，继续下一污渍"),
+        for column, (value, caption) in enumerate((("rewash", "再次清洗这一块"), ("next", "结束这块，清洗下一块"),
                                                   ("retake", "仅重拍复检"), ("pause", "暂停并保存"))):
             self.choice_frame.columnconfigure(column, weight=1)
             control = button(self.choice_frame, caption, lambda value=value: self.answer(value), primary=value == "rewash")
@@ -395,6 +396,41 @@ class WorkbenchWindow:
             self.capture()
         elif self.runtime.active:
             self.runtime.submit(action)
+
+    def roster_status(self, stable, item):
+        task = self.task or {}
+        if task.get("state") in {None, "DRAFT"}:
+            return ""
+        if item.get("finished"):
+            return "已记入报告"
+        if stable == self.current_target and self.current_route == "rewash":
+            return "再次清洗"
+        if stable == self.current_target and self.current_route != "recorded":
+            return "正在清洗"
+        if stable == self.following_id:
+            return "下一块"
+        if item.get("decision") == "APPROVED":
+            return "待清洗"
+        return ""
+
+    def _preview_recheck_route(self, value):
+        facts = self.choice_facts or {}
+        target = facts.get("target_id") or self.current_target or "当前污渍"
+        nxt = facts.get("next_target_id")
+        if value == "rewash":
+            self.write(f"{target}：再次清洗。留在监控页，重新采集这一块的前图。")
+            self.views["monitor"].clear_recheck()
+        elif value == "next" and facts.get("hold") == "location":
+            self.write(f"{target} 位置未通过，不移动。清洗名单转到 {nxt}。" if nxt else f"{target} 位置未通过。没有下一块，暂停留档。")
+        elif value == "next":
+            self.write(f"{target} 已结束本次复检。下一块是 {nxt}，留在监控页采集前图。结果报告等名单走完再开。" if nxt
+                else f"{target} 是名单最后一块。档案写完后打开结果报告。")
+            self.views["monitor"].clear_recheck()
+        elif value == "retake":
+            self.write(f"{target}：只重拍这一次复检，不换污渍。")
+        else:
+            return
+        self.navigate("monitor")
 
     def navigate(self, page):
         if page == "review" and self.task is None:
@@ -431,6 +467,7 @@ class WorkbenchWindow:
             self.navigate("review" if self.task is not None and self.task.get("state") in {"DRAFT", "LOCKED"} else "monitor" if self.task is not None else "detection")
             return
         self.task, self.snapshot, self.reference, self.current_target = None, None, None, None
+        self.current_route, self.following_id = None, None
         self.coverage.reset()
         self.views["review"].selected = None
         self.views["review"].canvas.set_image(None)
@@ -525,6 +562,8 @@ class WorkbenchWindow:
             return
         identity, self.request_id = self.request_id, None
         if identity:
+            if self.answer_mode == "recheck_choice":
+                self._preview_recheck_route(value)
             arguments = {"request_id": identity, "answer": value}
             if self.answer_mode == "recheck_choice":
                 arguments["reason"] = self.choice_reason.get().strip()
@@ -611,11 +650,20 @@ class WorkbenchWindow:
         elif kind == "stage":
             self.current_phase = payload["phase"]
             self.current_target = payload.get("current_target_id")
+            self.current_route = payload.get("route")
+            self.following_id = payload.get("following_id")
             self.coverage_changed()
             self.views["monitor"].current.config(text=f"{self.current_target or '任务'} · {payload['explanation']}")
             if self.task:
+                self.views["review"].update_task(self.task)
                 self.views["monitor"].reference.set_targets(self.task["targets"], active=self.current_target)
-            if self.current_phase == "MOVE":
+                self.views["monitor"].show_roster(self.task, self.current_target, self.following_id, self.current_route)
+            if self.current_route in {"rewash", "next", "recorded"}:
+                self.views["monitor"].clear_recheck()
+            if self.task and self.current_phase in {
+                "MOVE", "CAPTURE_PRE", "CAPTURE_POST", "RETRY", "SELECT_TARGET",
+                "LOCATION_HOLD", "PLAN_TARGET", "ALIGN_AT_NOZZLE", "STAIN_RECORDED",
+            }:
                 self.navigate("monitor")
             self.phase_animation.stop()
             if self.current_phase in {"MOVE", "PUMP", "RETURN", "SEGMENT_PRE", "SEGMENT_POST", "VERIFY_TARGET", "PROBE_DEVICE"}:
@@ -635,6 +683,8 @@ class WorkbenchWindow:
             self.confirm_card.grid(row=4, column=0, sticky="ew", pady=(9, 0))
             self.confirm_yes.state(["!disabled"])
             self.confirm_no.state(["!disabled"])
+            if (payload.get("facts") or {}).get("phase") == "recheck" and self.task:
+                self.navigate("monitor")
             self.write("等待人工确认：" + payload["prompt"])
         elif kind == "recheck_choice":
             self.phase_animation.stop()
@@ -648,7 +698,14 @@ class WorkbenchWindow:
             self.confirm_no.state(["disabled"])
             self.choice_frame.pack(fill="x", pady=(5, 0))
             last = self.choice_facts.get("last_target")
-            self.choice_buttons["next"].config(text="不复洗，人工确认通过" if last else "不复洗，继续下一污渍")
+            hold = self.choice_facts.get("hold") == "location"
+            if hold:
+                self.choice_buttons["retake"].config(text="重新采集前图")
+                self.choice_buttons["next"].config(text="改洗下一污渍")
+            else:
+                self.choice_buttons["rewash"].config(text="再次清洗这一块")
+                self.choice_buttons["retake"].config(text="仅重拍复检")
+                self.choice_buttons["next"].config(text="不复洗，人工确认通过" if last else "结束这块，清洗下一块")
             for key, control in self.choice_buttons.items():
                 allowed = key in self.choice_values
                 if key == "next" and last and not self.choice_facts.get("passed") and not self.choice_facts.get("manual_accept_allowed"):
@@ -657,7 +714,10 @@ class WorkbenchWindow:
             self.confirm_text.config(text=payload["prompt"])
             self.confirm_card.grid(row=4, column=0, sticky="ew", pady=(9, 0))
             self.navigate("monitor")
-            self.write("复检结果已出，请人工选择复洗、继续、重拍或暂停。每次复洗仍重新授权移动与短喷。")
+            if hold:
+                self.write("前图位置未通过。可以重拍、改洗下一块或暂停。未通过时不会移动或喷水。")
+            else:
+                self.write("复检结果已出，请人工选择复洗、继续、重拍或暂停。每次复洗仍重新授权移动与短喷。")
         elif kind == "confirmation_closed":
             if self.request_id in {None, payload["request_id"]}:
                 self.request_id = None
@@ -728,6 +788,8 @@ class WorkbenchWindow:
             self.views["results"].update_snapshot(self.snapshot)
             if payload.get("auto_navigate", True) and not self.runtime.active:
                 self.navigate("results")
+                names = "、".join(item["target_id"] for item in self.snapshot.get("targets", []) if item.get("attempts"))
+                self.write("结果报告已接上清洗名单" + (f"：{names}" if names else "") + "。左侧点选污渍，上方切换每次清洗和复检。几何覆盖和脉冲计数不是洗净。")
             else:
                 self._refresh_nav()
                 self.write("末目标尚未复检通过或任务暂停；保留监控页。可显式打开结果页查看完整档案。")

@@ -373,15 +373,25 @@ class ReviewPage(Page):
                 self.tree.delete(item)
         for stable, item in targets.items():
             values = (label(item["source"]), f"{item['instance']['area_px']:.0f}" + (" 区域" if item["source"] == "manual" else ""), label(item["decision"]))
+            status = self.owner.roster_status(stable, item)
+            text = stable if not status else f"{stable} · {status}"
             if self.tree.exists(stable):
-                self.tree.item(stable, values=values)
+                self.tree.item(stable, text=text, values=values)
             else:
-                self.tree.insert("", "end", iid=stable, text=stable, values=values)
+                self.tree.insert("", "end", iid=stable, text=text, values=values)
+        focus = self.owner.following_id if self.owner.current_route == "recorded" and self.owner.following_id else self.owner.current_target
+        if focus and self.tree.exists(focus):
+            self.tree.see(focus)
         editable = task["state"] == "DRAFT"
         approved = sum(item["decision"] == "APPROVED" for item in targets.values())
         pending = sum(item["decision"] == "PENDING_REVIEW" for item in targets.values())
         excluded = sum(item["decision"] == "EXCLUDED" for item in targets.values())
-        self.counts.config(text=f"共 {len(targets)} 个候选 · 确认 {approved} · 排除 {excluded} · 待复核 {pending}    |    状态：{label(task['state'])}")
+        where = ""
+        if task.get("state") != "DRAFT" and self.owner.current_target:
+            where = f"    |    当前 {self.owner.current_target}"
+            if self.owner.following_id:
+                where += f" · 下一块 {self.owner.following_id}"
+        self.counts.config(text=f"共 {len(targets)} 个候选 · 确认 {approved} · 排除 {excluded} · 待复核 {pending}    |    状态：{label(task['state'])}{where}")
         for control in self.edit_buttons + [self.manual, self.all, self.recapture, self.reason]:
             control.state(["!disabled"] if editable else ["disabled"])
         self.lock.state(["!disabled"] if editable and approved else ["disabled"])
@@ -397,9 +407,22 @@ class ReviewPage(Page):
 class MonitorPage(Page):
     def __init__(self, owner):
         super().__init__(owner)
-        heading(self, "03  清洗监控", "左侧保留首次检测参考，右侧持续显示显微画面。当前 S 编号以金色高亮。")
+        heading(self, "03  清洗监控", "清洗名单按锁定顺序排列。再次清洗留在同一行；结束这块才转到下一块。全部记下后才打开结果报告。")
         self.current = tk.Label(self, text="等待执行", bg=PALE, fg=INK, anchor="w", padx=12, pady=10, font=(FONT, 13, "bold"))
-        self.current.pack(fill="x", pady=(0, 10))
+        self.current.pack(fill="x", pady=(0, 6))
+        self.roster = ttk.Treeview(self, columns=("status",), show="tree headings", height=4, selectmode="browse")
+        self.roster.heading("#0", text="清洗名单")
+        self.roster.column("#0", width=120, stretch=False)
+        self.roster.heading("status", text="这一步")
+        self.roster.column("status", width=420, stretch=True)
+        self.roster.pack(fill="x", pady=(0, 4))
+        self._roster_quiet = False
+        self._roster_focus = None
+        self.roster.bind("<<TreeviewSelect>>", self._roster_clicked)
+        self.roster_note = tk.Label(self, text="执行开始后，这里按锁定顺序显示每一块。点击名单不会跳过当前污渍。",
+            bg=CARD, fg=TEAL, anchor="w", justify="left", font=(FONT, 9), wraplength=980)
+        self.roster_note.pack(fill="x", pady=(0, 8))
+        self.roster_note.bind("<Configure>", lambda event: self.roster_note.config(wraplength=max(200, event.width - 8)))
         coverage_bar = tk.Frame(self, bg=CARD)
         coverage_bar.pack(fill="x", pady=(0, 6))
         self.coverage_button = button(coverage_bar, "当前完整残留 · 模拟覆盖", lambda: owner.coverage_open(latest=True))
@@ -479,8 +502,62 @@ class MonitorPage(Page):
 
     def reset(self):
         self.position_data, self.geometry_data = {}, {}
+        for item in self.roster.get_children():
+            self.roster.delete(item)
+        self.roster_note.config(text="执行开始后，这里按锁定顺序显示每一块。点击名单不会跳过当前污渍。")
         for canvas in (self.reference, self.live, self.pre_crop, self.post_crop, self.overlay):
             canvas.set_image(None)
+
+    def show_roster(self, task, active, following, route):
+        targets = (task or {}).get("targets") or {}
+        order = list((task or {}).get("execution_ids") or [])
+        if not order:
+            order = [key for key, item in targets.items() if item.get("decision") == "APPROVED"]
+        self._roster_quiet = True
+        for item in self.roster.get_children():
+            self.roster.delete(item)
+        for stable in order:
+            item = targets.get(stable) or {}
+            self.roster.insert("", "end", iid=stable, text=stable, values=(self.owner.roster_status(stable, item),))
+        focus = following if route == "recorded" and following in order else active if active in order else None
+        self._roster_focus = focus
+        if focus and self.roster.exists(focus):
+            self.roster.selection_set(focus)
+            self.roster.see(focus)
+        self._roster_quiet = False
+        self.roster_note.config(text=self._roster_note(active, following, route))
+
+    def _roster_note(self, active, following, route):
+        if route == "rewash" and active:
+            return f"{active} 再次清洗：留在本页采集新前图。名单不往后跳，结果报告等全部结束后再开。"
+        if route == "next" and active:
+            tail = f"下一块是 {following}。" if following else "这是名单最后一块。"
+            return f"已转到 {active}。{tail}仍在监控页采集前图，不会现在打开报告。"
+        if route == "recorded" and following:
+            return f"当前块已记入档案。下一步清洗 {following}，留在监控页。"
+        if route == "report":
+            return "清洗名单已全部记下。档案写完后打开结果报告，可按污渍查看每次清洗和复检。"
+        if active:
+            return f"当前 {active}" + (f" · 下一块 {following}" if following else " · 这是名单最后一块")
+        return "执行开始后，这里按锁定顺序显示每一块。点击名单不会跳过当前污渍。"
+
+    def _roster_clicked(self, _event=None):
+        if self._roster_quiet:
+            return
+        selected = self.roster.selection()
+        focus = self._roster_focus
+        if not selected or selected[0] == focus:
+            return
+        self.owner.write(f"{selected[0]} 不能从名单直接开始。复检后选“结束这块，清洗下一块”，才会按顺序转到它。")
+        if focus and self.roster.exists(focus):
+            self._roster_quiet = True
+            self.roster.selection_set(focus)
+            self._roster_quiet = False
+
+    def clear_recheck(self):
+        for canvas in (self.pre_crop, self.post_crop, self.overlay):
+            canvas.set_image(None, placeholder="新的一轮还没有复检图")
+        self.calculation.config(text="上一轮复检已结束。新前图采集后才会出现新的对比。", fg=MUTED)
         self.calculation.config(text=roi_explanation(None), fg=MUTED)
         self.position.config(text="XY 位置参考尚未确认；机械边界未知。")
         self.calibration.config(text="喷头中心：没有有效标定文件；不显示对齐估算。")

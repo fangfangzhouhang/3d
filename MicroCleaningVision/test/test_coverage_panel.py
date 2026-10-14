@@ -327,20 +327,26 @@ class CoveragePanelTests(unittest.TestCase):
             if panel.current_plan is None or not panel.root.winfo_ismapped() or any(
                     canvas.winfo_width() <= 1 for canvas in (panel.original_canvas, panel.mask_canvas, panel.canvas)):
                 return False
+            if panel.image_scroller.winfo_height() <= 80 or any(
+                    button.winfo_height() <= 20 for button in (panel.previous_button, panel.play_button, panel.next_button, panel.full_button)):
+                return False
+            if len(panel.image_scroller.cget("scrollregion").split()) < 4:
+                return False
             # Assert after real WM mapping/configure events in the mainloop.
             root_bottom = panel.root.winfo_rooty() + panel.root.winfo_height()
+            region = panel.image_scroller.cget("scrollregion").split()
+            self.assertGreater(float(region[3]) - float(region[1]), panel.image_scroller.winfo_height() + 40)
             for canvas in (panel.original_canvas, panel.mask_canvas, panel.canvas):
-                self.assertGreater(canvas.winfo_width(), 150)
-                self.assertGreater(canvas.winfo_height(), 90)
-                self.assertLessEqual(canvas.winfo_rooty() + canvas.winfo_height(), root_bottom)
-            self.assertLess(panel.original_canvas.winfo_rootx(), panel.canvas.winfo_rootx())
+                self.assertGreater(canvas.winfo_width(), 280)
+                self.assertGreaterEqual(canvas.winfo_height(), 280)
             self.assertLess(panel.original_canvas.winfo_rooty(), panel.mask_canvas.winfo_rooty())
-            self.assertGreater(panel.diameter_entry.winfo_rootx(), panel.canvas.winfo_rootx())
-            self.assertLessEqual(panel.export_button.winfo_rooty() + panel.export_button.winfo_height(), root_bottom)
+            self.assertLess(panel.mask_canvas.winfo_rooty(), panel.canvas.winfo_rooty())
+            self.assertGreater(panel.diameter_entry.winfo_rootx(), panel.image_scroller.winfo_rootx() + panel.image_scroller.winfo_width() - 40)
+            self.assertLessEqual(panel.export_button.winfo_rooty() + panel.export_button.winfo_height(), root_bottom + 2)
             for button in (panel.previous_button, panel.play_button, panel.next_button, panel.full_button):
                 self.assertGreater(button.winfo_height(), 20)
-                self.assertGreaterEqual(button.winfo_rooty(), panel.canvas.winfo_rooty() + panel.canvas.winfo_height())
-                self.assertLessEqual(button.winfo_rooty() + button.winfo_height(), panel.export_button.winfo_rooty())
+                self.assertGreaterEqual(button.winfo_rooty(), panel.image_scroller.winfo_rooty() + panel.image_scroller.winfo_height() - 4)
+                self.assertLessEqual(button.winfo_rooty() + button.winfo_height(), panel.export_button.winfo_rooty() + 2)
             panel.advanced_button.invoke()
             self.assertEqual("pack", panel.advanced_frame.winfo_manager())
             panel.advanced_button.invoke()

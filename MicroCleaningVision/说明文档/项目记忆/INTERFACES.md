@@ -1,5 +1,13 @@
 # INTERFACES｜模块之间怎样传数据
 
+## 当前交接：2026-10-13，直径快照与驻点几何
+
+`WorkbenchCoverageHub` 在预览更新或关闭时调用 `WorkbenchRuntime.set_coverage_execution`。快照只有直径、单位、证据引用、覆盖目标和候选间隔；没有 CoveragePlan，也不改 `executable`。设备线程用锁读取。直径为空时快照是 None，执行退回单点中心。
+
+`CleaningLoop(..., coverage_parameters=...)` 可选。返回的几何增加 `motion_source` 和 `dwells`。单点路径这两个字段分别是 `center_point` 和空元组，原 MOVEXY 不变。多站时每跳自带行、前后脉冲计数和独立 MotionRequest。`CycleExecution.dwell_results` 记录每站是否收到 DONE。
+
+位置未通过时，人工选择的事实带 `hold=location`。按钮文案是重新采集前图、改洗下一污渍、暂停并保存。普通复检按钮是再次清洗这一块、结束这块，清洗下一块、仅重拍复检、暂停并保存。阶段事件增加 `current_target_id`、`following_id` 和 `route`（`rewash` / `next` / `recorded` / `report`）。这只给工作台显示，不改共享 contracts、ports、串口句子和固件。结果报告仍由原 `read_run` / `export_report` 按污渍汇总每一轮清洗和复检。
+
 ## 当前交接：2026-10-13，显示选项兼容
 
 StandaloneCoveragePanel.options可省略/为None：新UI采用RenderOptions(target=False, stations=False, alpha=0.25)。显式Options原样使用；旧归档CLI传archive.options，headless export-only保留原默认。Profile/Kernel/Plan/Renderer/归档schema、共享合同与串口均未改。

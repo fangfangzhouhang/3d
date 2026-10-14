@@ -195,6 +195,26 @@ class TkWorkbenchAdversarialTests(unittest.TestCase):
         self.window._event(WorkbenchEvent(kind, payload))
         self.window.root.update()
 
+    def test_capture_retry_and_location_hold_stay_on_the_monitor(self):
+        self.window.navigate("review")
+        self.event("stage", phase="CAPTURE_PRE", explanation="按空格抓前图。", current_target_id="S0001")
+        self.assertEqual("monitor", self.window.current_page)
+        self.window.navigate("review")
+        self.event("stage", phase="RETRY", explanation="再试同一块。", current_target_id="S0001")
+        self.assertEqual("monitor", self.window.current_page)
+        self.window.navigate("review")
+        self.event("confirmation", request_id="recheck", prompt="请看画面后复检", facts={"phase": "recheck"})
+        self.assertEqual("monitor", self.window.current_page)
+        self.event("recheck_choice", request_id="hold", prompt="位置未通过",
+            choices=("retake", "next", "pause"), facts={"hold": "location", "last_target": False, "passed": False})
+        self.assertEqual("重新采集前图", self.window.choice_buttons["retake"].cget("text"))
+        self.assertEqual("改洗下一污渍", self.window.choice_buttons["next"].cget("text"))
+        self.assertEqual("monitor", self.window.current_page)
+        self.event("recheck_choice", request_id="done", prompt="复检完成",
+            choices=("rewash", "next", "retake", "pause"), facts={"last_target": False, "passed": True})
+        self.assertEqual("仅重拍复检", self.window.choice_buttons["retake"].cget("text"))
+        self.assertEqual("结束这块，清洗下一块", self.window.choice_buttons["next"].cget("text"))
+
     def test_recheck_strings_do_not_become_motion_yes_and_duplicate_click_is_ignored(self):
         self.event("recheck_choice", request_id="decision", prompt="是否复洗", choices=("rewash", "next", "retake", "pause"), facts={})
         self.window.confirm_yes.invoke()
@@ -303,6 +323,45 @@ class TkWorkbenchAdversarialTests(unittest.TestCase):
             pre_crop=image, post_crop=image, overlay=image)
         self.assertIn("无法计算", monitor.calculation.cget("text"))
         self.assertIn("前后偏移超限", monitor.calculation.cget("text"))
+
+    def test_rewash_keeps_the_row_and_next_moves_the_roster_before_the_report(self):
+        task = {"state": "RUNNING", "execution_ids": ["S0001", "S0002"], "targets": {
+            "S0001": {"source": "algorithm", "decision": "APPROVED", "finished": False,
+                "instance": {"area_px": 10, "bbox": [1, 1, 4, 4]}, "attempt_count": 1},
+            "S0002": {"source": "algorithm", "decision": "APPROVED", "finished": False,
+                "instance": {"area_px": 8, "bbox": [8, 8, 4, 4]}, "attempt_count": 0},
+        }}
+        self.window.navigate("review")
+        self.event("stage", phase="RETRY", explanation="再次清洗 S0001", current_target_id="S0001",
+            route="rewash", following_id="S0002", task=task)
+        monitor = self.window.views["monitor"]
+        self.assertEqual("monitor", self.window.current_page)
+        self.assertEqual("再次清洗", monitor.roster.item("S0001", "values")[0])
+        self.assertEqual("下一块", monitor.roster.item("S0002", "values")[0])
+        self.assertIn("不往后跳", monitor.roster_note.cget("text"))
+        self.assertIn("S0001 · 再次清洗", self.window.views["review"].tree.item("S0001", "text"))
+        finished = {"state": "RUNNING", "execution_ids": ["S0001", "S0002"], "targets": {
+            "S0001": {**task["targets"]["S0001"], "finished": True},
+            "S0002": task["targets"]["S0002"]}}
+        self.event("stage", phase="STAIN_RECORDED", explanation="下一块是 S0002", current_target_id="S0001",
+            route="recorded", following_id="S0002", task=finished)
+        self.assertEqual("已记入报告", monitor.roster.item("S0001", "values")[0])
+        self.assertEqual(("S0002",), monitor.roster.selection())
+        started = {"state": "RUNNING", "execution_ids": ["S0001", "S0002"], "targets": finished["targets"]}
+        self.event("stage", phase="CAPTURE_PRE", explanation="现在转到 S0002", current_target_id="S0002",
+            route="next", following_id=None, task=started)
+        self.assertEqual("正在清洗", monitor.roster.item("S0002", "values")[0])
+        self.assertIn("已转到 S0002", monitor.roster_note.cget("text"))
+        self.assertEqual("新的一轮还没有复检图", monitor.pre_crop.placeholder)
+        monitor.roster.selection_set("S0001")
+        self.window.root.update()
+        self.assertEqual(("S0002",), monitor.roster.selection())
+        snapshot = self.snapshot(True)
+        second = {**snapshot["targets"][0], "target_id": "S0002"}
+        snapshot = {**snapshot, "targets": [snapshot["targets"][0], second]}
+        self.event("results", snapshot=snapshot, auto_navigate=True)
+        self.assertEqual("results", self.window.current_page)
+        self.assertEqual({"S0001", "S0002"}, set(self.window.views["results"].tree.get_children()))
 
 
 if __name__ == "__main__":

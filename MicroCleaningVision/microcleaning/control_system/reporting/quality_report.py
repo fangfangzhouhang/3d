@@ -71,6 +71,7 @@ REASONS = {
     "REPLAY_RESIDUE_REMAINS": "当前复检仍有残留，由人工决定是否复洗",
     "RESIDUAL_REMAINS": "当前复检仍有残留，由人工决定是否复洗",
     "HUMAN_PAUSED_AFTER_RECHECK": "操作员在复检后暂停，完整证据已保留",
+    "HUMAN_PAUSED_AFTER_LOCATION_HOLD": "前图位置未通过，操作员暂停。没有移动，也没有喷水",
     "ROI_REFERENCE_EMPTY": "首次区域没有有效污渍，显示0%，无法建立清洗依据",
     "ROI_PRE_EMPTY": "清洗前原区域未检出污渍，显示0%，不能计算有效清洗率",
     "ROI_POST_EMPTY": "清洗后原区域未检出污渍，按要求显示0%；须人工确认，不能据此自动认定洗净",

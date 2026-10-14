@@ -106,6 +106,26 @@ def load_nozzle_offset(path: str | Path) -> NozzleOffset:
 
 
 @dataclass(frozen=True)
+class DwellHop:
+    """一个驻点的相对移动。空行表示就地喷，不另发 MOVEXY。"""
+
+    index: int
+    point_px: tuple[float, float]
+    dispatch: Stage2Dispatch
+    position_before: tuple[int, int] | None
+    position_after: tuple[int, int] | None
+    request: MotionRequest | None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index, "point_px": [self.point_px[0], self.point_px[1]],
+            "lines": list(self.dispatch.lines), "position_before": self.position_before,
+            "position_after": self.position_after,
+            "request_id": None if self.request is None else self.request.request_id,
+        }
+
+
+@dataclass(frozen=True)
 class CycleGeometry:
     preview: PathPreview
     outbound: Stage2Dispatch
@@ -118,6 +138,8 @@ class CycleGeometry:
     offset_delta_steps: tuple[int, int]
     cycle_abs_steps: tuple[int, int]
     reasons: tuple[str, ...]
+    dwells: tuple[DwellHop, ...] = ()
+    motion_source: str = "center_point"
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -127,6 +149,7 @@ class CycleGeometry:
             "target_delta_steps": self.target_delta_steps, "offset_delta_steps": self.offset_delta_steps,
             "cycle_abs_steps": self.cycle_abs_steps, "reasons": self.reasons,
             "return_reference": "saved_original_overview", "offset_application_count": 1,
+            "motion_source": self.motion_source, "dwells": [hop.to_dict() for hop in self.dwells],
         }
 
 
@@ -183,8 +206,148 @@ def build_cycle_geometry(
         request(returning, execution), observation_position, execution, target_net, (dx, dy), cycle_abs, tuple(reasons))
 
 
+def build_station_cycle_geometry(
+    plan: CleaningPlan, *, base: PathPlaceholderConfig, calibration: MotorCalibration | None,
+    offset: NozzleOffset, observation_position: tuple[int, int] | None, task_id: str,
+    used_abs_steps: tuple[int, int] = (0, 0), budget: int = STAGE2_RUN_STEP_CAP, real: bool = False,
+) -> CycleGeometry:
+    """两个及以上驻点：第一跳加一次针头偏移，其后只走驻点之间的像素差。"""
+
+    if len(plan.path_px) < 2:
+        raise ValueError("COVERAGE_STATIONS_REQUIRE_AT_LEAST_TWO")
+    offset.validate(calibration, real=real)
+    if not isinstance(budget, int) or isinstance(budget, bool) or not 1 <= budget <= STAGE2_RUN_STEP_CAP:
+        raise ValueError(f"BUDGET_MUST_NOT_EXCEED_{STAGE2_RUN_STEP_CAP}")
+    if any(not isinstance(v, int) or isinstance(v, bool) or v < 0 for v in used_abs_steps):
+        raise ValueError("USED_BUDGET_INVALID")
+    if base.work.nozzle_offset_mm != (0.0, 0.0) or (calibration and calibration.nozzle_px is not None):
+        raise ValueError("MULTIPLE_NOZZLE_COMPENSATIONS")
+    if base.work.homography_3x3 is not None:
+        raise ValueError("HOMOGRAPHY_REFERENCE_NOT_SUPPORTED_IN_V1")
+    width, height = plan.image_size_px
+    placeholders, _ = stage2_placeholders(base, (height, width), calibration)
+    preview = build_path_preview(plan, placeholders=placeholders)
+    legs = preview.motion.legs
+    if len(legs) != len(plan.path_px):
+        raise ValueError("COVERAGE_STATION_LEGS_MISMATCH")
+    dx, dy = offset.scope_to_nozzle_delta_steps
+    shift = _signed_dispatch(dx, dy, budget)
+    cursor = observation_position
+    hop_dispatches: list[Stage2Dispatch] = []
+    for index, leg in enumerate(legs):
+        step = _signed_dispatch(leg.steps_x, leg.steps_y, budget)
+        if index == 0:
+            step = _join(step, shift)
+        hop_dispatches.append(step)
+        net = _net(step.lines)
+        cursor = None if cursor is None else (cursor[0] + net[0], cursor[1] + net[1])
+    outbound = hop_dispatches[0]
+    for extra in hop_dispatches[1:]:
+        outbound = _join(outbound, extra)
+    target_lines: list[str] = []
+    for leg in legs:
+        target_lines.extend(_signed_dispatch(leg.steps_x, leg.steps_y, budget).lines)
+    target_net = _net(tuple(target_lines))
+    net = _net(outbound.lines)
+    returning = _signed_dispatch(-net[0], -net[1], budget)
+    execution = None if observation_position is None else (observation_position[0] + net[0], observation_position[1] + net[1])
+    cycle_abs = (outbound.transmit_abs_steps_x + returning.transmit_abs_steps_x,
+                 outbound.transmit_abs_steps_y + returning.transmit_abs_steps_y)
+    reasons = []
+    if any(step.truncated for step in hop_dispatches) or returning.truncated:
+        reasons.append("INCOMPLETE_DISPATCH")
+    if preview.motion.out_of_travel:
+        reasons.append("PATH_OUT_OF_TRAVEL")
+    reference = calibration.ref if calibration else "mock://declared-stage2-geometry"
+    geometry_hash = hashlib.sha256(json.dumps({"offset": offset.to_dict(), "work": placeholders.to_dict(),
+        "motor": None if calibration is None else calibration.sha256}, sort_keys=True, allow_nan=False).encode()).hexdigest()
+    warnings = () if calibration is None else calibration.warnings
+
+    def request(dispatch, before):
+        return MotionRequest(new_motion_request_id(), task_id, dispatch.lines, before, "image_center",
+            reference, geometry_hash, warnings, dispatch.truncated)
+
+    cursor = observation_position
+    dwells = []
+    for index, (point, step) in enumerate(zip(plan.path_px, hop_dispatches)):
+        before = cursor
+        hop_net = _net(step.lines)
+        after = None if before is None else (before[0] + hop_net[0], before[1] + hop_net[1])
+        dwells.append(DwellHop(index, (float(point[0]), float(point[1])), step, before, after,
+            None if not step.lines else request(step, before)))
+        cursor = after
+    return CycleGeometry(preview, outbound, returning, request(outbound, observation_position),
+        request(returning, execution), observation_position, execution, target_net, (dx, dy), cycle_abs,
+        tuple(reasons), tuple(dwells), "coverage_stations")
+
+
+def coverage_station_points(mask, parameters: dict, *, mask_kind: str = "segmented_stain"):
+    """读取显式直径下的驻点像素。CoveragePlan 本身仍不可执行。"""
+
+    from microcleaning.control_system.planning.coverage_model import Evidence, FootprintProfile, build_kernel
+    from microcleaning.control_system.planning.coverage_planner import CoverageInput, CoveragePolicy, plan_coverage
+
+    diameter = parameters.get("diameter")
+    if diameter is None:
+        return None
+    profile = FootprintProfile(
+        str(parameters.get("profile_id") or "workbench-virtual-circle-v1"), float(diameter),
+        str(parameters.get("unit") or "px"),
+        Evidence("assumed", str(parameters.get("evidence_ref") or "explicit-workbench-diameter")),
+    )
+    policy = CoveragePolicy(
+        target_coverage=float(parameters.get("target_coverage", 0.95)),
+        max_stations=int(parameters.get("max_stations", 64)),
+        candidate_stride_px=int(parameters.get("candidate_stride_px", 2)),
+    )
+    model = build_kernel(profile, None)
+    if not model.available:
+        return None
+    plan = plan_coverage(CoverageInput(mask, "execution", mask_kind, "cycle-pre-mask"), model, policy=policy)
+    if plan.executable or plan.status not in {"COMPLETE", "PARTIAL"} or not plan.stations:
+        return None
+    return plan.points_px
+
+
+def motion_plan_for_mask(mask, parameters, *, fallback_plan: CleaningPlan, mask_kind: str = "segmented_stain", **kwargs):
+    """有可用驻点时走驻点几何；否则沿用原来的单点计划。"""
+
+    points = None
+    note = "本轮使用单点中心"
+    if isinstance(parameters, dict) and parameters.get("diameter") is not None:
+        try:
+            points = coverage_station_points(mask, parameters, mask_kind=mask_kind)
+        except Exception as exc:
+            points = None
+            note = f"覆盖驻点没有接入本轮移动：{type(exc).__name__}，改用单点中心"
+        else:
+            note = f"本轮按显式直径移动 {len(points)} 个覆盖驻点" if points else "没有可用的覆盖驻点，本轮改用单点中心"
+    if not points:
+        return build_cycle_geometry(fallback_plan, **kwargs), note
+    import numpy as np
+    height, width = mask.shape[:2]
+    plan = CleaningPlan(
+        CleaningStrategy.CENTER_POINT, "image_px", (int(width), int(height)), float(np.count_nonzero(mask)),
+        tuple((float(x), float(y)) for x, y in points), tuple(range(len(points))), "explicit_coverage_stations",
+    )
+    if len(points) == 1:
+        return replace(build_cycle_geometry(plan, **kwargs), motion_source="coverage_stations"), note
+    return build_station_cycle_geometry(plan, **kwargs), note
+
+
 def _signed_dispatch(x: int, y: int, budget: int) -> Stage2Dispatch:
     return single_move_dispatch(abs(x), "FWD" if x >= 0 else "REV", abs(y), "FWD" if y >= 0 else "REV", budget=budget)
+
+
+def _join(left: Stage2Dispatch, right: Stage2Dispatch) -> Stage2Dispatch:
+    return Stage2Dispatch(
+        left.lines + right.lines,
+        left.planned_abs_steps_x + right.planned_abs_steps_x,
+        left.planned_abs_steps_y + right.planned_abs_steps_y,
+        left.transmit_abs_steps_x + right.transmit_abs_steps_x,
+        left.transmit_abs_steps_y + right.transmit_abs_steps_y,
+        left.budget, left.truncated or right.truncated,
+    )
 
 
 def _net(lines: tuple[str, ...]) -> tuple[int, int]:

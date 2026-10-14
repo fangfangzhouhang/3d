@@ -166,6 +166,8 @@ class WorkbenchRuntime:
         self._guard, self._active = threading.Lock(), False
         self.report_busy = False
         self.last_status = "SUCCESS"
+        self._coverage_lock = threading.Lock()
+        self._coverage_execution = None
         try:
             result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=Path(__file__).resolve().parents[2],
                 capture_output=True, text=True, timeout=3, check=True)
@@ -262,7 +264,8 @@ class WorkbenchRuntime:
                 executor=executor, placeholders=self.placeholders, calibration=self.calibration, offset=self.offset,
                 config=self.config, compare=self.compare, review=self.review, recheck_decision=self.recheck_decision, metadata=metadata,
                 on_event=lambda event: self.bus.emit(event.pop("kind"), **event),
-                on_coverage_input=self.coverage_input if self.coverage_enabled else None)
+                on_coverage_input=self.coverage_input if self.coverage_enabled else None,
+                coverage_parameters=self.coverage_parameters)
             result = self.loop.run()
             self.last_status = result["status"]
         except Exception as exc:
@@ -381,10 +384,20 @@ class WorkbenchRuntime:
         phase, stable = facts.get("phase"), facts.get("target_id", "当前目标")
         geometry = facts.get("geometry") or {}
         duration = (facts.get("pump_request") or {}).get("duration_ms", self.args.pump_duration_ms)
-        planned = "；".join(motion_chinese(line) for line in geometry.get("outbound", {}).get("lines", []))
+        lines = geometry.get("outbound", {}).get("lines", [])
+        if geometry.get("motion_source") == "coverage_stations":
+            shown = "；".join(motion_chinese(line) for line in lines[:4])
+            extra = f"；其余 {len(lines) - 4} 段见几何记录" if len(lines) > 4 else ""
+            count = len(geometry.get("dwells") or []) or 1
+            planned = f"按显式直径的 {count} 个驻点移动，针头偏移只加在第一段。{shown}{extra}"
+        else:
+            planned = "；".join(motion_chinese(line) for line in lines)
+        station = facts.get("station_index")
+        station_count = facts.get("station_count")
+        where = f"第 {station}/{station_count} 个驻点。" if station and station_count else ""
         prompts = {
             "move": f"{stable}：批准去程。{planned}。" + ("本次确认仅移动，抵达后仍需单独确认喷洗。" if facts.get("include_pump", True) else "此模式不喷水，批准去程和回程。"),
-            "align": f"{stable}：去程脉冲计数已完成。请现场确认目标与针头重合；确认后请求短喷 {duration} ms。",
+            "align": f"{stable}：{where}请现场确认目标与针头重合；确认后请求短喷 {duration} ms。",
             "return": f"{stable}：收到喷洗 DONE，仅表示输出结束。确认后回到原显微观察位 {geometry.get('observation_position')}。",
             "return_without_spray": f"{stable}：未批准喷洗。确认后仅回到原观察位；拒绝则停在当前位置。",
             "recheck": f"{stable}：回程计数已结束。请看实时画面确认回到原视野；确认后采集新的后图进行复检。",
@@ -411,8 +424,33 @@ class WorkbenchRuntime:
         self.bus.emit("pair", pre=pair["pre"], post=pair["post"])
         return self.confirmations.ask("请核对前后图是否属于同一视野且可以比较。确认只表示可比较，不表示污渍已经洗净。", facts={"phase": "compare"})
 
+    def set_coverage_execution(self, parameters):
+        with self._coverage_lock:
+            self._coverage_execution = None if not parameters else dict(parameters)
+
+    def coverage_parameters(self):
+        with self._coverage_lock:
+            value = self._coverage_execution
+            return None if value is None else dict(value)
+
     def recheck_decision(self, facts):
         target = facts["target_id"]
+        if facts.get("hold") == "location":
+            prompt = (f"{target}：前图相对首次位置未通过，原因 {facts.get('reason_codes')}。"
+                "可以重新采集前图、改洗下一块或暂停。未通过时不会移动或喷水。")
+            task = self.loop.task
+            task.state = "WAITING_CONFIRMATION"
+            task.persist()
+            self.bus.emit("task", task=task.ui_snapshot())
+            try:
+                answer = self.confirmations.ask_choice(prompt, choices=tuple(facts["choices"]), facts=facts)
+                defaults = {"retake": "重新采集前图", "next": "位置未通过，改洗下一块", "pause": "位置未通过，暂停并保存"}
+                return {"choice": answer["choice"], "reason": answer.get("reason") or defaults[answer["choice"]]}
+            finally:
+                if not self.cancel.event.is_set():
+                    task.state = "RUNNING"
+                    task.persist()
+                    self.bus.emit("task", task=task.ui_snapshot())
         rate = facts["roi_analysis"].get("removal_rate")
         rate_text = "无有效数值" if rate is None else f"{rate:.1%}"
         ending = "不复洗将继续下一块。" if facts["next_target_id"] else "只有有效复检通过并认可结果后才进入报告。"

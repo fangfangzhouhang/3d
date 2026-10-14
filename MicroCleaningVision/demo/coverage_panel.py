@@ -135,48 +135,54 @@ class StandaloneCoveragePanel:
         header = ttk.Frame(self.root, style="Coverage.TFrame", padding=(24, 16))
         header.pack(fill="x")
         ttk.Label(header, text="智能覆盖预览", style="Coverage.TLabel", font=("Microsoft YaHei UI", 23, "bold")).pack(side="left")
-        ttk.Label(header, text="SIMULATION · 仅模拟 · executable=false", style="Coverage.TLabel", foreground=TEAL).pack(side="right")
-        ttk.Label(self.root, text="预计几何覆盖 ≠ 实际清除率   |   访问虚线 ≠ 平台实际轨迹   |   全程不发送硬件动作", style="Coverage.TLabel").pack(fill="x", padx=26, pady=(0, 10))
+        ttk.Label(header, text="SIMULATION · 预览不直接发令 · 计划对象 executable=false", style="Coverage.TLabel", foreground=TEAL).pack(side="right")
+        ttk.Label(self.root, text="预计几何覆盖 ≠ 实际清除率   |   本窗口不直接发令   |   已填写的直径会在后续清洗中作为驻点移动，每段仍需人工确认", style="Coverage.TLabel").pack(fill="x", padx=26, pady=(0, 10))
         body = ttk.Frame(self.root, style="Coverage.TFrame", padding=(20, 0))
         body.pack(fill="both", expand=True)
-        body.columnconfigure(0, weight=2)
-        body.columnconfigure(1, weight=5)
+        body.columnconfigure(0, weight=1)
+        body.columnconfigure(1, weight=0)
         body.rowconfigure(0, weight=1)
-        left = ttk.Frame(body, style="Coverage.TFrame", width=round(260 * self.layout_scale), padding=(0, 4, 8, 0))
-        left.grid(row=0, column=0, sticky="nsew")
-        left.columnconfigure(0, weight=1)
-        left.rowconfigure(1, weight=1)
-        left.rowconfigure(3, weight=1)
-        ttk.Label(left, text="01  原始图像", style="Coverage.TLabel", font=("Microsoft YaHei UI", 12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 6))
-        self.original_canvas = tk.Canvas(left, bg="#e1e9e7", highlightthickness=0,
-            width=round(260 * self.layout_scale), height=round(210 * self.layout_scale))
-        self.original_canvas.grid(row=1, column=0, sticky="nsew")
+        image_column = ttk.Frame(body, style="Coverage.TFrame")
+        image_column.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
+        image_column.columnconfigure(0, weight=1)
+        image_column.rowconfigure(0, weight=1)
+        self.image_scroller = tk.Canvas(image_column, bg=BG, highlightthickness=0)
+        image_scroll = ttk.Scrollbar(image_column, orient="vertical", command=self.image_scroller.yview)
+        image_scroll.grid(row=0, column=1, sticky="ns")
+        self.image_scroller.grid(row=0, column=0, sticky="nsew")
+        self.image_scroller.configure(yscrollcommand=image_scroll.set)
+        images = ttk.Frame(self.image_scroller, style="Coverage.TFrame")
+        image_window = self.image_scroller.create_window(0, 0, window=images, anchor="nw")
+        images.bind("<Configure>", lambda _event: self.image_scroller.configure(scrollregion=self.image_scroller.bbox("all")))
+        self.image_scroller.bind("<Configure>", lambda event: self.image_scroller.itemconfigure(image_window, width=event.width))
+        images.columnconfigure(0, weight=1)
+        canvas_width = round(720 * self.layout_scale)
+        canvas_height = round(420 * self.layout_scale)
         self.mask_title = tk.StringVar()
-        mask_heading = ttk.Label(left, textvariable=self.mask_title, style="Coverage.TLabel", font=("Microsoft YaHei UI", 12, "bold"),
-            wraplength=round(260 * self.layout_scale))
-        mask_heading.grid(row=2, column=0, sticky="ew", pady=(14, 6))
-        mask_heading.bind("<Configure>", lambda event: mask_heading.configure(wraplength=max(round(180 * self.layout_scale), event.width)))
-        self.mask_canvas = tk.Canvas(left, bg="#e1e9e7", highlightthickness=0,
-            width=round(260 * self.layout_scale), height=round(210 * self.layout_scale))
-        self.mask_canvas.grid(row=3, column=0, sticky="nsew")
-        ttk.Label(left, textvariable=self.provenance, style="Coverage.TLabel", wraplength=round(260 * self.layout_scale),
-            foreground=MUTED, font=("Microsoft YaHei UI", 9)).grid(row=4, column=0, sticky="ew", pady=(10, 0))
-        for canvas in (self.original_canvas, self.mask_canvas):
+        sections = (
+            ("01  原始图像", "original_canvas", None),
+            (None, "mask_canvas", self.mask_title),
+            ("03  预计覆盖叠加 · 仅模拟", "canvas", None),
+        )
+        for row, (title, name, variable) in enumerate(sections):
+            heading_options = {"textvariable": variable} if variable is not None else {"text": title}
+            heading = ttk.Label(images, style="Coverage.TLabel", font=("Microsoft YaHei UI", 13, "bold"),
+                wraplength=canvas_width, **heading_options)
+            heading.grid(row=row * 2, column=0, sticky="w", pady=(12 if row else 0, 6))
+            canvas = tk.Canvas(images, bg="#e1e9e7", highlightthickness=0, width=canvas_width, height=canvas_height)
+            canvas.grid(row=row * 2 + 1, column=0, sticky="ew")
             canvas.bind("<Configure>", self._resize)
-        center = ttk.Frame(body, style="Coverage.TFrame")
-        center.grid(row=0, column=1, sticky="nsew", padx=10)
-        ttk.Label(center, text="03  预计覆盖叠加 · 仅模拟", style="Coverage.TLabel", font=("Microsoft YaHei UI", 13, "bold")).pack(anchor="w", pady=(4, 8))
-        self.canvas = tk.Canvas(center, bg="#e1e9e7", highlightthickness=0, width=round(580 * self.layout_scale), height=round(480 * self.layout_scale))
-        self.canvas.pack(fill="both", expand=True)
-        self.canvas.bind("<Configure>", self._resize)
-        self.playback_label = ttk.Label(center, text="驻点进度 0 / 0", style="Coverage.TLabel")
-        self.playback_label.pack(anchor="w", pady=(10, 3))
-        self.step_slider = ttk.Scale(center, from_=0, to=1, command=self._step_changed)
-        self.step_slider.pack(fill="x")
-        controls = ttk.Frame(center, style="Coverage.TFrame")
-        controls.pack(side="bottom", fill="x", pady=8, before=self.canvas)
-        self.step_slider.pack(side="bottom", fill="x", before=self.canvas)
-        self.playback_label.pack(side="bottom", anchor="w", pady=(10, 3), before=self.canvas)
+            setattr(self, name, canvas)
+        ttk.Label(images, textvariable=self.provenance, style="Coverage.TLabel", wraplength=canvas_width,
+            foreground=MUTED, font=("Microsoft YaHei UI", 9)).grid(row=6, column=0, sticky="ew", pady=(10, 8))
+        playback = ttk.Frame(image_column, style="Coverage.TFrame")
+        playback.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        self.playback_label = ttk.Label(playback, text="驻点进度 0 / 0", style="Coverage.TLabel")
+        self.playback_label.pack(anchor="w")
+        self.step_slider = ttk.Scale(playback, from_=0, to=1, command=self._step_changed)
+        self.step_slider.pack(fill="x", pady=(3, 0))
+        controls = ttk.Frame(playback, style="Coverage.TFrame")
+        controls.pack(fill="x", pady=(6, 0))
         self.previous_button = ttk.Button(controls, text="◀ 上一点", command=lambda: self.show_step(self.step.get() - 1), style="Coverage.TButton")
         self.previous_button.pack(side="left")
         self.play_button = ttk.Button(controls, text="播放 / 暂停", command=self.toggle_play, style="Coverage.TButton")
@@ -185,8 +191,20 @@ class StandaloneCoveragePanel:
         self.next_button.pack(side="left")
         self.full_button = ttk.Button(controls, text="完整计划", command=lambda: self.show_step(len(self.current_plan.stations) if self.current_plan else 0), style="Coverage.TButton")
         self.full_button.pack(side="right")
+
+        def scroll_images(event):
+            self.image_scroller.yview_scroll(int(-event.delta / 120), "units")
+            return "break"
+
+        def bind_wheel(widget):
+            widget.bind("<MouseWheel>", scroll_images)
+            for child in widget.winfo_children():
+                bind_wheel(child)
+
+        bind_wheel(self.image_scroller)
+        bind_wheel(images)
         controls_frame = ttk.Frame(body, style="Coverage.TFrame", padding=(8, 4, 0, 0))
-        controls_frame.grid(row=0, column=2, sticky="nsew")
+        controls_frame.grid(row=0, column=1, sticky="nsew")
         # Keep every control reachable at the existing minimum size/high DPI.
         self.controls_canvas = tk.Canvas(controls_frame, bg=BG, highlightthickness=0, width=round(235 * self.layout_scale))
         scrollbar = ttk.Scrollbar(controls_frame, orient="vertical", command=self.controls_canvas.yview)

@@ -18,7 +18,7 @@ from microcleaning.control_system.serial.stm32_serial import STM32SerialControll
 from microcleaning.control_system.reporting import read_run, export_report
 
 
-def execute(folder, *, decide, target_count=1, scenario="success", confirm=lambda _: True, frame_type=MockFrames):
+def execute(folder, *, decide, target_count=1, scenario="success", confirm=lambda _: True, frame_type=MockFrames, coverage_parameters=None):
     frames = frame_type(scenario, roi_mode=True)
     raw = MockF103Serial(frames, scenario)
     position = folder / "position.json"
@@ -35,12 +35,92 @@ def execute(folder, *, decide, target_count=1, scenario="success", confirm=lambd
     loop = CleaningLoop(output_dir=folder, source=frames, segmenter=FrozenSegmenter("hsv"),
         executor=executor, placeholders=load_path_placeholders(None), calibration=None, offset=mock_offset(),
         config=LoopConfig(max_cycles=1, max_retries_per_target=0), compare=lambda _: True,
-        review=review, recheck_decision=decide, metadata={"operator": "模拟操作员"})
+        review=review, recheck_decision=decide, metadata={"operator": "模拟操作员"},
+        coverage_parameters=coverage_parameters)
     result = loop.run()
     return result, raw, frames, loop
 
 
 class InteractiveRewashTests(unittest.TestCase):
+    def test_explicit_diameter_visits_each_station_and_applies_the_offset_once(self):
+        def parameters():
+            return {"diameter": 8, "unit": "px", "candidate_stride_px": 4, "max_stations": 6, "target_coverage": 0.95}
+        with tempfile.TemporaryDirectory() as tmp:
+            result, raw, _, _ = execute(Path(tmp), decide=lambda _: {"choice": "next", "reason": "继续"}, coverage_parameters=parameters)
+            self.assertEqual(result["status"], "SUCCESS", result["reasons"])
+            geometry = json.loads((Path(tmp) / "cycle_001" / "geometry.json").read_text(encoding="utf-8"))
+            self.assertEqual("coverage_stations", geometry["motion_source"])
+            self.assertGreaterEqual(len(geometry["dwells"]), 2)
+            self.assertEqual(1, geometry["offset_application_count"])
+            moves = [item.decode("ascii").strip() for item in raw.writes if item.startswith(b"MOVEXY")]
+            sent = []
+            for hop in geometry["dwells"]:
+                sent.extend(hop["lines"])
+            sent.extend(geometry["returning"]["lines"])
+            self.assertEqual(sent, moves)
+            self.assertEqual(raw.pump_count, len(geometry["dwells"]))
+            later = [line for hop in geometry["dwells"][1:] for line in hop["lines"]]
+            self.assertNotIn(geometry["dwells"][0]["lines"][-1], later)
+
+    def test_failed_location_can_retake_without_aborting_the_task(self):
+        from dataclasses import replace as replace_location
+        from microcleaning.control_system.orchestration import cleaning_loop
+        real = cleaning_loop.validate_roi_location
+        calls = {"n": 0}
+        def wrapped(*args, **kwargs):
+            calls["n"] += 1
+            result = real(*args, **kwargs)
+            if calls["n"] == 1:
+                return replace_location(result, valid=False, reason_codes=("ROI_POSITION_SHIFTED", "ROI_ALIGNMENT_LOW_CONFIDENCE"))
+            return result
+        def decide(facts):
+            if facts.get("hold") == "location":
+                return {"choice": "retake", "reason": "重拍前图"}
+            return {"choice": "next", "reason": "继续"}
+        with tempfile.TemporaryDirectory() as tmp, patch.object(cleaning_loop, "validate_roi_location", wrapped):
+            result, raw, frames, _ = execute(Path(tmp), decide=decide)
+            self.assertEqual(result["status"], "SUCCESS", result["reasons"])
+            self.assertEqual(raw.pump_count, 1)
+            self.assertEqual(frames.capture_phases[:2], ["pre", "pre"])
+            self.assertTrue((Path(tmp) / "cycle_001" / "rejected_pre_001" / "location_check.json").is_file())
+
+    def test_failed_location_can_skip_to_the_next_stain_without_moving(self):
+        from dataclasses import replace as replace_location
+        from microcleaning.control_system.orchestration import cleaning_loop
+        real = cleaning_loop.validate_roi_location
+        calls = {"n": 0}
+        def wrapped(*args, **kwargs):
+            calls["n"] += 1
+            result = real(*args, **kwargs)
+            if calls["n"] == 1:
+                return replace_location(result, valid=False, reason_codes=("ROI_POSITION_SHIFTED",))
+            return result
+        def decide(facts):
+            if facts.get("hold") == "location":
+                self.assertIn("next", facts["choices"])
+                return {"choice": "next", "reason": "改洗下一块"}
+            return {"choice": "next", "reason": "继续"}
+        with tempfile.TemporaryDirectory() as tmp, patch.object(cleaning_loop, "validate_roi_location", wrapped):
+            result, raw, frames, loop = execute(Path(tmp), decide=decide, target_count=2)
+            self.assertEqual(result["status"], "SUCCESS", result["reasons"])
+            self.assertEqual(raw.pump_count, 1)
+            self.assertTrue(loop.task.targets["S0001"].finished)
+            self.assertEqual("pre", frames.capture_phases[0])
+            self.assertTrue((Path(tmp) / "cycle_001" / "location_hold.json").is_file())
+
+    def test_failed_location_pause_does_not_move_or_spray(self):
+        from dataclasses import replace as replace_location
+        from microcleaning.control_system.orchestration import cleaning_loop
+        real = cleaning_loop.validate_roi_location
+        def wrapped(*args, **kwargs):
+            result = real(*args, **kwargs)
+            return replace_location(result, valid=False, reason_codes=("ROI_ALIGNMENT_LOW_CONFIDENCE",))
+        with tempfile.TemporaryDirectory() as tmp, patch.object(cleaning_loop, "validate_roi_location", wrapped):
+            result, raw, _, _ = execute(Path(tmp), decide=lambda facts: {"choice": "pause", "reason": "先停下"})
+            self.assertEqual(result["status"], "HUMAN", result["reasons"])
+            self.assertIn("HUMAN_PAUSED_AFTER_LOCATION_HOLD", result["reasons"])
+            self.assertEqual(raw.pump_count, 0)
+            self.assertEqual(raw.writes, [])
     def test_twelve_rewashes_ignore_old_cycle_and_retry_caps_keep_same_target(self):
         seen = []
         def decide(f):
@@ -137,4 +217,37 @@ class InteractiveRewashTests(unittest.TestCase):
             self.assertEqual(raw.pump_count, 2)
             self.assertEqual(result["quality_status"], "FAIL")
             self.assertTrue(result["report_ready"])
+
+    def test_rewash_stays_on_the_same_stain_then_next_opens_the_report(self):
+        def decide(facts):
+            if facts.get("hold") == "location":
+                return {"choice": "retake", "reason": "重拍"}
+            if facts["target_id"] == "S0001" and facts["cycle"] == 1:
+                return {"choice": "rewash", "reason": "再洗这一块"}
+            return {"choice": "next", "reason": "转到下一块或结束"}
+        with tempfile.TemporaryDirectory() as tmp:
+            result, raw, _, _ = execute(Path(tmp), decide=decide, target_count=2)
+            self.assertEqual(result["status"], "SUCCESS", result["reasons"])
+            self.assertEqual([c["target_id"] for c in result["cycles"]], ["S0001", "S0001", "S0002"])
+            self.assertEqual(raw.pump_count, 3)
+            self.assertTrue(result["report_ready"])
+            events = [json.loads(line) for line in (Path(tmp) / "stage_events.jsonl").read_text(encoding="utf-8").splitlines()]
+            captures = [event for event in events if event["phase"] == "CAPTURE_PRE"]
+            self.assertEqual([None, "S0001", "S0002"], [event["current_target_id"] for event in captures])
+            self.assertEqual([None, "rewash", "next"], [event["route"] for event in captures])
+            recorded = [event for event in events if event["phase"] == "STAIN_RECORDED"]
+            self.assertEqual(["recorded", "report"], [event["route"] for event in recorded])
+            self.assertEqual("S0002", recorded[0]["following_id"])
+            snapshot = read_run(tmp)
+            by_id = {row["target_id"]: row for row in snapshot["targets"]}
+            self.assertEqual(len(by_id["S0001"]["attempts"]), 2)
+            self.assertEqual(len(by_id["S0002"]["attempts"]), 1)
+            report = export_report(tmp)
+            text = (report / "index.html").read_text(encoding="utf-8")
+            self.assertIn("S0001", text)
+            self.assertIn("S0002", text)
+            import csv
+            with (report / "attempts.csv").open(encoding="utf-8-sig", newline="") as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual({"S0001", "S0002"}, {row["污渍编号"] for row in rows})
 

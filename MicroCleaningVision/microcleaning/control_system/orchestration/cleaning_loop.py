@@ -20,7 +20,7 @@ from microcleaning.control_system.orchestration.workbench_events import Operatio
 from microcleaning.control_system.planning.cleaning_plan import plan_cleaning
 from microcleaning.control_system.planning.path_preview import draw_path_overlay, resolve_plan_policy
 from microcleaning.control_system.planning.sequence_planner import STRATEGIES, plan_sequence
-from microcleaning.control_system.planning.stage2_geometry import build_cycle_geometry, stage2_placeholders
+from microcleaning.control_system.planning.stage2_geometry import build_cycle_geometry, motion_plan_for_mask, stage2_placeholders
 from microcleaning.control_system.planning.stage2_position import load_position
 from microcleaning.control_system.safety.motion_gate import STAGE2_RUN_STEP_CAP, explain_travel_block
 from microcleaning.control_system.replay.episode_store import write_episode
@@ -40,6 +40,7 @@ _STAGE_TEXT = {
     "EXTRACT_TARGETS": "正在读取第一次画面的编号。",
     "SELECT_TARGET": "按编号选择下一块。",
     "PLAN_TARGET": "正在规划这一块。",
+    "LOCATION_HOLD": "前图位置未通过。可以重拍、改洗下一块或暂停。未通过时不移动、不喷水。",
     "BUILD_MOTION": "正在换成步进脉冲。",
     "AUTHORIZE": "看下面的说明，再确认是否移动。",
     "MOVE": "去程开始。黄十字是显微镜中心。",
@@ -93,7 +94,8 @@ class CleaningLoop:
                  compare: Callable[[dict], bool] | None = None, review: Callable | None = None,
                  recheck_decision: Callable[[dict], dict] | None = None,
                  metadata: dict | None = None, on_event: Callable[[dict], None] | None = None,
-                 on_coverage_input: Callable[[dict], None] | None = None) -> None:
+                 on_coverage_input: Callable[[dict], None] | None = None,
+                 coverage_parameters: Callable[[], dict | None] | None = None) -> None:
         config.validate()
         self.config = config
         self.folder = Path(output_dir).resolve()
@@ -107,6 +109,7 @@ class CleaningLoop:
         self.review, self.metadata, self.on_event = review, metadata or {}, on_event
         self.recheck_decision = recheck_decision
         self.on_coverage_input = on_coverage_input
+        self.coverage_parameters = coverage_parameters
         self.interactive_recheck = recheck_decision is not None
         self.report_ready = False
         self._initial_frame = None
@@ -138,8 +141,11 @@ class CleaningLoop:
             "task_manifest_ref": "task_manifest.json" if review is not None else None,
             "evidence_boundary": "Mock 是软件证据；实物需独立记录"})
 
-    def stage(self, phase: str) -> None:
-        event = {"phase": phase, "cycle": self._cycle, "at": now()}
+    def stage(self, phase: str, *, explanation: str | None = None, route: str | None = None) -> None:
+        text = explanation or _STAGE_TEXT.get(phase, phase)
+        following = self._following_id(self.current_target_id) if self.current_target_id and self.roster_ids else None
+        event = {"phase": phase, "cycle": self._cycle, "at": now(), "current_target_id": self.current_target_id,
+                 "following_id": following, "route": route}
         self.events.append(event)
         if len(self.events) > 100:
             self.events.pop(0)
@@ -147,12 +153,29 @@ class CleaningLoop:
             stream.write(json.dumps(event, ensure_ascii=False) + "\n")
         write_json(self.folder / "progress.json", {"task_id": self.task_id, "events": self.events,
             "used_abs_steps": self.used, "completed_cycles": len(self.cycles)})
-        print(_STAGE_TEXT.get(phase, phase), flush=True)
+        print(text, flush=True)
         tell = getattr(self.source, "tell", None)
         if callable(tell):
-            tell(_STAGE_TEXT.get(phase, phase))
-        self._emit("stage", phase=phase, explanation=_STAGE_TEXT.get(phase, phase), cycle=self._cycle,
-                   current_target_id=self.current_target_id)
+            tell(text)
+        self._emit("stage", phase=phase, explanation=text, cycle=self._cycle,
+                   current_target_id=self.current_target_id, following_id=following, route=route)
+
+    def _bind_upcoming_target(self) -> tuple[str | None, str | None]:
+        """下一轮采前图之前，先把当前编号指到这一轮真正要洗的污渍。"""
+        if self.ledger is None or not self.roster_ids:
+            return None, None
+        upcoming = self._next_roster_id()
+        if not upcoming:
+            return None, None
+        previous = self.current_target_id
+        self.current_target_id = upcoming
+        if not self.interactive_recheck:
+            return None, None
+        if previous == upcoming:
+            return (f"再次清洗 {upcoming}。留在监控页，按空格采集这一块的新前图。不换下一块，也不打开报告。", "rewash")
+        if previous and previous != upcoming:
+            return (f"{previous} 已记入清洗名单。现在转到 {upcoming}，留在监控页采集它的前图。报告在名单全部结束后打开。", "next")
+        return None, None
 
     def _emit(self, kind: str, **payload) -> None:
         if self.on_event is not None:
@@ -181,7 +204,8 @@ class CleaningLoop:
                 if position.xy() != self.observation_position or position.zero_set_at != self.position_zero_set_at:
                     status, reasons = "HUMAN", ("ORIGINAL_OBSERVATION_POSITION_CHANGED",)
                     break
-                self.stage("CAPTURE_PRE")
+                caption, route = self._bind_upcoming_target()
+                self.stage("CAPTURE_PRE", explanation=caption, route=route)
                 pre = self._observe("pre", cycle_dir)
                 if pre["observation"].quality_flags:
                     self._say(f"图像质量提示 {list(pre['observation'].quality_flags)}。不因此停止，仍逐次确认。")
@@ -249,46 +273,53 @@ class CleaningLoop:
                             "initial_area_px": reference.initial_area_px, "segmentation": frozen.to_dict()})
                         write_png(self.folder / f"roi_reference_{selected}_mask.png", baseline)
                         self._roi_refs[selected] = reference
-                    pre["mask"] = self._roi_segmenters[selected].mask(pre["frame"].image)
-                    write_png(cycle_dir / "pre_mask.png", pre["mask"])
-                    pre["metadata"]["roi_segmentation"] = self._roi_segmenters[selected].to_dict()
-                    pre["metadata"]["initial_scan_measurement"] = pre["metadata"]["measurement"]
-                    import numpy as np
-                    ys, xs = np.nonzero(pre["mask"])
-                    pre["metadata"]["measurement"] = asdict(ContaminationMeasurement(len(xs),
-                        None if not len(xs) else (float(xs.mean()), float(ys.mean())), 1.0 if len(xs) else 0.0,
-                        0.0, str(cycle_dir / "pre_mask.png"), len(extract_target_instances(pre["mask"])), "frozen-roi-segmentation-v1"))
-                    write_json(cycle_dir / "pre.json", pre["metadata"])
-                    location = validate_roi_location(reference, pre["frame"].image, pre["mask"])
-                    write_json(cycle_dir / "location_check.json", asdict(location))
-                    self._coverage_input(pre, (pre["mask"] > 0) & reference.measurement_domain,
-                        selected, stage="pre", cycle=number, valid=location.valid,
-                        reasons=location.reason_codes)
+                    location = self._measure_interactive_pre(pre, selected, cycle_dir, number, reference)
                     if not location.valid:
-                        raise TargetIdentityError(f"{selected}:ROI_REFERENCE_POSITION_UNCERTAIN:{','.join(location.reason_codes)}")
+                        choice, pre, location = self._resolve_invalid_location(
+                            pre, selected, cycle_dir, location, number, reference)
+                        if choice == "pause":
+                            status, reasons = "HUMAN", ("HUMAN_PAUSED_AFTER_LOCATION_HOLD",)
+                            episode_written = True
+                            break
+                        if choice == "next":
+                            route = self._finish_stain_and_continue(pre, selected, cleaned=False)
+                            episode_written = True
+                            if route == "success_done":
+                                status, reasons = "SUCCESS", ("ALL_OBSERVED_TARGETS_COMPLETED",)
+                                break
+                            continue
                     # 原像素区域不变；本轮规划用当前残留，而不是重放首次动作。
-                    target_mask = (pre["mask"] > 0) & reference.measurement_domain
                     import numpy as np
-                    target_mask = target_mask.astype(np.uint8) * 255
-                    if not np.any(target_mask):
+                    coverage_mask = ((pre["mask"] > 0) & reference.measurement_domain).astype(np.uint8) * 255
+                    if not np.any(coverage_mask):
                         raise TargetIdentityError(f"{selected}:ROI_PRE_EMPTY:原区域未检出，禁止盲目复喷")
                     # 不重新配对新的 T 编号；允许污渍减少导致质心在冻结区域内变化。
-                    current = extract_target_instances(target_mask)
+                    current = extract_target_instances(coverage_mask)
                     if not current:
                         raise TargetIdentityError(f"{selected}:ROI_FOREGROUND_IDENTITY_UNCERTAIN")
                     instance = max(current, key=lambda target: target.area_px)
+                    target_mask = coverage_mask
                     if len(current) > 1:
-                        self._say(f"{selected} 原区域剩余 {len(current)} 片，仍保留同一污渍编号；本轮规划最大残片，复检统计全部残留。")
-                        target_mask = extract_target_mask(target_mask, instance)
+                        self._say(f"{selected} 原区域剩余 {len(current)} 片，仍保留同一污渍编号。未填写覆盖直径时，移动仍用最大残片的中心；复检统计全部残留。")
+                        target_mask = extract_target_mask(coverage_mask, instance)
+                else:
+                    coverage_mask = target_mask
                 verification_mask = target_mask if self.task is not None and selected in self.task.manual_masks else self.roster_mask
                 write_png(cycle_dir / "selected_target_mask.png", target_mask)
                 normalized, _ = stage2_placeholders(self.placeholders, self.roster_mask.shape, self.calibration)
-                plan = plan_cleaning(target_mask, policy=resolve_plan_policy(normalized))
+                fallback = plan_cleaning(target_mask, policy=resolve_plan_policy(normalized))
                 self.stage("BUILD_MOTION")
-                geometry = build_cycle_geometry(plan, base=self.placeholders, calibration=self.calibration,
-                    offset=self.offset, observation_position=self.observation_position,
-                    task_id=self.task_id, used_abs_steps=(0, 0) if self.interactive_recheck else self.used,
+                manual = self.task is not None and self.task.targets[selected].source == "manual"
+                parameters = self._read_coverage_parameters()
+                geometry, note = motion_plan_for_mask(
+                    coverage_mask, parameters, fallback_plan=fallback,
+                    mask_kind="manual_roi_segmented" if manual else "segmented_stain",
+                    base=self.placeholders, calibration=self.calibration, offset=self.offset,
+                    observation_position=self.observation_position, task_id=self.task_id,
+                    used_abs_steps=(0, 0) if self.interactive_recheck else self.used,
                     budget=self.config.step_budget, real=self.config.real)
+                if parameters:
+                    self._say(note + "。几何覆盖不是实际清除。")
                 write_json(cycle_dir / "geometry.json", geometry.to_dict())
                 write_json(cycle_dir / "path_preview.json", geometry.preview.to_dict())
                 write_png(cycle_dir / "path_overlay.png", draw_path_overlay(pre["frame"].image, geometry.preview))
@@ -571,6 +602,69 @@ class CleaningLoop:
             # This observer supplies a simulation preview, never a control gate.
             pass
 
+    def _read_coverage_parameters(self):
+        reader = self.coverage_parameters
+        if not callable(reader):
+            return None
+        try:
+            parameters = reader()
+        except Exception as exc:
+            self._say(f"覆盖参数没有读到：{type(exc).__name__}。本轮改用单点中心。")
+            return None
+        return parameters if isinstance(parameters, dict) else None
+
+    def _measure_interactive_pre(self, pre, selected, cycle_dir, number, reference):
+        import numpy as np
+        pre["mask"] = self._roi_segmenters[selected].mask(pre["frame"].image)
+        write_png(cycle_dir / "pre_mask.png", pre["mask"])
+        pre["metadata"]["roi_segmentation"] = self._roi_segmenters[selected].to_dict()
+        pre["metadata"]["initial_scan_measurement"] = pre["metadata"]["measurement"]
+        ys, xs = np.nonzero(pre["mask"])
+        pre["metadata"]["measurement"] = asdict(ContaminationMeasurement(len(xs),
+            None if not len(xs) else (float(xs.mean()), float(ys.mean())), 1.0 if len(xs) else 0.0,
+            0.0, str(cycle_dir / "pre_mask.png"), len(extract_target_instances(pre["mask"])), "frozen-roi-segmentation-v1"))
+        write_json(cycle_dir / "pre.json", pre["metadata"])
+        location = validate_roi_location(reference, pre["frame"].image, pre["mask"])
+        write_json(cycle_dir / "location_check.json", asdict(location))
+        self._coverage_input(pre, (pre["mask"] > 0) & reference.measurement_domain,
+            selected, stage="pre", cycle=number, valid=location.valid, reasons=location.reason_codes)
+        return location
+
+    def _location_hold(self, selected, location) -> str:
+        self.stage("LOCATION_HOLD")
+        following = self._following_id(selected)
+        choices = ("retake", "next", "pause") if following else ("retake", "pause")
+        self._say(f"{selected}：前图相对首次位置未通过，原因 {','.join(location.reason_codes)}。可以重拍、改洗下一块或暂停。不会在未通过时移动或喷水。")
+        decision = self.recheck_decision({"hold": "location", "target_id": selected, "cycle": self._cycle,
+            "reason_codes": list(location.reason_codes),
+            "shift_px": None if location.shift_px is None else list(location.shift_px),
+            "choices": choices, "next_target_id": following, "last_target": following is None,
+            "passed": False, "manual_accept_allowed": False, "require_reason": False})
+        if not isinstance(decision, dict) or decision.get("choice") not in choices:
+            raise ValueError("INVALID_LOCATION_HOLD_DECISION")
+        return decision["choice"]
+
+    def _resolve_invalid_location(self, pre, selected, cycle_dir, location, number, reference):
+        attempt = 0
+        while not location.valid:
+            choice = self._location_hold(selected, location)
+            if choice != "retake":
+                write_json(cycle_dir / "location_hold.json", {"target_id": selected, "choice": choice,
+                    "location": asdict(location), "motion": "not_sent", "pump": "not_sent"})
+                return choice, pre, location
+            attempt += 1
+            rejected = cycle_dir / f"rejected_pre_{attempt:03d}"
+            rejected.mkdir()
+            for name in ("pre.png", "pre_mask.png", "pre.json", "location_check.json"):
+                source = cycle_dir / name
+                if source.exists():
+                    source.replace(rejected / name)
+            self._say(f"{selected}：重新采集前图。未通过的画面留在 {rejected.name}。")
+            self.stage("CAPTURE_PRE")
+            pre = self._observe("pre", cycle_dir)
+            location = self._measure_interactive_pre(pre, selected, cycle_dir, number, reference)
+        return "ready", pre, location
+
     def _interactive_recheck(self, active, pre, outcome, entry, cycle_dir):
         """每次复检都落盘后才请求人决定；重拍不产生新运动或喷洗。"""
         selected = active["target_id"]
@@ -656,7 +750,7 @@ class CleaningLoop:
             if decision["choice"] == "rewash":
                 entry.retry_count += 1
                 self.task.targets[selected].retry_count = entry.retry_count
-                self.stage("RETRY")
+                self.stage("RETRY", explanation=f"再次清洗 {selected}。留在监控页，下一步重新采集这一块的前图。", route="rewash")
                 self._say(f"人工要求第 {entry.retry_count} 次复洗 {selected}；重新采图、规划及授权。")
                 return post, verification, "retry"
             if decision["choice"] == "pause":
@@ -685,9 +779,15 @@ class CleaningLoop:
             self._advance_closed(post["observation"].observation_id, post["mask"], completed_id=selected if selected in self.ledger.entries else None)
         if self.task is not None:
             self.task.targets[selected].finished = True
-        self.stage("STAIN_RECORDED")
         finished = sum(1 for item in self.ledger.entries.values() if item.completed)
         nxt = self._following_id(selected)
+        if self.interactive_recheck and nxt is None:
+            recorded = (f"{selected} 已记入清洗名单。名单已全部处理，正在写入档案，随后打开结果报告。", "report")
+        elif self.interactive_recheck:
+            recorded = (f"{selected} 已记入清洗名单。下一块是 {nxt}，仍留在监控页。", "recorded")
+        else:
+            recorded = (None, None)
+        self.stage("STAIN_RECORDED", explanation=recorded[0], route=recorded[1])
         if nxt is None:
             if cleaned:
                 self._say(f"{_ordinal(finished)}污渍已清洗完成。编号名单已全部处理，不再重复清洗。这次结束不是洁净验收。")
