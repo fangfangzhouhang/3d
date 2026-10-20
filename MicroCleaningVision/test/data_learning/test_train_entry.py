@@ -1,4 +1,4 @@
-"""成员 A 训练入口：OpenCV 调参可用，深度学习后端必须拒绝。"""
+"""成员 A 训练入口：OpenCV 调参可用。YOLO 仍拒绝；分割入口不直接启动 PyTorch。"""
 
 from __future__ import annotations
 
@@ -15,14 +15,25 @@ HAS_PERCEPTION_DEPS = importlib.util.find_spec("cv2") is not None and importlib.
 
 
 class TrainEntryBackendTests(unittest.TestCase):
-    def test_yolo_and_torch_backends_are_rejected(self):
+    def test_yolo_stays_banned_and_torch_points_at_plan_imitation(self):
         from microcleaning.data_learning.train_entry import main
 
-        for backend in ("yolo", "torch", "semantic-seg", "autodl"):
+        expected = {
+            "yolo": "AGPL",
+            "torch": "plan_imitation.train",
+            "semantic-seg": "plan_imitation.train",
+            "autodl": "learning-torch.txt",
+        }
+        for backend, needle in expected.items():
             with self.subTest(backend=backend), redirect_stderr(io.StringIO()) as err:
                 code = main(["--backend", backend])
             self.assertEqual(2, code)
-            self.assertTrue(err.getvalue())
+            message = err.getvalue()
+            self.assertIn(needle, message)
+            if backend == "yolo":
+                self.assertIn("禁止", message)
+            if backend == "semantic-seg":
+                self.assertNotIn("禁止", message)
 
     def test_unknown_backend_is_rejected(self):
         from microcleaning.data_learning.train_entry import main

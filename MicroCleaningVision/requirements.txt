@@ -7,4 +7,5 @@
 # - 相机与 OpenCV 基线：requirements/perception-opencv.txt
 # - 已评审的 STM32 串口适配器：requirements/control-serial.txt
 #
-# 不要把历史 YOLO、PyTorch、3D 或训练依赖加到这里；它们不是当前闭环依赖。
+# 不要把 YOLO/ultralytics（AGPL）、3D 或 PyTorch 加到本文件。
+# 离线路径/覆盖模仿若要训练，另装 requirements/learning-torch.txt，不进入基础环境。

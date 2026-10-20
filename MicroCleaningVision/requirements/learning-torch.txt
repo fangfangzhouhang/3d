@@ -1,0 +1,6 @@
+# 可选：离线路径/覆盖模仿学习。不要把本文件并进 requirements.txt。
+# 不要加入 ultralytics、YOLO 或任何 AGPL 检测包。
+# 先安装 requirements/perception-opencv.txt。CPU 示例：
+#   python -m pip install -r requirements/learning-torch.txt --index-url https://download.pytorch.org/whl/cpu
+# 装上 torch 也不会打开串口，检查点也不能当成喷点执行命令。
+torch>=2.2,<2.7

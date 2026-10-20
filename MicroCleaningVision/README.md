@@ -101,7 +101,14 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m unittest discover -s test -p "test*.py" -v
 ```
 
-测试通过只说明软件回归正常，不说明已经标定或已经清洗。
+可选的离线路径/覆盖模仿另装 PyTorch，不写入上面的基础环境，也不要安装 YOLO：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements\learning-torch.txt --index-url https://download.pytorch.org/whl/cpu
+.\.venv\Scripts\python.exe -m microcleaning.data_learning.plan_imitation.train --tiny --output-dir output\plan_imitation\tiny
+```
+
+说明见 [路径覆盖模仿学习](说明文档/软件组/路径覆盖模仿学习_设计说明.md)。测试通过或微型训练跑完，只说明软件回归或管线能算完，不说明已经标定或已经清洗。学习喷点不可执行。
 
 ## 单入口闭环
 

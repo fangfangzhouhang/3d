@@ -336,6 +336,7 @@ development_environment:
   base_profile: "requirements.txt；标准库Mock/回放框架"
   perception_profile: "requirements/perception-opencv.txt；A/B真实图像任务"
   serial_profile: "requirements/control-serial.txt；仅获得真实协议并批准后使用"
+  learning_profile: "requirements/learning-torch.txt；可选 CPU 路径/覆盖模仿；不含 YOLO；检查点不可执行"
 
 major_risks:
   - "源码当前PB12，旧资料仍有PB2；必须核对同次烧录和接线。默认ARM按钮非强制，轮询联锁不替代独立断电。"
@@ -344,8 +345,8 @@ major_risks:
   - "Demo运动关卡只覆盖当前主发送器；center_object和calibrate_motor_mm_per_px脚本直接发串口运动，不能宣称所有运动入口都统一授权。"
   - "三人尚无稳定投入时间，采用核心/扩展/备用任务和实际专注时段回填。"
   - "用户持有相机和GPU经验，A阶段负担可能在标注/训练期上升，需要按两轮真实记录再平衡。"
-  - "旧原型目录 legacy 已删除；不要把 YOLO、双目或 3D 空实现重新放回主入口。"
-  - "模型训练可能被过早启动；必须先有HSV失败、人工标注和独立测试集。"
+  - "旧原型目录 legacy 已删除；不要把 YOLO、双目或 3D 空实现重新放回主入口。YOLO/ultralytics 另因 AGPL 不进入依赖。"
+  - "污渍分割模型仍须先有稳定失败、人工标注和独立测试集。2026-10-20 起可选 PyTorch 只用于离线路径模仿，喷点不可执行。"
   - "HSV默认参数只针对高饱和红色标记物；真实相机、材料和光照变化可能使其立即失效。"
   - "Demo路线只考虑mask几何，不包含喷头直径、速度、平台动力学和真实障碍物。"
 
@@ -360,6 +361,7 @@ next_actions:
   - "WORKBENCH-FIELD-01：软件界面完成Mock后，由操作者按手册审核子集；H1/H2先交同次接线/烧录/STOP及标定，A/B交可比前后图；再单目标独立现场验收。不要把Mock报告PASS解释为实物效果。"
   - "C-LOOP-FIELD-01：H2交三份实测配置、H1交同次固件/接线/停止证据、A/B交可比图后，C仅做新单入口--real --max-cycles 1、默认不重试，逐轮YES并保存完整运行目录；未实物运行。"
   - "TEAM-POST-01：从同学机拷回成功 Episode、PONG 原文和命令；不要在无 diff 时覆盖本机 demo/ 当官方实喷。"
+  - "A-PLAN-IMITATION-01：真实同尺寸 Mask 到位前只跑合成路径模仿和几何对照；不要把热图送进串口。"
   - "A-P1-U500-01：插入U500后运行scripts/probe_usb_camera.py，再运行--capture-test；保存index、分辨率、FPS、PNG、SHA256和质量结果。"
   - "B-U500-01：只在 U500 开发集一次改 LocalContrastPolicy 一个字段；升降看新留出，不碰 public_002/011/M9/M12。"
   - "C-PATH-01：analyze 不发步进。stage2-move 必须有标定 JSON、运动关卡、人确认和 --arm-stage2-xy。无实测标定不把毫米写成已验收。"

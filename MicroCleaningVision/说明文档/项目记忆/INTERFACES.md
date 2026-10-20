@@ -1,5 +1,11 @@
 # INTERFACES｜模块之间怎样传数据
 
+## 当前交接：2026-10-20，学习喷点提案
+
+新增仅 A 离线使用的 `learned-coverage-proposal-v1` 与 `plan-imitation-train-v1` / `plan-imitation-eval-v1`。输入是 `image_px` 二值 Mask；教师点来自现有 `coverage-plan-v1` 贪心结果。热图解码后的点必须落在 `prepare_coverage_domain` 的候选驻点上。评估报告并列 `HEATMAP_IMITATION`、`COVERAGE_AWARE`、`CENTER_POINT_COMPONENTS`、`RASTER_SCAN_DWELL` 的几何覆盖率、点数和直线路程。
+
+三个硬件标志在提案、配置和报告里固定 false。不新增串口句子，不改 mcl-v0.1、contracts/ports 或 CoveragePlan 字段。`train_entry` 的 opencv-tune 报告格式不变。真实 Mask 目录的字段见 [设计说明](../软件组/路径覆盖模仿学习_设计说明.md)。
+
 ## 当前交接：2026-10-13，显示选项兼容
 
 StandaloneCoveragePanel.options可省略/为None：新UI采用RenderOptions(target=False, stations=False, alpha=0.25)。显式Options原样使用；旧归档CLI传archive.options，headless export-only保留原默认。Profile/Kernel/Plan/Renderer/归档schema、共享合同与串口均未改。
