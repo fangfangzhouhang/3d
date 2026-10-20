@@ -1,7 +1,8 @@
 """成员 A 的训练入口。
 
 默认 workflow=review：终端逐步提示，对照人工 Mask，只改一轮邻域差异参数后停下。
-语义分割 / YOLO / AutoDL 在此入口明确拒绝。
+本入口仍只做 OpenCV 调参。YOLO 因 AGPL 拒绝。
+torch / semantic-seg / autodl 不在这里训练；可选 PyTorch 只用于离线路径覆盖模仿。
 """
 
 from __future__ import annotations
@@ -28,10 +29,21 @@ from microcleaning.vision.tune_local_contrast import LabeledExample, tune_local_
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 OPENCV_BACKENDS = frozenset({"opencv-tune", "opencv", "local"})
 BLOCKED_BACKENDS = {
-    "semantic-seg": "语义分割训练尚未实现。当前入口只做 OpenCV 邻域差异调参。",
-    "torch": "PyTorch 训练尚未实现。当前入口只做 OpenCV 邻域差异调参。",
-    "yolo": "禁止 AGPL YOLO，也不要把 legacy YOLO 当训练入口。",
-    "autodl": "AutoDL 训练尚未开放。请先用 --backend opencv-tune。",
+    "semantic-seg": (
+        "污渍语义分割不在本入口训练。可选 PyTorch 仅用于离线路径/覆盖模仿："
+        "python -m microcleaning.data_learning.plan_imitation.train "
+        "（requirements/learning-torch.txt，不进入基础环境）。"
+    ),
+    "torch": (
+        "本入口不启动 PyTorch。路径/覆盖热图模仿见 "
+        "python -m microcleaning.data_learning.plan_imitation.train ，"
+        "依赖 requirements/learning-torch.txt。YOLO 仍因 AGPL 禁止。"
+    ),
+    "yolo": "禁止 AGPL YOLO，也不要把 legacy YOLO 当训练入口。不要安装 ultralytics。",
+    "autodl": (
+        "AutoDL 远端训练没有接入。本机可选 PyTorch 见 requirements/learning-torch.txt "
+        "与 python -m microcleaning.data_learning.plan_imitation.train。"
+    ),
 }
 
 
@@ -174,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--backend",
         default="opencv-tune",
-        help="opencv-tune 为已实现；semantic-seg/torch/yolo/autodl 会拒绝",
+        help="opencv-tune 为已实现。yolo 因 AGPL 拒绝；torch/semantic-seg/autodl 改走 plan_imitation 或拒绝",
     )
     parser.add_argument("--raw-root", type=Path, default=Path("data") / "raw_images")
     parser.add_argument("--mask-dir", type=Path, default=Path("data") / "annotations" / "masks")
@@ -215,7 +227,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if backend not in OPENCV_BACKENDS:
         print(
-            f"未知 backend={args.backend}。可用：opencv-tune。拒绝：semantic-seg / torch / yolo / autodl。",
+            f"未知 backend={args.backend}。可用：opencv-tune。yolo 因 AGPL 拒绝；"
+            "torch / semantic-seg / autodl 不在本入口训练。",
             file=sys.stderr,
         )
         return 2

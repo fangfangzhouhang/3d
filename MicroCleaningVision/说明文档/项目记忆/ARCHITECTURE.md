@@ -1,5 +1,9 @@
 # ARCHITECTURE｜整个系统怎么工作
 
+## 当前交接：2026-10-20，离线模仿支路
+
+`data_learning/plan_imitation/` 读取合成或将来的二值 Mask，调用现有 `build_kernel`、`plan_coverage`、`prepare_coverage_domain`、`evaluate_coverage` 和 `analyze_coverage`。网络只在可选 torch 已安装时由训练/评估脚本加载。该支路不进入 CleaningLoop、串口或 Safety Governor，也不把热图写成 ActionRequest。CoveragePlan 与学习提案都保持不可执行。
+
 ## 当前交接：2026-10-13，三图显示支路
 
 StandaloneCoveragePanel从同一CoverageDataset读取原RGB/完整Mask，独立绘制并按数据身份/画布尺寸缓存两张输入图；初始化、重算、无模型与缩放均不依赖current_plan。中央继续用原render_coverage。参数移至可滚动右侧，高级项可展开，底部播放/导出优先保留空间。

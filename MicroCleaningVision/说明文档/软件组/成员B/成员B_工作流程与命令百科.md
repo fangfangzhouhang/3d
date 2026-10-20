@@ -17,7 +17,7 @@ cd "D:\大创\3d\MicroCleaningVision"
 .\.venv\Scripts\python.exe -m microcleaning.data_learning.train_entry
 ```
 
-不要加 `--apply`，除非人看过叠加图。留出 `public_002` / `public_011` / `M9` / `M12` 不准调参。禁止 `--backend yolo/torch`。
+不要加 `--apply`，除非人看过叠加图。留出 `public_002` / `public_011` / `M9` / `M12` 不准调参。`--backend yolo` 因 AGPL 仍然禁止。`--backend torch` 不会在这个识别入口里训练；可选 PyTorch 只在 A 的离线路径模仿脚本中，不改变 B 的默认算法。
 
 只跑算法、不调参时：
 

@@ -3,7 +3,7 @@
 > 2026-10-10 工作台交接补充：工作台v3已通过490项软件回归，人工复洗无业务上限，每轮与重拍分别归档；末块可信认可后用户选择报告。归档同任务成像条件、原始图/标注/哈希及每轮人工依据，合成测试不混作实物真值。最新操作和成员交付见[工作台手册](../可视化工作台操作手册.md)及[详细验收](../工作台复洗与位置管理验收_2026-10-10.md)。本轮无真实相机/COM/电机/泵/打印操作。 下文有日期的实验/计划仍保留历史证据，不能替代最新源码和同次实物记录。
 
 > 用途：成员 A 不需要每次询问“下一条命令是什么”。从图片进入项目，到交给 B，再到评价 B 的算法，全部按本文件执行。  
-> 当前边界：本文件只记录仓库中已经存在、可以运行的命令。语义分割训练仍未实现；OpenCV 邻域差异自动调参见第 18 节，不要把它写成深度学习已上线。
+> 当前边界：本文件只记录仓库中已经存在、可以运行的命令。污渍语义分割仍不在 `train_entry`。OpenCV 邻域差异自动调参见第 18 节。可选的路径/覆盖热图模仿见第 19 节和 `requirements/learning-torch.txt`，不要把它写成识别模型已上线或清洗有效。YOLO 因 AGPL 仍然禁止。
 
 ## 0. 当前该做什么（2026-10-02）
 
@@ -747,7 +747,7 @@ A 和 B 的关系可以记成一句话：
 
 ## 18. OpenCV 训练入口（自动调参）
 
-这是当前唯一实现的「训练」。默认命令会在**终端逐步提示**：先跑 B 的算法并标出 Mask，再和人工 Mask 对比、打印指标、简要分析，然后**只改一个参数**，复跑一次后停下等人检查。代码里的 `local-contrast-v0.1` 默认值不会被直接改写。语义分割 / YOLO / AutoDL 会拒绝。
+这是污渍识别侧唯一实现的调参。默认命令会在**终端逐步提示**：先跑 B 的算法并标出 Mask，再和人工 Mask 对比、打印指标、简要分析，然后**只改一个参数**，复跑一次后停下等人检查。代码里的 `local-contrast-v0.1` 默认值不会被直接改写。`--backend yolo` 因 AGPL 拒绝。`--backend torch`、`semantic-seg`、`autodl` 不在本入口训练，会指向下面的路径模仿或直接退出。
 
 标注好原图和同名 Mask 之后，一条总命令：
 
@@ -776,3 +776,15 @@ data/metadata.csv         可选；写了 unlabeled 的图会跳过
 终端会依次打印第 1～7 步，以及每步真实用时和每个候选的 IoU。叠加图在 `output/data_learning/tuning/<本次>/before/` 和 `after/`。本轮**不会**写入 `data/models/local_contrast_policy.json`。你看过叠加图、确认提升后再加 `--apply`。
 
 旧的静默网格搜索仍可用：`--workflow search`。
+
+## 19. 可选：路径/覆盖热图模仿
+
+这不是污渍分割，也不进工作台执行。真实喷点数据还没有，默认用合成 Mask，教师是现有贪心 `plan_coverage`。先装感知依赖，再单独装 CPU 版 PyTorch。不要把 torch 写进 `requirements.txt`，不要装 YOLO。
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements\learning-torch.txt --index-url https://download.pytorch.org/whl/cpu
+.\.venv\Scripts\python.exe -m microcleaning.data_learning.plan_imitation.train --tiny --output-dir output\plan_imitation\tiny
+.\.venv\Scripts\python.exe -m microcleaning.data_learning.plan_imitation.evaluate --checkpoint output\plan_imitation\tiny\checkpoint.pt --samples 4 --output output\plan_imitation\tiny\eval.json
+```
+
+思路、真实 Mask 以后的字段和安全边界见 [路径覆盖模仿学习](../路径覆盖模仿学习_设计说明.md)。检查点不可执行。几何覆盖率不是清除率。

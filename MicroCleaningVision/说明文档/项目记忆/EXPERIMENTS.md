@@ -1,5 +1,16 @@
 # EXPERIMENTS｜做过什么，结果怎样
 
+## EXP-SW-PLAN-IMITATION-20261020：合成几何上的热图模仿冒烟
+
+本云端工作区，CPython 3.12.3，NumPy 2.5.4，OpenCV 4.14.0.94，PyTorch 2.6.0+cpu。没有相机、COM、电机、泵或固件动作。学习提案与评估 JSON 的 executable/feeds_action_request/send_to_controller 均为 false。
+
+- 教师热图解码：单测把贪心驻点画成尖峰后再解码，点数和几何覆盖率与教师一致，且 `analyze_coverage` 的贪心点列与 `teacher_plan` 相同。这是解码闭环，不是网络精度。
+- 微型训练命令：`python -B -m microcleaning.data_learning.plan_imitation.train --tiny --output-dir /tmp/plan_imitation_tiny --epochs 2 --train-samples 4 --val-samples 2`。32×32、假定直径 7 px、步长 4、最多 4 点、目标 0.90、通道 8、CPU。train loss 0.303839→0.292546，val loss 0.299643→0.288837。这两张验证 Mask 上学习/教师几何覆盖率都是 0.9047619047619048，点数都是 4。样本太少，不能当成泛化。
+- 留出评估：`evaluate --checkpoint /tmp/plan_imitation_tiny/checkpoint.pt --samples 4 --seed 1000`。均值几何覆盖率学习 0.43737809999263044、贪心 0.613249462771486、中心 0.04296431276031806、扫描 0.13212976069162333。点数 4.0 / 4.0 / 0.75 / 0.75。直线路程约 46.56 / 60.58 / 18.39 / 24.65 px。学习结果低于贪心教师。中心和扫描点数可以小于 1，是现有过滤后的均值，不是新算法改写。
+- 全量：`MPLBACKEND=Agg xvfb-run -a python -B -m unittest discover -s test -p 'test*.py' -q`，630 项，22.071 秒，OK，失败/错误/跳过 0。其中新模仿测试 10 项。秒数是这台机器的一次计时，不与原先 Windows 全量时长比较，也不证明现场性能。
+
+原始检查点在本机 `/tmp/plan_imitation_tiny/`，未提交（仓库忽略 `*.pt`）。不证明喷点更优、定位、喷痕或清洁效果。
+
 ## EXP-SW-THREE-VIEW-20261013：E2三图与导航
 
 基线fzh-branch@1107267，2份demo源码/2份测试增量；未提交/推送/实物操作。最终全量620项190.614秒OK，失败/错误/跳过0，含130项覆盖相关及10项覆盖真实Tk。新增4项Tk测试检查同帧完整输入、重算/无效时输入保留、强度不规划/导出快照、旧Options/最小布局、五页守卫/预览重开/MOVE/复检/结果路由。
