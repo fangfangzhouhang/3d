@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import queue
 import threading
 import time
@@ -267,6 +268,8 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--connect-only", action="store_true", help="真实设备仅连接、预览与采图；禁止运动和喷水")
     parser.add_argument("--mock-scenario", choices=SCENARIOS, default="success")
     parser.add_argument("--output-root", type=Path, default=Path("output/closed_loop"))
+    parser.add_argument("--dataset-root", type=Path, default=os.environ.get("MICROCLEANING_DATA_ROOT") or None,
+        help="可选共享数据根目录；优先于 MICROCLEANING_DATA_ROOT，仅五页工作台自动归档")
     parser.add_argument("--algorithm", choices=VISION_ALGORITHMS, default="local")
     parser.add_argument("--policy", type=Path)
     parser.add_argument("--no-tuned-policy", action="store_true")
@@ -291,6 +294,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--camera-height", type=int)
     parser.add_argument("--camera-backend", type=int)
     parser.add_argument("--warmup-frames", type=int, default=5)
+    parser.add_argument("--archive-policy", choices=("selected", "all"), default="selected",
+        help="默认仅暂存，正式保留由用户确认；all 显式启用旧版自动归档")
+    parser.add_argument("--open-run", type=Path, help="在工作台查看已有实验，不启动设备任务")
     parser.add_argument("--workbench", action="store_true", help="Mock 使用五页交互工作台；Real 默认启用")
     args = parser.parse_args(argv)
     if args.connect_only:
@@ -332,7 +338,7 @@ def main(argv: list[str] | None = None) -> int:
         offset.validate(calibration, real=args.real)
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
-    if args.real or args.workbench:
+    if args.real or args.workbench or args.open_run is not None:
         from demo.workbench_runtime import WorkbenchRuntime
         return WorkbenchRuntime(args=args, config=config, segmenter=segmenter,
             placeholders=placeholders, calibration=calibration, offset=offset).run()

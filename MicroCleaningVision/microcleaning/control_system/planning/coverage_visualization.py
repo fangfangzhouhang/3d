@@ -128,7 +128,7 @@ def render_coverage(image_rgb: np.ndarray, plan: CoveragePlan, *,
     if options.stations:
         for index, (x, y) in enumerate(points, 1):
             draw.ellipse((x - 8, y - 8, x + 8, y + 8), fill=COLORS["stations"], outline="white", width=1)
-            draw.text((x, y), str(index), fill="white", anchor="mm", font=ImageFont.load_default(size=10))
+            draw.text((x, y), str(index), fill="white", anchor="mm", font=_default_font(10))
     result = immutable_array(np.asarray(canvas))
     metrics = None if evaluation is None else evaluation.metrics
     metadata = {"schema_version": "coverage-visualization-v1", "plan_id": plan.to_dict()["plan_id"],
@@ -142,11 +142,19 @@ def render_coverage(image_rgb: np.ndarray, plan: CoveragePlan, *,
     return CoverageVisualization(result, metrics, count, canonical_json(metadata))
 
 
+def _default_font(size: int):
+    """Pillow's sized default was added after 9.5; keep the bitmap fallback."""
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
 def _font(size: int):
     for path in (Path("C:/Windows/Fonts/msyh.ttc"), Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")):
         if path.is_file():
             return ImageFont.truetype(str(path), size), path.name == "msyh.ttc"
-    return ImageFont.load_default(size=size), False
+    return _default_font(size), False
 
 
 def render_report(plan: CoveragePlan, view: CoverageVisualization) -> Image.Image:

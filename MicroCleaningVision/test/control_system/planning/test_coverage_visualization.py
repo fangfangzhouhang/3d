@@ -1,6 +1,7 @@
 """P3 pixel partitions, prefix semantics and original-coordinate rendering."""
 
 import unittest
+from unittest.mock import patch
 from dataclasses import replace
 
 import numpy as np
@@ -22,6 +23,23 @@ def sample_plan(*, diameter=8, constraints=None):
 
 
 class CoverageVisualizationTests(unittest.TestCase):
+    def test_default_font_without_size_api_keeps_real_coverage_rendering(self):
+        from PIL import ImageFont
+        original = ImageFont.load_default
+        calls = []
+        def legacy(**kwargs):
+            calls.append(kwargs)
+            if "size" in kwargs:
+                raise TypeError("legacy Pillow does not accept size")
+            return original()
+        image, plan = sample_plan()
+        with patch.object(ImageFont, "load_default", side_effect=legacy):
+            view = render_coverage(image, plan)
+        self.assertEqual(view.image_rgb.shape, image.shape)
+        self.assertGreater(view.metrics.station_count, 0)
+        self.assertIn({}, calls)
+        self.assertIn({"size": 10}, calls)
+
     def test_exact_covered_uncovered_partition_in_original_pixels(self):
         image, plan = sample_plan()
         view = render_coverage(image, plan, options=RenderOptions(target=False, footprints=False,

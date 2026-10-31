@@ -24,7 +24,8 @@ from microcleaning.control_system.reporting import export_report, read_run, reco
 
 
 def make_runtime(folder: Path, scenario="workbench-mixed"):
-    args = SimpleNamespace(output_root=folder, real=False, mock_scenario=scenario, camera_index=None,
+    # Existing automatic-archive tests opt into that policy explicitly.
+    args = SimpleNamespace(archive_policy="all", output_root=folder, real=False, mock_scenario=scenario, camera_index=None,
         camera_width=None, camera_height=None, camera_backend=None, warmup_frames=1, baudrate=115200,
         serial_timeout=0.15, serial_port=None, arm_stage2_xy=False, arm_pump=False, confirm_pump=False,
         pump_duration_ms=500, position_path=None, stage2_set_zero=False)
