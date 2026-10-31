@@ -3,6 +3,19 @@
 updated_at: 2026-10-31
 current_phase: "A离线对焦和真实工作台仅连接模式已提交并推送origin/456；已有三图UI保留，功能提交b9c27047已核验。G0/G1与真实清洁仍未过，A4与主线质量贯通待完成。完整实验资产仍本机。"
 
+main_sync_456_20261031:
+  merge_commit: 38caf656269e41980462adf86bbbfa978f8924a8
+  merged_main_commit: c8320cbab3bbcd4f3b55c92d410dfc413bb6bf5e
+  branch: "456"
+  merge_pushed_and_remote_verified: true
+  resolved_document_files: 9
+  merge_tree_identical_to_previous_456: true
+  protected_nonconflict_files_byte_identical: 363
+  main_is_ancestor_of_456: true
+  code_changed: false
+  tests_rerun: false
+  no_test_rerun_reason: identical_source_and_test_tree
+  hardware_actions_performed: false
 publication_456_20261031:
   feature_commit: b9c27047cce402ded27ce1ced0693f4f16ea522b
   branch: "456"
