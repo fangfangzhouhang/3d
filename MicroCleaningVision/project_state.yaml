@@ -1,14 +1,29 @@
 # 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
 # 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
-updated_at: 2026-10-30
-current_phase: "真实设备仅连接工作台已实现，并在2026-10-30接入COM5/显微镜1；无运动/泵武装、无归零。A1-A3已完成，A4与C/B质量贯通待完成，G0/G1仍未过。本轮main@c8320cb加未提交改动，无提交/推送；历史覆盖验收数字保留。"
+updated_at: 2026-10-31
+current_phase: "A离线对焦和真实工作台仅连接模式已提交并推送origin/456；已有三图UI保留，功能提交b9c27047已核验。G0/G1与真实清洁仍未过，A4与主线质量贯通待完成。完整实验资产仍本机。"
 
+publication_456_20261031:
+  feature_commit: b9c27047cce402ded27ce1ced0693f4f16ea522b
+  branch: "456"
+  remote: origin
+  code_pushed: true
+  remote_feature_sha_verified: true
+  previous_remote_sha: 8b14b3bfa8a72fa0e7ecde3545bade9325efaa37
+  preexisting_local_commits_published: 34
+  force_push: false
+  main_reference_changed: false
+  original_branch_history_preserved: true
+  regression_fixture_pngs_shared: 3
+  full_development_images_and_runtime_logs_shared: false
+  publication_record: 说明文档/进度记录/提交与拉取日志.md
+  hardware_actions_performed_for_publication: false
 workbench_connection_only_20261030:
   status: implemented_and_real_connection_observed
   observation_time: "2026-10-30T23:19:31+08:00"
   observation_is_continuous_online_guarantee: false
   baseline_commit: c8320cbab3bbcd4f3b55c92d410dfc413bb6bf5e
-  changes_committed: false
+  changes_committed: true
   cli: demo.closed_loop_station_--connect-only
   implementation: demo/device_connection.py
   serial_port: COM5
@@ -51,7 +66,7 @@ focus_calibration_a_20261030:
   baseline_branch: main
   baseline_commit: c8320cbab3bbcd4f3b55c92d410dfc413bb6bf5e
   status: a1_a3_offline_implemented_a4_pending
-  changes_committed: false
+  changes_committed: true
   implementation: microcleaning/data_learning/focus_calibration.py
   tests: test/data_learning/test_focus_calibration.py
   regression_manifest: test/data_learning/fixtures/gate1_focus/manifest.json
@@ -101,7 +116,7 @@ focus_calibration_a_20261030:
 coverage_preview_ui_v1:
   baseline_commit: 1107267a9e3036c2fd069e5e23a5fb5a2071c5b5
   status: implemented_and_software_validated
-  changes_committed: false
+  changes_committed: true
   layout_scope: existing_coverage_preview_window
   source_views: same_frozen_frame_and_complete_target_mask
   profile_structure: existing_FootprintProfile
