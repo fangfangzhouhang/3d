@@ -171,8 +171,12 @@ class WorkbenchCoverageHub:
                 raise ValueError("COVERAGE_SOURCE_SUPERSEDED")
             binding, generation = source.binding, panel.accepted_generation
             def save(rgb, plan, destination, *, constraints, options, step_count):
-                return export_bound_preview(rgb, plan, source.folder, binding, generation=generation,
-                    constraints=constraints, options=options, step_count=step_count)
+                # This callback runs on coverage-export, never Tk. Share the
+                # runtime coordinator even when a lightweight UI owner is used.
+                from demo.workbench_runtime import task_files
+                with task_files(source.folder):
+                    return export_bound_preview(rgb, plan, source.folder, binding, generation=generation,
+                        constraints=constraints, options=options, step_count=step_count)
             return save
         popup = Toplevel(self.owner.root)
         if self.worker is None:

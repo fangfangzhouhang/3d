@@ -300,6 +300,8 @@ class WorkbenchWindow:
         style.configure("Horizontal.TProgressbar", background=TEAL, troughcolor=PALE, borderwidth=0)
         self.sample, self.operator, self.note = tk.StringVar(), tk.StringVar(), tk.StringVar()
         self.task, self.snapshot, self.reference = None, None, None
+        self.result_folder, self.archive_states = None, {}
+        self.data_save_window = None
         from demo.workbench_coverage import WorkbenchCoverageHub
         self.coverage = WorkbenchCoverageHub(self)
         self.current_page, self.current_phase, self.current_target = "cover", "WELCOME", None
@@ -309,6 +311,7 @@ class WorkbenchWindow:
         self.result_image_nonce = 0
         self.camera_state, self.serial_state, self.pump_state = "尚未连接", "尚未探测", "尚未探测"
         self.closing, self.restart_requested = False, False
+        self._close_started, self._close_after = None, None
         self.pair_window, self.last_report, self.result_image_id = None, None, None
         self.heartbeat_count = 0
         self.destroyed = False
@@ -445,6 +448,9 @@ class WorkbenchWindow:
         self.progress_text.config(text="正在准备显微视野")
         self.stop.state(["!disabled"])
         if self.runtime.start({"sample_id": self.sample.get().strip(), "operator": self.operator.get().strip()}):
+            self.result_folder = getattr(self.runtime, "folder", None)
+            self.last_report = None
+            self.views["results"].update_archive({"status": "pending", "local_saved": False})
             self.views["cover"].start.config(text="返回当前任务  →")
             self.navigate("detection")
             self.write("开始新任务。请采集首次图像；此时不会发送运动或喷洗指令。")
@@ -566,8 +572,60 @@ class WorkbenchWindow:
             self.progress.stop()
             self.progress.configure(mode="determinate", value=100 * finished / len(approved) if approved else 0)
 
+    def _matches_task(self, payload):
+        from demo.workbench_runtime import task_key
+        key = payload.get("task_key")
+        if key is None:
+            return True  # legacy synchronous/device events
+        expected = self.result_folder
+        if expected is None and self.snapshot is not None:
+            expected = self.snapshot["folder"]
+        return expected is not None and key == task_key(expected)
+
+    def _close_when_ready(self):
+        if not self.closing or self.destroyed or self.runtime.active:
+            return  # physical safety cleanup is never cut short by archive timeouts
+        from demo.workbench_runtime import ARCHIVE_CLOSE_GRACE_SECONDS
+        import time
+        if self._close_started is None:
+            self._close_started = time.monotonic()
+        elapsed = time.monotonic() - self._close_started
+        busy = getattr(self.runtime, "archive_busy", False)
+        if not busy and not self.runtime.report_busy:
+            self._destroy()
+            return
+        if elapsed >= ARCHIVE_CLOSE_GRACE_SECONDS:
+            stop = getattr(self.runtime, "request_archive_stop", None)
+            if stop is not None:
+                stop()
+            self.progress_text.config(text="归档等待超时，正在终止后台归档；本地原始档案保留")
+        if elapsed >= ARCHIVE_CLOSE_GRACE_SECONDS + 2.0:
+            self.write("共享归档未确认完成，稍后须独立校验/重新归档。原始任务状态不变。")
+            self._destroy()
+            return
+        if self._close_after is None:
+            def poll():
+                self._close_after = None
+                self._close_when_ready()
+            self._close_after = self.root.after(50, poll)
+
     def _event(self, event):
+        from demo.workbench_runtime import task_key
         payload, kind = event.payload, event.kind
+        if kind == "archive_status":
+            self.archive_states[payload["task_key"]] = payload
+            if self._matches_task(payload):
+                self.views["results"].update_archive(payload)
+            dialog = getattr(self, "data_save_window", None)
+            if dialog is not None and not dialog.closed and payload["task_key"] == task_key(dialog.folder):
+                dialog.update_archive(payload)
+            self._close_when_ready()
+            return
+        if payload.get("task_key") is not None and not self._matches_task(payload):
+            if kind == "report_busy":
+                self.views["results"].refresh_exports()
+            self._close_when_ready()
+            return
         if "task" in payload:
             self._task_update(payload["task"])
         if kind == "log":
@@ -718,14 +776,20 @@ class WorkbenchWindow:
             if self.restart_requested:
                 self.restart_requested = False
                 self.root.after(50, self.start_task)
-            elif self.closing and not self.runtime.report_busy:
-                self._destroy()
+            elif self.closing:
+                self._close_when_ready()
                 return
         elif kind == "results":
             if self.restart_requested:
                 return
             self.snapshot = payload["snapshot"]
+            self.result_folder = self.snapshot["folder"]
             self.views["results"].update_snapshot(self.snapshot)
+            from demo.workbench_runtime import task_key
+            getter = getattr(self.runtime, "archive_status", lambda folder: {})
+            state = getter(self.result_folder) or self.archive_states.get(task_key(self.result_folder)) or {
+                "status": "not_configured" if getattr(self.runtime, "dataset_root", None) is None else "unknown"}
+            self.views["results"].update_archive(state)
             if payload.get("auto_navigate", True) and not self.runtime.active:
                 self.navigate("results")
             else:
@@ -740,8 +804,7 @@ class WorkbenchWindow:
         elif kind == "report_busy":
             self.views["results"].export_state.config(text="正在后台生成报告…" if payload["busy"] else "已导出：" + self.last_report if self.last_report else "报告操作已结束。原始记录保留。")
             self.views["results"].refresh_exports(busy=payload["busy"])
-            if self.closing and not payload["busy"] and not self.runtime.active:
-                self._destroy()
+            self._close_when_ready()
         elif kind == "report_ready":
             self.last_report = payload["folder"]
             self.views["results"].export_state.config(text="已导出：" + self.last_report)
@@ -815,7 +878,33 @@ class WorkbenchWindow:
             return
         folder = filedialog.askdirectory(parent=self.root, title="选择包含 summary.json 的任务目录", initialdir=str(self.runtime.args.output_root.resolve()))
         if folder:
+            self.result_folder = folder
             self.runtime.load_results(folder)
+
+    def show_data_save(self):
+        from demo.workbench_runtime import task_key
+        if self.snapshot is None or self.runtime.active:
+            self.write("任务结束且原始档案保存后，才可以选择正式保留。")
+            return
+        dialog = self.data_save_window
+        if dialog is not None and not dialog.closed:
+            if task_key(dialog.folder) == task_key(self.snapshot["folder"]):
+                dialog.window.lift()
+                return
+            dialog.close()
+        from demo.workbench_views import DataSaveDialog
+        self.data_save_window = DataSaveDialog(self)
+
+    def open_data_location(self, folder, location):
+        # A cloud-backed explorer path may stall; never wait on the Tk thread.
+        import os
+        import threading
+        def open_location():
+            try:
+                os.startfile(location)
+            except Exception as exc:
+                self.runtime._task_event("error", folder, message=f"打开目录失败：{exc}")
+        threading.Thread(target=open_location, name="mcv-open-data", daemon=True).start()
 
     def open_evidence(self):
         import os
@@ -861,15 +950,25 @@ class WorkbenchWindow:
             self.closing = True
             self.runtime.submit("cancel", reason="WINDOW_CLOSE_REQUESTED")
             self.write("关闭请求已收到。等待设备线程收尾和证据保存后关闭窗口。")
-        elif self.runtime.report_busy:
+        elif self.runtime.report_busy or getattr(self.runtime, "archive_busy", False):
             self.closing = True
-            self.write("等待正在导出的报告收尾后关闭窗口。")
+            self.write("设备已收尾。短暂等待后台归档，超时将终止归档并关闭；本地原始档案保留。")
+            self._close_when_ready()
         else:
             self._destroy()
 
     def _destroy(self):
         import gc
         self.destroyed = True
+        stop = getattr(self.runtime, "request_archive_stop", None)
+        if stop is not None:
+            stop()
+        if self._close_after is not None:
+            self.root.after_cancel(self._close_after)
+            self._close_after = None
+        dialog = getattr(self, "data_save_window", None)
+        if dialog is not None:
+            dialog.close()
         self.coverage.close()
         if self._pump_after is not None:
             self.root.after_cancel(self._pump_after)

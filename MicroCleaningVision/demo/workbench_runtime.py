@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+from contextlib import contextmanager
 import queue
 import subprocess
+import sys
 import threading
 import time
 import webbrowser
@@ -24,6 +27,63 @@ from microcleaning.control_system.serial.stage2_link import Stage2SerialLink
 from microcleaning.control_system.serial.stm32_serial import STM32SerialController
 from microcleaning.control_system.serial.resource_lease import ResourceLease, device_resources
 from microcleaning.control_system.reporting import export_report, read_run, record_quality_review
+
+
+ARCHIVE_CLOSE_GRACE_SECONDS = 2.0
+ARCHIVE_TERMINATE_SECONDS = 0.5
+
+
+class ArchiveInterrupted(RuntimeError):
+    pass
+
+
+_TASK_FILES_GUARD = threading.Lock()
+_TASK_FILES_LOCKS = {}
+
+
+def task_key(folder):
+    """Stable local identity, including startup archives without a task_id."""
+    return os.path.normcase(str(Path(folder).resolve()))
+
+
+@contextmanager
+def task_files(folder, *, cancel=None):
+    """One process-wide lock per run for ALL workbench derived file writers.
+
+    Only background callers may acquire it. This coordinates workbench threads,
+    not external programs. Never acquired by the device cleanup path. Archive
+    owns it from snapshot read through P1 publication and independent validation.
+    """
+    if threading.current_thread() is threading.main_thread():
+        raise RuntimeError("TASK_FILES_REQUIRE_BACKGROUND_THREAD")
+    key = task_key(folder)
+    with _TASK_FILES_GUARD:
+        lock = _TASK_FILES_LOCKS.setdefault(key, threading.Lock())
+    if cancel is None:
+        lock.acquire()
+    else:
+        while True:
+            if cancel.is_set():
+                raise ArchiveInterrupted("ARCHIVE_SHUTDOWN_REQUESTED")
+            if lock.acquire(timeout=0.05):
+                break
+    try:
+        yield
+    finally:
+        lock.release()
+
+
+class _TaskEvents:
+    """Capture a task identity once; delayed callbacks keep their original owner."""
+    def __init__(self, bus, folder):
+        self.bus, self.folder, self.key = bus, str(Path(folder).resolve()), task_key(folder)
+
+    def emit(self, kind, **payload):
+        payload.update(task_key=self.key, task_folder=self.folder)
+        self.bus.emit(kind, **payload)
+
+    def frame(self, image):
+        self.bus.frame(image)
 
 
 class _CameraPanelBridge:
@@ -161,10 +221,21 @@ class WorkbenchRuntime:
         self.args, self.config, self.segmenter = args, config, segmenter
         self.placeholders, self.calibration, self.offset = placeholders, calibration, offset
         self.bus, self.commands = EventBus(), queue.Queue()
+        self.task_events = self.bus
         self.cancel, self.confirmations = Cancellation(), None
         self.source, self.loop, self.folder, self.worker = None, None, None, None
         self._guard, self._active = threading.Lock(), False
         self.report_busy = False
+        configured = getattr(args, "dataset_root", None) or os.environ.get("MICROCLEANING_DATA_ROOT")
+        # Do not resolve/access a potentially slow shared drive on Tk or device threads.
+        self.dataset_root = Path(configured).expanduser() if configured else None
+        self._archive_guard = threading.Lock()
+        self._retention_guard = threading.Lock()
+        self._archive_states, self._archive_workers = {}, {}
+        self._archive_destinations, self._archive_selections = {}, {}
+        self.archive_policy = getattr(args, "archive_policy", "selected")
+        self._archive_processes = {}
+        self._archive_stop = threading.Event()
         self.last_status = "SUCCESS"
         try:
             result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=Path(__file__).resolve().parents[2],
@@ -194,9 +265,13 @@ class WorkbenchRuntime:
                 return False
             self._active = True
         self.cancel = Cancellation()
-        self.confirmations = ConfirmationBroker(self.bus, self.cancel)
         self.commands = queue.Queue()
-        self.worker = threading.Thread(target=self._run_task, args=(dict(metadata),), name="mcv-device-owner", daemon=True)
+        run_root = self.args.output_root / "待决定暂存" if self.archive_policy == "selected" else self.args.output_root
+        self.folder = (run_root / f"station_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}").resolve()
+        self.task_events = _TaskEvents(self.bus, self.folder)
+        self.bus.latest_frame()  # discard the previous camera's last frame before a new owner starts
+        self.confirmations = ConfirmationBroker(self.task_events, self.cancel)
+        self.worker = threading.Thread(target=self._run_task, args=(dict(metadata), self.folder), name="mcv-device-owner", daemon=True)
         self.worker.start()
         return True
 
@@ -213,9 +288,11 @@ class WorkbenchRuntime:
         else:
             self.commands.put({"action": action, **payload})
 
-    def _run_task(self, metadata):
-        folder = self.args.output_root / f"station_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
+    def _run_task(self, metadata, folder=None):
+        run_root = self.args.output_root / "待决定暂存" if self.archive_policy == "selected" else self.args.output_root
+        folder = folder or run_root / f"station_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
         self.folder = folder.resolve()
+        bus = _TaskEvents(self.bus, folder)
         executor, self.source, self.loop, device_lease = None, None, None, None
         metadata.update(git_commit=self.git_commit, sample_id=metadata.get("sample_id") or "未记录",
             git_dirty=self.git_dirty, ui_version="workbench-v3-roi",
@@ -227,7 +304,7 @@ class WorkbenchRuntime:
             if self.args.real:
                 device_lease = ResourceLease(device_resources(self.args.serial_port, self.args.position_path)).acquire()
             frames = None if self.args.real else MockFrames(self.args.mock_scenario, roi_mode=True)
-            self.source = CameraBroker(args=self.args, segmenter=self.segmenter, bus=self.bus, cancel=self.cancel, frames=frames)
+            self.source = CameraBroker(args=self.args, segmenter=self.segmenter, bus=bus, cancel=self.cancel, frames=frames)
             if self.args.real:
                 path, factory = self.args.position_path, None
                 current = load_position(path)
@@ -240,7 +317,7 @@ class WorkbenchRuntime:
                 set_zero(path)
             session = F103SerialSession(port=self.args.serial_port if self.args.real else None,
                 baudrate=self.args.baudrate, timeout=self.args.serial_timeout, serial_factory=factory, cancellation=self.cancel,
-                on_serial_event=lambda event: self.bus.emit("serial", **event) if event["line"].startswith("MCV1|") else None)
+                on_serial_event=lambda event: bus.emit("serial", **event) if event["line"].startswith("MCV1|") else None)
             link = Stage2SerialLink(session=session, armed=self.args.arm_stage2_xy if self.args.real else True)
             last_motion = [0.0]
             def motion(event):
@@ -250,18 +327,18 @@ class WorkbenchRuntime:
                     if now - last_motion[0] < 0.3:
                         return
                     last_motion[0] = now
-                self.bus.emit("motion", **event)
+                bus.emit("motion", **event)
             link.on_progress = motion
             controller = STM32SerialController(session=session,
                 arm_pump=self.args.arm_pump and self.args.confirm_pump if self.args.real else True)
             executor = HardwareExecutor(session=session, link=link, controller=controller,
                 position_path=path, confirm=self.confirm, pump_duration_ms=self.args.pump_duration_ms,
-                on_position=lambda data: self.bus.emit("position", **data))
-            self.bus.emit("position", **executor.position_snapshot)
+                on_position=lambda data: bus.emit("position", **data))
+            bus.emit("position", **executor.position_snapshot)
             self.loop = CleaningLoop(output_dir=folder, source=self.source, segmenter=self.segmenter,
                 executor=executor, placeholders=self.placeholders, calibration=self.calibration, offset=self.offset,
                 config=self.config, compare=self.compare, review=self.review, recheck_decision=self.recheck_decision, metadata=metadata,
-                on_event=lambda event: self.bus.emit(event.pop("kind"), **event),
+                on_event=lambda event: bus.emit(event.pop("kind"), **event),
                 on_coverage_input=self.coverage_input if self.coverage_enabled else None)
             result = self.loop.run()
             self.last_status = result["status"]
@@ -276,9 +353,9 @@ class WorkbenchRuntime:
                 if not (folder / "run_config.json").exists():
                     write_json(folder / "run_config.json", {"metadata": metadata})
             except OSError as record_error:
-                self.bus.emit("error", message=f"原始记录写入失败：{record_error}。任务停止，请检查输出目录。")
+                bus.emit("error", message=f"原始记录写入失败：{record_error}。任务停止，请检查输出目录。")
             self.last_status = result["status"]
-            self.bus.emit("completed", summary=result, folder=str(folder.resolve()), task=None)
+            bus.emit("completed", summary=result, folder=str(folder.resolve()), task=None)
         finally:
             errors = []
             for resource, code in ((executor, "EXECUTOR_CLOSE_FAILED"), (self.source, "FRAME_SOURCE_CLOSE_FAILED"), (device_lease, "DEVICE_LEASE_CLOSE_FAILED")):
@@ -288,7 +365,7 @@ class WorkbenchRuntime:
                     except Exception as exc:
                         errors.append({"reason": code, "type": type(exc).__name__, "message": str(exc)})
             if errors:
-                self.bus.emit("log", message="收尾提示：" + "; ".join(error["message"] for error in errors))
+                bus.emit("log", message="收尾提示：" + "; ".join(error["message"] for error in errors))
                 try:
                     recorded = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
                     recorded.update(status="ERROR", workflow_status="FAILED", quality_status="INCOMPLETE")
@@ -297,30 +374,235 @@ class WorkbenchRuntime:
                     write_json(folder / "summary.json", recorded)
                     if self.loop is not None and self.loop.task is not None:
                         self.loop.task.finish("FAILED")
-                    self.bus.emit("completed", summary=recorded, folder=str(folder.resolve()), task=None)
+                    bus.emit("completed", summary=recorded, folder=str(folder.resolve()), task=None)
                 except (OSError, ValueError) as record_error:
-                    self.bus.emit("error", message=f"收尾异常未能留档：{record_error}")
+                    bus.emit("error", message=f"收尾异常未能留档：{record_error}")
                 self.last_status = "ERROR"
             if self.loop is None and executor is not None:
                 try:
                     write_json(folder / "serial.json", {"events": executor.session.serial_events,
                         "preserved_replies": [line.decode("ascii", errors="replace").strip() for line in executor.session.preserved_replies]})
                 except OSError as record_error:
-                    self.bus.emit("error", message=f"启动失败时的串口记录未能保存：{record_error}")
+                    bus.emit("error", message=f"启动失败时的串口记录未能保存：{record_error}")
             snapshot = None
             try:
                 # 本来就在后台设备线程；完成最后一次读档后才发布空闲。
                 snapshot = read_run(folder)
             except Exception as read_error:
-                self.bus.emit("error", message=f"结果读取失败：{read_error}")
+                bus.emit("error", message=f"结果读取失败：{read_error}")
+            # Only local validation here: no shared-drive access or lock waiting.
+            try:
+                final_summary = json.loads((folder / "summary.json").read_text(encoding="utf-8-sig"))
+                local_saved = isinstance(final_summary, dict) and bool(final_summary.get("status"))
+            except (OSError, ValueError):
+                local_saved = False
+            self._schedule_archive(folder, resources_released=not errors, local_saved=local_saved)
             with self._guard:
                 self._active = False
-            self.bus.emit("idle")
+            bus.emit("idle", task_key=task_key(folder), task_folder=str(folder.resolve()))
             if snapshot is not None:
-                self.bus.emit("results", snapshot=snapshot, auto_navigate=bool(snapshot.get("report_ready")))
+                self._task_event("results", folder, snapshot=snapshot, auto_navigate=bool(snapshot.get("report_ready")))
+
+    def _task_event(self, kind, source_folder, **payload):
+        self.bus.emit(kind, task_key=task_key(source_folder), task_folder=str(Path(source_folder).resolve()), **payload)
+
+    @property
+    def archive_busy(self):
+        with self._archive_guard:
+            return any(s["status"] in {"pending", "archiving"} for s in self._archive_states.values())
+
+    def archive_status(self, folder):
+        with self._archive_guard:
+            return dict(self._archive_states.get(task_key(folder), {}))
+
+    def _archive_update(self, folder, **state):
+        key = task_key(folder)
+        with self._archive_guard:
+            current = self._archive_states.setdefault(key, {})
+            current.update(state)
+            payload = dict(current)
+        self._task_event("archive_status", folder, **payload)
+
+    def _schedule_archive(self, folder, *, resources_released, local_saved, data_root=None):
+        """Called only after all cleanup and final local summary writes complete.
+
+        Snapshot semantics: include all files committed before acquiring task_files;
+        later reports/reviews/previews wait, then remain local. Never patch summary
+        or task state to describe an archival outcome, and never auto-resync it.
+        """
+        folder = Path(folder).resolve()
+        key = task_key(folder)
+        destination = self.dataset_root if data_root is None else Path(data_root).expanduser()
+        with self._archive_guard:
+            if key in self._archive_states:
+                return  # one immutable snapshot per task, including failures
+            self._archive_destinations[key] = destination
+            self._archive_states[key] = {"local_saved": local_saved, "resources_released": resources_released, "status": "pending",
+                "path": None, "verification": "not_checked", "error": None}
+        if not resources_released or not local_saved:
+            self._archive_update(folder, status="failed", error="设备/相机释放未确认或最终 summary.json 未保存，未启动共享归档。")
+            return
+        if self.archive_policy == "selected" and data_root is None:
+            self._archive_update(folder, status="awaiting_selection", retention="pending")
+            return
+        if destination is None:
+            self._archive_update(folder, status="not_configured")
+            return
+
+        def archive():
+            try:
+                with task_files(folder, cancel=self._archive_stop):
+                    summary = json.loads((folder / "summary.json").read_text(encoding="utf-8-sig"))
+                    if not isinstance(summary, dict) or not summary.get("status"):
+                        raise ValueError("FINAL_SUMMARY_REQUIRED")
+                    self._archive_update(folder, status="archiving", task_status=summary["status"],
+                        snapshot_at=datetime.now().astimezone().isoformat())
+                    result = self._execute_archive(folder, self._archive_stop)
+                    if self._archive_stop.is_set():
+                        raise ArchiveInterrupted("ARCHIVE_SHUTDOWN_REQUESTED")
+                    self._archive_update(folder, status=result["status"], path=result["path"], verification="verified",
+                        retention="kept", destination_kind=self._archive_selections.get(key, {}).get("destination_kind", "shared"),
+                        selection_ref=result.get("selection_ref"))
+            except ArchiveInterrupted as exc:
+                self._archive_update(folder, status="interrupted", error=str(exc), verification="not_verified")
+            except BaseException as exc:
+                self._archive_update(folder, status="failed", error=f"{type(exc).__name__}: {exc}", verification="not_verified")
+        try:
+            # The supervisor does no shared-filesystem I/O. The file-only child
+            # is explicitly terminated/reaped on shutdown; daemon is a final
+            # guard for a stalled process-launch/OS call, not the cancellation.
+            worker = threading.Thread(target=archive, name="mcv-run-archive", daemon=True)
+            with self._archive_guard:
+                self._archive_workers[key] = worker
+            self._archive_update(folder, status="pending")
+            worker.start()
+        except Exception as exc:
+            self._archive_update(folder, status="failed", error=f"{type(exc).__name__}: {exc}")
+
+    def save_archive(self, folder, data_root, *, purpose, reason, destination_kind="local", operator=""):
+        """Explicit human retention request; no filesystem waits on the Tk thread.
+
+        The source remains a recoverable pending record. The selected destination
+        receives the same immutable P1 snapshot and an external decision receipt.
+        """
+        if self.active or self._archive_stop.is_set():
+            return False
+        if not str(data_root or "").strip() or not purpose.strip() or not reason.strip():
+            return False
+        if destination_kind not in {"local", "shared"}:
+            return False
+        folder = Path(folder)
+        key = task_key(folder)
+        if not self._retention_guard.acquire(blocking=False):
+            return False
+        try:
+            with self._archive_guard:
+                previous = self._archive_states.get(key, {})
+                worker = self._archive_workers.get(key)
+                if (previous.get("status") in {"pending", "archiving"}
+                        or previous.get("resources_released") is False
+                        or previous.get("local_saved") is False or (worker and worker.is_alive())):
+                    return False
+                self._archive_states.pop(key, None)
+                self._archive_selections[key] = dict(purpose=purpose.strip(), reason=reason.strip(),
+                    destination_kind=destination_kind, operator=operator,
+                    decided_at=datetime.now().astimezone().isoformat())
+            self._schedule_archive(folder, resources_released=True, local_saved=True, data_root=data_root)
+            return True
+        finally:
+            self._retention_guard.release()
+
+    def defer_retention(self, folder):
+        """Keep pending originals; neither promote nor delete any experiment."""
+        if self.active:
+            return False
+        state = self.archive_status(folder)
+        if state.get("status") in {"pending", "archiving", "exported", "skipped"}:
+            return False
+        self._archive_update(folder, status="deferred", retention="deferred", local_saved=True)
+        return True
+
+    def _archive_command(self, folder):
+        key = task_key(folder)
+        command = [sys.executable, "-m", "demo.run_archive_worker", "--run", str(folder),
+            "--data-root", str(self._archive_destinations.get(key, self.dataset_root))]
+        if key in self._archive_selections:
+            command += ["--selection", json.dumps(self._archive_selections[key], ensure_ascii=True)]
+        return command
+
+    @staticmethod
+    def _terminate_archive_process(process):
+        if process.poll() is not None:
+            return
+        process.terminate()
+        try:
+            process.wait(timeout=ARCHIVE_TERMINATE_SECONDS)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=ARCHIVE_TERMINATE_SECONDS)
+
+    def _execute_archive(self, folder, stop):
+        if stop.is_set():
+            raise ArchiveInterrupted("ARCHIVE_SHUTDOWN_REQUESTED")
+        process = subprocess.Popen(self._archive_command(folder), cwd=Path(__file__).resolve().parents[1],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        key = task_key(folder)
+        with self._archive_guard:
+            self._archive_processes[key] = process
+        try:
+            while True:
+                if stop.is_set():
+                    self._terminate_archive_process(process)
+                    raise ArchiveInterrupted("归档关闭等待超时，工作进程已终止；共享发布结果未确认，请独立校验。")
+                try:
+                    stdout, stderr = process.communicate(timeout=0.05)
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
+            if stop.is_set():
+                raise ArchiveInterrupted("ARCHIVE_SHUTDOWN_REQUESTED")
+            try:
+                message = json.loads(stdout)
+            except ValueError as exc:
+                raise RuntimeError(f"ARCHIVE_WORKER_PROTOCOL_ERROR:{process.returncode}:{stderr[-1000:]}") from exc
+            if process.returncode != 0 or not message.get("ok"):
+                if message.get("path"):
+                    self._archive_update(folder, path=message["path"])
+                raise RuntimeError(message.get("error") or f"ARCHIVE_WORKER_EXIT:{process.returncode}")
+            result = message["result"]
+            if result.get("status") not in {"exported", "skipped"} or not result.get("path"):
+                raise RuntimeError("ARCHIVE_WORKER_INVALID_RESULT")
+            return result
+        finally:
+            # Release the task lock only after the child has stopped/reaped.
+            self._terminate_archive_process(process)
+            process.communicate()
+            with self._archive_guard:
+                self._archive_processes.pop(key, None)
+
+    def request_archive_stop(self):
+        """Tk may signal; only supervisors terminate/wait. No shared I/O here."""
+        self._archive_stop.set()
+
+    def shutdown_archives(self, timeout=2.0):
+        """Bounded final process cleanup after mainloop exits, also on exceptions."""
+        self.request_archive_stop()
+        deadline = time.monotonic() + timeout
+        with self._archive_guard:
+            workers = list(self._archive_workers.values())
+        for worker in workers:
+            if worker.ident is not None:
+                worker.join(max(0, deadline - time.monotonic()))
+        with self._archive_guard:
+            processes = list(self._archive_processes.values())
+        for process in processes:
+            if process.poll() is None:
+                process.kill()  # local OS call, never wait for a shared drive
+        return not any(p.poll() is None for p in processes)
 
     def review(self, task, pre, prepare):
-        self.bus.emit("candidates", task=task.to_dict(), image=pre["frame"].image, mask=pre["mask"])
+        self.task_events.emit("candidates", task=task.to_dict(), image=pre["frame"].image, mask=pre["mask"])
         self._initial_coverage(task, pre)
         while True:
             self.cancel.check()
@@ -345,20 +627,20 @@ class WorkbenchRuntime:
                     task.lock()
                 elif action == "begin":
                     task.begin()
-                    self.bus.emit("task", task=task.ui_snapshot())
+                    self.task_events.emit("task", task=task.ui_snapshot())
                     return
                 else:
                     continue
-                self.bus.emit("task", task=task.ui_snapshot())
+                self.task_events.emit("task", task=task.ui_snapshot())
             except (ValueError, PermissionError, OSError) as exc:
-                self.bus.emit("error", message=str(exc))
+                self.task_events.emit("error", message=str(exc))
 
     def coverage_input(self, payload):
         try:
             from demo.workbench_coverage import freeze_source
-            self.bus.emit("coverage_source", source=freeze_source(**payload))
+            self.task_events.emit("coverage_source", source=freeze_source(**payload))
         except Exception as exc:
-            self.bus.emit("coverage_issue", message=f"模拟覆盖输入不可用：{type(exc).__name__}: {exc}")
+            self.task_events.emit("coverage_issue", message=f"模拟覆盖输入不可用：{type(exc).__name__}: {exc}")
 
     def _initial_coverage(self, task, pre, target_ids=None):
         if not self.coverage_enabled:
@@ -374,7 +656,7 @@ class WorkbenchRuntime:
                     "mask_kind": "manual_region" if candidate.source == "manual" else "segmented_stain",
                     "metadata": pre["metadata"]})
         except Exception as exc:
-            self.bus.emit("coverage_issue", message=f"模拟覆盖输入不可用：{type(exc).__name__}: {exc}")
+            self.task_events.emit("coverage_issue", message=f"模拟覆盖输入不可用：{type(exc).__name__}: {exc}")
 
     def confirm(self, facts):
         from demo.workbench_views import motion_chinese
@@ -398,17 +680,17 @@ class WorkbenchRuntime:
         if task is not None:
             task.state = "WAITING_CONFIRMATION"
             task.persist()
-            self.bus.emit("task", task=task.ui_snapshot())
+            self.task_events.emit("task", task=task.ui_snapshot())
         try:
             return self.confirmations.ask(prompts.get(phase, f"请核对本阶段 {phase} 的记录后确认。"), facts=facts)
         finally:
             if task is not None and not self.cancel.event.is_set():
                 task.state = "RUNNING"
                 task.persist()
-                self.bus.emit("task", task=task.ui_snapshot())
+                self.task_events.emit("task", task=task.ui_snapshot())
 
     def compare(self, pair):
-        self.bus.emit("pair", pre=pair["pre"], post=pair["post"])
+        self.task_events.emit("pair", pre=pair["pre"], post=pair["post"])
         return self.confirmations.ask("请核对前后图是否属于同一视野且可以比较。确认只表示可比较，不表示污渍已经洗净。", facts={"phase": "compare"})
 
     def recheck_decision(self, facts):
@@ -420,11 +702,11 @@ class WorkbenchRuntime:
         task = self.loop.task
         task.state = "WAITING_CONFIRMATION"
         task.persist()
-        self.bus.emit("task", task=task.ui_snapshot())
+        self.task_events.emit("task", task=task.ui_snapshot())
         try:
             answer = self.confirmations.ask_choice(prompt, choices=tuple(facts["choices"]), facts=facts)
             if answer["choice"] == "next" and facts.get("require_reason") and not answer.get("reason"):
-                self.bus.emit("error", message="人工最终通过必须填写复核理由；当前结果保留，未继续动作。")
+                self.task_events.emit("error", message="人工最终通过必须填写复核理由；当前结果保留，未继续动作。")
                 return {"choice": "pause", "reason": "人工最终复核理由缺失"}
             return {"choice": answer["choice"], "reason": answer.get("reason") or {"rewash": "人工认为需要继续清洗", "next": "人工选择不复洗并结束本目标",
                 "retake": "人工要求重新采集复检图", "pause": "人工暂停并保留记录"}[answer["choice"]]}
@@ -432,9 +714,10 @@ class WorkbenchRuntime:
             if not self.cancel.event.is_set():
                 task.state = "RUNNING"
                 task.persist()
-                self.bus.emit("task", task=task.ui_snapshot())
+                self.task_events.emit("task", task=task.ui_snapshot())
 
     def pair_images(self, pair):
+        folder = pair.get("task_folder") or self.folder
         def read():
             import cv2
             import numpy as np
@@ -448,46 +731,50 @@ class WorkbenchRuntime:
                     except OSError:
                         pass
                 images.append(image)
-            self.bus.emit("pair_images", pre=images[0], post=images[1])
+            self._task_event("pair_images", folder, pre=images[0], post=images[1])
         threading.Thread(target=read, name="mcv-pair-images", daemon=True).start()
 
     def load_results(self, folder, *, auto_navigate=True):
         def read():
             try:
-                self.bus.emit("results", snapshot=read_run(folder), auto_navigate=auto_navigate)
+                with task_files(folder):
+                    snapshot = read_run(folder)
+                self._task_event("results", folder, snapshot=snapshot, auto_navigate=auto_navigate)
             except Exception as exc:
-                self.bus.emit("error", message=f"结果读取失败：{exc}")
+                self._task_event("error", folder, message=f"结果读取失败：{exc}")
         threading.Thread(target=read, name="mcv-evidence-reader", daemon=True).start()
 
     def report(self, folder, formats=("html", "csv"), *, open_after=False, print_after=False):
         if self.report_busy:
             return False
         self.report_busy = True
-        self.bus.emit("report_busy", busy=True)
+        self._task_event("report_busy", folder, busy=True)
         def write():
             try:
-                if print_after and not read_run(folder).get("report_ready"):
-                    raise PermissionError("末目标尚未通过或证据有问题，当前只允许查看/导出档案")
-                report = export_report(folder, formats=formats)
-                self.bus.emit("report_ready", folder=str(report), formats=formats)
+                with task_files(folder):
+                    if print_after and not read_run(folder).get("report_ready"):
+                        raise PermissionError("末目标尚未通过或证据有问题，当前只允许查看/导出档案")
+                    report = export_report(folder, formats=formats)
+                self._task_event("report_ready", folder, folder=str(report), formats=formats)
                 if open_after or print_after:
                     url = (report / "index.html").as_uri() + ("#print" if print_after else "")
                     webbrowser.open(url)
             except Exception as exc:
-                self.bus.emit("error", message=f"报告导出失败（原始记录保留）：{exc}")
+                self._task_event("error", folder, message=f"报告导出失败（原始记录保留）：{exc}")
             finally:
                 self.report_busy = False
-                self.bus.emit("report_busy", busy=False)
+                self._task_event("report_busy", folder, busy=False)
         threading.Thread(target=write, name="mcv-report-export", daemon=True).start()
         return True
 
     def quality_review(self, folder, **fields):
         def append():
             try:
-                record_quality_review(folder, **fields)
+                with task_files(folder):
+                    record_quality_review(folder, **fields)
                 self.load_results(folder)
             except Exception as exc:
-                self.bus.emit("error", message=f"复核记录未保存：{exc}")
+                self._task_event("error", folder, message=f"复核记录未保存：{exc}")
         threading.Thread(target=append, name="mcv-quality-review", daemon=True).start()
 
     def comparison_images(self, folder, target: dict, *, masks=False, attempt_index=-1, recheck_index=-1, nonce=None, crop=False):
@@ -512,12 +799,30 @@ class WorkbenchRuntime:
                     except OSError:
                         pass
                 result.append(image)
-            self.bus.emit("result_images", folder=str(folder), target_id=target["target_id"], nonce=nonce,
+            self._task_event("result_images", folder, folder=str(folder), target_id=target["target_id"], nonce=nonce,
                 attempt_index=attempt_index, recheck_index=recheck_index, pre=result[0], post=result[1])
         threading.Thread(target=read, name="mcv-comparison-images", daemon=True).start()
 
     def run(self):
         from demo.station_window import WorkbenchWindow
         panel = WorkbenchWindow(self)
-        panel.root.mainloop()
+        opened = getattr(self.args, "open_run", None)
+        if opened is not None:
+            panel.result_folder = opened
+            panel.root.title("MicroCleaningVision · 实验数据保存")
+            self.load_results(opened)
+            tries = [0]
+            def show_saved_data():
+                if panel.destroyed:
+                    return
+                if panel.snapshot is not None:
+                    panel.show_data_save()
+                elif tries[0] < 100:
+                    tries[0] += 1
+                    panel.root.after(100, show_saved_data)
+            panel.root.after(100, show_saved_data)
+        try:
+            panel.root.mainloop()
+        finally:
+            self.shutdown_archives()
         return {"SUCCESS": 0, "HUMAN": 2, "ERROR": 3, "CANCELLED": 130}.get(self.last_status, 3)

@@ -378,6 +378,17 @@ class CameraPreview:
     def capture(self, phase, *, after=None):
         from microcleaning.control_system.orchestration.cleaning_loop import CapturedFrame
         from demo.image_ops import _draw_contamination
+        earliest = None if after is None else datetime.fromisoformat(after)
+        if earliest is not None:
+            if earliest.tzinfo is None:
+                raise USBCameraError("CAPTURE_TIMESTAMP_INVALID", "回程完成时间必须带时区")
+            # Coarse Windows wall clocks can give equal successive timestamps.
+            # Wait BEFORE reading a new frame; never fabricate a future timestamp.
+            deadline = time.monotonic() + 0.1
+            while datetime.now(timezone.utc) <= earliest:
+                if time.monotonic() >= deadline:
+                    raise USBCameraError("CAPTURE_CLOCK_NOT_AFTER_RETURN", "系统时钟尚未晚于回程完成时间，未采集复检帧")
+                time.sleep(0.001)
         self._acquire()
         handle = self.capture_handle
         for _ in range(self.warmup):
@@ -408,8 +419,11 @@ class CameraPreview:
                     "backend": self.backend, "actual_size": list(frame.shape[:2]),
                     "exposure": self._setting(self.cv2.CAP_PROP_EXPOSURE), "gain": self._setting(self.cv2.CAP_PROP_GAIN),
                     "auto_exposure": self._setting(self.cv2.CAP_PROP_AUTO_EXPOSURE)}
+                captured_at = datetime.now(timezone.utc)
+                if earliest is not None and captured_at <= earliest:
+                    raise USBCameraError("CAPTURE_CLOCK_NOT_AFTER_RETURN", "采集时钟回退，不能确认后图晚于回程")
                 return CapturedFrame(frame.copy(), f"camera_{self.index}_{self.sequence}",
-                    datetime.now(timezone.utc).isoformat(), f"usb-camera:{self.index}", settings)
+                    captured_at.isoformat(), f"usb-camera:{self.index}", settings)
 
     def _setting(self, property_id):
         import math

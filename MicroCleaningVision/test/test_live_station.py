@@ -48,6 +48,37 @@ class ClosedLoopPreviewTests(unittest.TestCase):
         source.close()
         self.assertTrue(fake.released)
 
+    def test_coarse_clock_waits_before_capture_without_fabricating_timestamp(self):
+        import numpy as np
+        from datetime import datetime, timezone, timedelta
+        from unittest.mock import patch
+        returned = datetime(2026, 10, 31, tzinfo=timezone.utc)
+        advanced = returned + timedelta(milliseconds=1)
+        fake = FakeVideoCapture(reads=[(True, np.full((20,20,3), 80, dtype=np.uint8))])
+        source, opened = self.preview(fake, [32, 32])
+        with patch("demo.camera_preview.datetime") as clock, patch("demo.camera_preview.time.sleep") as sleep:
+            clock.fromisoformat.return_value = returned
+            clock.now.side_effect = [returned, returned, advanced, advanced]
+            frame = source.capture("post", after=returned.isoformat())
+        self.assertEqual(frame.captured_at, advanced.isoformat())
+        self.assertEqual(sleep.call_count, 2)
+        self.assertEqual(opened, [1])
+
+    def test_stopped_clock_fails_before_camera_read_instead_of_faking_freshness(self):
+        import numpy as np
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+        returned = datetime(2026, 10, 31, tzinfo=timezone.utc)
+        fake = FakeVideoCapture(reads=[(True, np.full((20,20,3), 80, dtype=np.uint8))])
+        source, opened = self.preview(fake, [32, 32])
+        with patch("demo.camera_preview.datetime") as clock, patch("demo.camera_preview.time.monotonic", side_effect=[0, 1]):
+            clock.fromisoformat.return_value = returned
+            clock.now.return_value = returned
+            with self.assertRaises(USBCameraError):
+                source.capture("post", after=returned.isoformat())
+        self.assertEqual(opened, [])
+        self.assertEqual(source.sequence, 0)
+
     def test_cancellation_does_not_reuse_a_previous_frame(self):
         import numpy as np
         fake = FakeVideoCapture(reads=[(True, np.full((20, 20, 3), 100, dtype=np.uint8))])
