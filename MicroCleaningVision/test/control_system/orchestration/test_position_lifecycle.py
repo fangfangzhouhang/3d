@@ -20,13 +20,9 @@ from microcleaning.control_system.serial.stm32_serial import STM32SerialControll
 from microcleaning.vision.contamination import ContaminationMeasurement
 
 
-TEMP_ROOT = Path("D:/大创/tmp/mcv_impl_20261010")
-
-
 class _PositionFixture(unittest.TestCase):
     def setUp(self):
-        TEMP_ROOT.mkdir(parents=True, exist_ok=True)
-        self.folder = tempfile.TemporaryDirectory(dir=TEMP_ROOT)
+        self.folder = tempfile.TemporaryDirectory(prefix="mcv_position_")
         self.addCleanup(self.folder.cleanup)
         self.path = Path(self.folder.name) / "position.json"
         ledger.set_zero(self.path)

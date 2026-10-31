@@ -324,10 +324,13 @@ class CoveragePanelTests(unittest.TestCase):
         panel.root.deiconify()
         panel.root.geometry("1080x730")
         def drive():
+            buttons = (panel.previous_button, panel.play_button, panel.next_button, panel.full_button)
             if panel.current_plan is None or not panel.root.winfo_ismapped() or any(
-                    canvas.winfo_width() <= 1 for canvas in (panel.original_canvas, panel.mask_canvas, panel.canvas)):
+                    canvas.winfo_width() <= 1 for canvas in (panel.original_canvas, panel.mask_canvas, panel.canvas)) or any(
+                    not button.winfo_ismapped() for button in buttons):
                 return False
-            # Assert after real WM mapping/configure events in the mainloop.
+            # Descendants can map after their canvases. Keep every dimension
+            # assertion; wait for buttons as well rather than inspecting 1px placeholders.
             root_bottom = panel.root.winfo_rooty() + panel.root.winfo_height()
             for canvas in (panel.original_canvas, panel.mask_canvas, panel.canvas):
                 self.assertGreater(canvas.winfo_width(), 150)

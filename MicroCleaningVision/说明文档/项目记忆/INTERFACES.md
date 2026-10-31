@@ -1,5 +1,21 @@
 # INTERFACES｜模块之间怎样传数据
 
+## 2026-11-01：修饰键与发送日志语义
+
+WASD映射保持W/S=X正/反、A/D=Y反/正；Ctrl/Alt/系统组合键不创建JogRequest，大小写仍接受。局部stdout JSON message新增TX_PENDING表示待发送意图；TX改为完整write返回后的记录，不证明物理运动。输出通道错误保留UI事件、触发STOP/锁定并拒绝重新启用，需重启恢复日志。串口协议、共享合同、原维护YES和固件均未改。
+
+## 2026-10-31后续：用户指定交换WASD轴映射
+
+当前映射为W=(+20,0)、S=(-20,0)、A=(0,-20)、D=(0,+20)，单位为默认脉冲/键；即W/S控制X正/反，A/D控制Y反/正。显式--steps时同步缩放。界面、控制器与设备最终请求校验使用同一KEYS；旧轴映射请求在设备边界拒绝。该条替代此前W/S=Y、A/D=X的键盘约定；固件、端口、单步/STOP与位置规则不变。
+
+## 2026-10-31后续：WASD局部授权改名与显式启动
+
+JogController.arm(operator_authorized=False)取代原hardware_confirmed，真实必须是明确bool True；它表示操作者授权，不宣称急停已安装。JogConfig增加enable:bool=False，CLI --enable仅启动时请求握手，默认仍不自动启用；停止/失焦不自动重试。真实窗口按钮等价一次显式授权。stdout JSON行为mode/port/message，含TX/RX与READY/LOCKED原始记录。没有共享接口/固件协议变更。此节替代下方旧三核验框的主机界面约定，依据用户明确覆盖规则。
+
+## 2026-10-31：WASD维护局部接口
+
+JogConfig固定real/port/steps/timeout/正式position_path，默认模拟、20脉冲/步、2秒；steps复用维护1–1000上限，timeout有限0.2–10。真实必须显式端口，GUI三项人工条件默认为false；单次新按键生成冻结JogRequest(key,x,y)，设备边界复核与固定步数/单轴映射一致。只复用HELLO/READXY/MOVEXY/STOP，无共享schema或线上协议变更。日志区分SIM、TX/RX、STOP已确认/未确认；ACK/计数不升级物理证据。旧维护逐次YES规则不变。[入口与条件](../软件组/WASD维护点动.md)。
+
 ## 2026-10-30：工作台仅连接接口（主机局部）
 
 新增 CLI 模式 --connect-only，与 --mock / --real 互斥；必须显式 --serial-port / --camera-index，可指定现有相机参数和 --output-root。运动/泵武装、归零、非默认位置路径、尺度/偏移/工作坐标配置一律拒绝。没有新增串口命令、共享合同或位置字段。

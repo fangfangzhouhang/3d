@@ -1,5 +1,43 @@
 # EXPERIMENTS｜做过什么，结果怎样
 
+## EXP-WASD-REVIEW-20261101：修复并准备上传456
+
+基线456@56a32cf9395c67535bc9ca1692fb3e0b42d647a3，加本轮未提交WASD成果。用户授权检查修复并推送456；本轮只用协议替身、合成图与自身Tk测试，没有连接或发令到实物。
+
+- 新回归修复前27项为2失败/2错误：修饰组合键进入点动、TX日志期间取消仍写入、stdout关闭/写错打断停止清理。修复后专项27项1.582秒全通过，覆盖日志破管、关闭流ValueError、清理/锁定/不重启、发送前零运动与修饰键20组合。
+- 旧布局时间线显示30ms父/子仍未映射、60ms画布已映射但按钮1px/未映射、120ms四按钮均114×41且可见；900ms保持。测试增加按钮映射前置等待，全部原尺寸/位置断言保留，覆盖UI业务源码未改。独立界面7项4.588秒通过。
+- 旧位置16项故障用例不再写死D盘，改标准TemporaryDirectory(prefix=mcv_position_)；业务和故障断言不变。完整discover不再注入TEMP_ROOT或更改测试模块。
+- 最终全量681项57.214秒：680通过、0失败、0错误、1跳过，可选Matplotlib依赖缺失；未安装或升级依赖。普通TEMP/TMP指向可写工作区只是进程环境，非测试逻辑适配。原失败和上一版677项旧布局失败仍保留。
+
+证据仅本机work/review_publish_456_20261101/：regressions_before_fix.log、jog_release.log、coverage_panel_final.log、full_release.log、full_results.json、layout_before.json、layout_mapping_timeline.jsonl、before_sources.json及源码副本。源码/手册将随本次456发布，原始日志未上传；发布事实另查提交日志。软件结果不能升级实物急停、方向/位移/停止、尺度或清洗结论。
+
+## EXP-WASD-AXES-SWAPPED-20261031
+
+23:47:30（UTC+8）核对旧点动/相机进程均已关闭后，仅重开真实点动窗口PID2740，COM5 HELLO回复v0.3，READXY回复X=20/BX=0/Y=20/BY=0，观察READY；只发启动查询，未由Agent发运动键。窗口枚举确认真实点动标题，stderr空。独立相机脚本未改，本次没有重开已关闭的相机。启动与运行日志索引work/wasd_20261031/axes_swapped_launch.json，旧日志不覆盖。
+
+用户要求W/S改X、A/D改Y。修改KEYS及UI提示，专项23项/2.629秒通过；独立期望为W(+20,0)、S(-20,0)、A(0,-20)、D(0,+20)，设备层新增拒绝旧映射请求断言，原单步/STOP/失焦/互斥/持久化/授权测试保留。没有代按实物运动键。仅本机日志work/wasd_20261031/axes_swapped_special.log；未重复全量，677项旧布局失败/可选跳过属于上一版授权修订的回归证据，不冒充本次映射最终全量。
+
+## EXP-WASD-OPERATOR-OVERRIDE-20261031：显式授权修订与COM5就绪
+
+用户在要求“直接启用”后明确覆盖旧项目规则；主机改用明确operator_authorized/启用按钮，可显式--enable仅启动握手，不代勾急停验收，不修改固件或原执行入口。本轮没有代按实物运动键。
+
+- 修订专项23项/2.443秒通过，含显式启动只连接不移动、STOP后不自动再启用。最终全量677项/79.928秒：675通过、1既有最小尺寸布局失败、0错误、1可选Matplotlib跳过。仍外部适配旧D盘目录，本次提权运行消除沙箱chdir错误，未改旧断言。日志operator_override_special.log、operator_override_full.log、operator_override_full_results.json均在work/wasd_20261031/，仅本机。
+- 初查COM5未枚举，用户明确“已接回，仍是COM5”；随后只针对COM5核对VID_1A86/PID_7523 CH340身份，不扫描。核对并关闭自己原模拟进程29512/456后，23:39:07（UTC+8）启动真实窗口，PID6308，20脉冲/键，显式--enable。原始启动记录仅TX HELLO/RX STEP_OK v0.3、TX READXY/RX STEP2 X=0 BX=0 Y=0 BY=0，随后READY；stderr为空，窗口枚举确认标题“WASD 步进点动 · 真实设备”。
+- 这是启动时就绪观察，不能保证持续在线或推断后续用户没有按键。没有由Agent发MOVEXY、PUMP、ARM、CLEAR或运动键；启动不建立正式零点。仍无实物急停，不将逻辑状态、授权或READY升级为G0/真实位移/停止验收。
+
+证据为同目录real_COM5_device.json、real_COM5_launch.json、real_COM5.out.jsonl、real_COM5.err.log。用户后续按键会继续追加该真实进程的stdout记录；不将运行中日志当不可变快照。代码、测试和说明未提交/推送。
+
+## EXP-WASD-20261031：独立点动软件，未运动实物
+
+基线456@56a32cf9395c67535bc9ca1692fb3e0b42d647a3；新增demo/scripts/test与手册，未提交/推送/烧录。本轮不打开COM、不替操作者发实物运动键；当前无实物急停。默认模拟与协议替身检验，不是电机或急停验收。
+
+- 最终专项22项/2.214秒通过，含3项实际Tk窗口测试：按键、按住抑制、空格/关闭、失焦保留held并锁定、真实核验框默认为false。协议替身覆盖完整START/READXY、错误/短计数/短写/不完整行/超时、互斥与发送前位置失效/持久化失败零运动、模拟无COM/无账本写入。
+- 首跑21项在沙箱虚拟TEMP下有权限错误，原始special_initial.log保留；仅将进程TEMP/TMP指向工作区后21项通过，再补失焦用例得到最终22项。旧测试与断言均未修改。
+- 全量676项/155.039秒：673通过、1失败、1错误、1可选Matplotlib跳过；仍只在外部测试进程重定向旧D盘TEMP_ROOT，未改业务或断言。错误来自旧Mock测试os.chdir回项目目录被沙箱拒绝；该旧模块在提权单独复测16项全通过。失败为旧test_coverage_panel最小尺寸布局断言button高度1不大于20；不加载新增WASD的旧模块单独复测7项，6通过/同一项失败，原覆盖UI源码和测试字节未变。本轮不扩大范围修改它，不宣称全量通过。
+- 改前257份既有demo/scripts/microcleaning/test/firmware文件逐份SHA核对，改变0份。新程序的真实分支仅以COM_TEST协议替身测试；没有实际方向/位移/停止或硬件效果证据。
+
+仅本机证据：C:/Users/lin43/Documents/Codex/2026-10-28/new-chat-2/work/wasd_20261031/ 下special_initial.log、special_workspace_temp.log、special_final.log、full_portable.log、full_portable_results.json、run_full_portable.py、old_ui_isolated.log、old_replay_isolated.log、protected_before.json、protected_result.json。23:18（UTC+8）桌面启动默认模拟，窗口枚举确认标题“WASD 步进点动 · 模拟（电机不会动）”，启动PID29512，stderr为空；未替用户点击启用或按键，未取得新的窗口截图验收。首次沙箱后台启动未保留窗口，后续核对无重复进程再启动桌面进程。源码与测试仍未提交，日志未上传。[操作与限制](../软件组/WASD维护点动.md)。
+
 ## EXP-CONNECTION-ONLY-20261030：工作台连接模式与真实设备查询
 
 用户批准仅连接方案；main@c8320cbab3bbcd4f3b55c92d410dfc413bb6bf5e，加原有 A 未提交成果及本轮 demo 改动。未提交/推送、未修改固件、C/B、质量默认或标定。此前 --real --arm-stage2-xy 启动因扩大到运动武装被自动审批拒绝，未执行；本次新增不带武装的独立能力模式，未重试被拒绝命令。
