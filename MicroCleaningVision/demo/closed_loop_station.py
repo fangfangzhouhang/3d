@@ -264,6 +264,7 @@ def main(argv: list[str] | None = None) -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--mock", action="store_true", help="软件闭环（默认），自动确认仅限 Mock")
     mode.add_argument("--real", action="store_true", help="实物五页工作台；每一步仍需人工确认")
+    mode.add_argument("--connect-only", action="store_true", help="真实设备仅连接、预览与采图；禁止运动和喷水")
     parser.add_argument("--mock-scenario", choices=SCENARIOS, default="success")
     parser.add_argument("--output-root", type=Path, default=Path("output/closed_loop"))
     parser.add_argument("--algorithm", choices=VISION_ALGORITHMS, default="local")
@@ -292,6 +293,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--warmup-frames", type=int, default=5)
     parser.add_argument("--workbench", action="store_true", help="Mock 使用五页交互工作台；Real 默认启用")
     args = parser.parse_args(argv)
+    if args.connect_only:
+        import math
+        if not args.serial_port or args.camera_index is None or args.camera_index < 0:
+            parser.error("仅连接模式必须显式指定 serial-port 和非负 camera-index，不扫描设备")
+        if (args.arm_stage2_xy or args.arm_pump or args.confirm_pump or args.stage2_set_zero
+                or args.position_path != DEFAULT_POSITION_PATH):
+            parser.error("仅连接模式禁止武装、归零或指定位置账本")
+        if any(value is not None for value in (args.stage2_calibration, args.nozzle_offset, args.path_placeholders)):
+            parser.error("仅连接模式不接受运动标定、喷头偏移或工作坐标配置")
+        if args.baudrate <= 0 or not math.isfinite(args.serial_timeout) or args.serial_timeout <= 0:
+            parser.error("仅连接模式波特率和有限超时必须为正")
+        try:
+            segmenter = FrozenSegmenter(args.algorithm, policy_path=args.policy,
+                use_tuned_policy=False if args.no_tuned_policy else None)
+        except (ValueError, OSError) as exc:
+            parser.error(str(exc))
+        from demo.workbench_runtime import WorkbenchRuntime
+        return WorkbenchRuntime(args=args, config=None, segmenter=segmenter, placeholders=None,
+            calibration=None, offset=None, coverage_enabled=False).run()
     try:
         config = LoopConfig(args.max_cycles, args.max_retries_per_target, args.sequence_strategy, args.stage2_max_steps, args.real)
         config.validate()

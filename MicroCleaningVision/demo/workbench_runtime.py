@@ -73,7 +73,7 @@ class CameraBroker:
                     width=self.args.camera_width, height=self.args.camera_height, backend=self.args.camera_backend,
                     warmup_frames=self.args.warmup_frames, panel=_CameraPanelBridge(self))
                 camera.open()
-            self.bus.emit("device", camera="实时画面已连接" if camera else "Mock 合成显微图", serial="尚未探测")
+            self._device("实时画面已连接" if camera else "Mock 合成显微图", "尚未探测")
             self.ready.set()
             while not self.stop_event.is_set():
                 try:
@@ -105,7 +105,7 @@ class CameraBroker:
         except Exception as exc:
             self.failure = exc
             self.bus.emit("log", message=f"相机没有画面：{exc}")
-            self.bus.emit("device", camera="连接失败", serial="尚未探测")
+            self._device("连接失败", "尚未探测")
         finally:
             self.ready.set()
             if camera is not None:
@@ -113,7 +113,13 @@ class CameraBroker:
                     camera.close()
                 except Exception as exc:
                     self.failure = exc
-            self.bus.emit("device", camera="已释放", serial="会话已收尾")
+            self._device("已释放", "会话已收尾")
+
+    def _device(self, camera, serial):
+        if getattr(self.args, "connect_only", False):
+            self.bus.emit("connection_device", camera=camera)
+        else:
+            self.bus.emit("device", camera=camera, serial=serial)
 
     def capture(self, phase, *, after=None):
         while not self.ready.wait(0.05):
@@ -158,6 +164,7 @@ class CameraBroker:
 class WorkbenchRuntime:
     def __init__(self, *, args, config, segmenter, placeholders, calibration, offset, coverage_enabled=True):
         self.coverage_enabled = coverage_enabled
+        self.connection_only = bool(getattr(args, "connect_only", False))
         self.args, self.config, self.segmenter = args, config, segmenter
         self.placeholders, self.calibration, self.offset = placeholders, calibration, offset
         self.bus, self.commands = EventBus(), queue.Queue()
@@ -201,6 +208,9 @@ class WorkbenchRuntime:
         return True
 
     def submit(self, action: str, **payload):
+        if self.connection_only and action not in {"capture", "cancel"}:
+            self.bus.emit("log", message="仅连接模式拒绝执行事件：" + str(action))
+            return False
         if action == "capture":
             if self.source is not None:
                 self.source.capture_key.set()
@@ -214,6 +224,9 @@ class WorkbenchRuntime:
             self.commands.put({"action": action, **payload})
 
     def _run_task(self, metadata):
+        if self.connection_only:
+            from demo.device_connection import run_connection_task
+            return run_connection_task(self, metadata)
         folder = self.args.output_root / f"station_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
         self.folder = folder.resolve()
         executor, self.source, self.loop, device_lease = None, None, None, None
@@ -519,5 +532,7 @@ class WorkbenchRuntime:
     def run(self):
         from demo.station_window import WorkbenchWindow
         panel = WorkbenchWindow(self)
+        if self.connection_only:
+            panel.root.after(100, panel.start_task)
         panel.root.mainloop()
         return {"SUCCESS": 0, "HUMAN": 2, "ERROR": 3, "CANCELLED": 130}.get(self.last_status, 3)

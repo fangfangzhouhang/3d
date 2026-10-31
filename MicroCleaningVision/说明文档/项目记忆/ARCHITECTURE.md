@@ -1,5 +1,13 @@
 # ARCHITECTURE｜整个系统怎么工作
 
+## 2026-10-30：真实设备只连接支路
+
+用户批准新增 --connect-only，closed_loop_station 在原完整 Real/Mock 分支之前校验独立能力：指定 COM/相机，拒绝运动/泵武装、归零、位置账本覆盖及运动几何配置。WorkbenchRuntime 冻结 connection_only，并将任务分流到 demo/device_connection.run_connection_task；不构造 CleaningLoop、HardwareExecutor、Stage2SerialLink 或 STM32SerialController。
+
+连接线程复用 COM ResourceLease 与 F103SerialSession，QueryOnlyConnection 只允许四项完整单行查询；相机仍由既有 CameraBroker 独占。Tk 主线程通过 connection_device / connection_capture 更新画面、状态和日志；后台和界面同时拒绝执行。串口保持到取消或关闭，关闭只释放传输、不发送 STOP/CLEAR/ARM，不建立位置零点。
+
+保存独立 connection_* 目录及原图/Mask/识别叠加，不伪装为清洗 summary/Episode 或正式位置账本。原完整 Real 仍有运动/标定与人工授权要求，旧 Mock 路径保持。操作见 [工作台手册](../软件组/可视化工作台操作手册.md)。
+
 ## 当前交接：2026-10-13，三图显示支路
 
 StandaloneCoveragePanel从同一CoverageDataset读取原RGB/完整Mask，独立绘制并按数据身份/画布尺寸缓存两张输入图；初始化、重算、无模型与缩放均不依赖current_plan。中央继续用原render_coverage。参数移至可滚动右侧，高级项可展开，底部播放/导出优先保留空间。

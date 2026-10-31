@@ -240,6 +240,9 @@ class CoverPage(Page):
         self.note.pack(fill="x", pady=15)
         if owner.runtime.args.real:
             self.note.config(text="Real 模式：相机和 COM 必须人工指定；运动、短喷、回程仍分别确认。设备状态以实际探测为准。")
+        if getattr(owner.runtime, "connection_only", False):
+            self.start.config(text="连接真实设备  →")
+            self.note.config(text="真实设备·仅连接：显示显微画面，查询 STM32；空格只采图和识别。移动、喷水和归零均禁用。")
         art = tk.Canvas(self, bg="#e4efeb", highlightthickness=0)
         art.grid(row=0, column=1, sticky="nsew", padx=(15, 0), pady=12)
         art.bind("<Configure>", lambda event: self._art(art, event.width, event.height))
@@ -275,6 +278,8 @@ class DetectionPage(Page):
         self.capture = button(actions, "采集首次图像并识别  [空格]", owner.capture, primary=True)
         self.capture.pack(side="right")
         self.capture.state(["disabled"])
+        if getattr(owner.runtime, "connection_only", False):
+            self.capture.config(text="采图并识别（不执行）  [空格]")
 
 
 class ReviewPage(Page):

@@ -1,5 +1,33 @@
 # EXPERIMENTS｜做过什么，结果怎样
 
+## EXP-CONNECTION-ONLY-20261030：工作台连接模式与真实设备查询
+
+用户批准仅连接方案；main@c8320cbab3bbcd4f3b55c92d410dfc413bb6bf5e，加原有 A 未提交成果及本轮 demo 改动。未提交/推送、未修改固件、C/B、质量默认或标定。此前 --real --arm-stage2-xy 启动因扩大到运动武装被自动审批拒绝，未执行；本次新增不带武装的独立能力模式，未重试被拒绝命令。
+
+- 新专项首轮 13 项有 1 个失败：无换行回复被误认；修复完整行判定并补参数/资源占用用例后 15 项通过，含实际 Tk 界面守卫、后台拒绝、失败释放、无归零/执行器及空格只采图。没有放宽旧测试。
+- 原样全量 654 项 / 58.012 秒，16 errors / 1 skipped；错误全部仍为旧 test_position_lifecycle.py 写死不存在的 D 盘目录。只重定向测试进程的 TEMP_ROOT 后中间全量通过；补连接期间即时保存原始查询/源码哈希后最终全量 654 项 / 57.733 秒，653 通过、0 failures、0 errors、1 skipped。跳过 coverage_analysis_report 实际 Agg 图，可选 Matplotlib 依赖缺失。
+- 真实连接在 2026-10-30 23:19（UTC+8）启动：操作者已确认大/小执行器电源关闭，只保留 USB；结束本轮独立预览进程以释放相机，使用 --connect-only --serial-port COM5 --camera-index 1 --camera-backend 1400 --camera-width 640 --camera-height 480 --no-tuned-policy。
+- 四项实际原始回复：HELLO → STEP_OK v0.3；READXY → STEP2 X=0 BX=0 Y=0 BY=0；MCV1|PING → MCV1|PONG；MCV1|STATUS → MCV1|STATUS|ESTOP=0|PUMP=0。CameraBroker 打开且读到相机后记录 CONNECTED，无连接错误。串口保持到用户取消/关闭；此记录仅为观察时状态。
+- 当次保存的发送原文只有这四项查询，motion_armed/pump_armed/position_reference_established=false。没有 MOVEXY、PUMP、ARM、CLEAR、STOP 或自动归零；READXY 不证明机械位置，ESTOP=0 不证明有急停。
+
+仅本机证据：C:/Users/lin43/Documents/Codex/2026-10-28/new-chat-2/work/connect_only/ 的 special_initial.log、special_final.log、full_original.log、full_portable.log、full_portable_final.log、full_portable_results.json 和目录适配脚本。真实在线记录在 outputs/Workbench_ConnectOnly_20261030/connection_20261030_231931_37070c89/connection.json；静态交付在 outputs/Workbench_ConnectOnly_交付_20261030/。日志/原始证据未上传。界面工具授权超时，未获取新工作台截图；真实 Tk 控件通过替身测试，真实连接依据程序状态/原始查询记录及窗口存在核对，不捏造目视验收。
+
+本次证明有限设备连接与读帧能力，不证明急停、像素毫米尺度、真实位移、喷水或清洁有效；G0/G1仍未通过，A4尚未进行。[入口与限制](../软件组/可视化工作台操作手册.md)。
+
+## EXP-A-FOCUS-20261030：真实失焦漏报回放与离线候选工具
+
+源码基线 main@c8320cbab3bbcd4f3b55c92d410dfc413bb6bf5e，加本轮未提交 A 改动。Python 3.13.5 / OpenCV 4.14.0 / NumPy 2.5.3。本轮未接相机、串口或执行器；实际图像沿用此前 G1 采集。
+
+证据仅本机保存于 C:/Users/lin43/Documents/Codex/2026-10-28/new-chat-2/outputs/。原 Gate1_20261030T132255Z.zip 的 SHA256 为 14515b523831dbef5e8575a2f76214c9a950889b55b37f913c8b7f0915372daa。新增 G1_A_20261030/ 保存 22 张原字节副本、清单、full_baseline/report.json、三图 fixture_baseline/ 及 validation/ 日志；不是团队已取得全部原始证据。
+
+- 全 22 图为同一次会话的开发/回归，21 clear / 1 defocused，材料/倍率/灯光 unknown。默认 reference=100 / minimum=0.7，失焦图方差 252.864267、正常最低 947.369855、恢复 1664.782020，全部 focus=1；missed_defocused=1、flagged_clear=0。清晰标签不等于材料或清洁真值。
+- 算术可分区间 361.23466749450137 < reference <= 1353.3855064755396，仅描述已看图。本轮没有选择生产参考值或导出实际设备配置。1200 仅在临时单元测试中作为显式输入，不能当成标定参数。
+- 新增专项：python -B -m unittest discover -s test/data_learning -p test_focus_calibration.py -v，19 项 / 1.073 秒通过；A 模块 discover，80 项 / 2.049 秒通过。首个模块路径启动失败留在 focus_tests_initial.log，正确 discover 结果在 focus_tests.log。
+- 原样全量：python -B -m unittest discover -s test -p 'test*.py' -v，639 项 / 55.190 秒，16 errors / 1 skipped。错误全部来自旧 test_position_lifecycle.py 的 D:/大创/tmp/mcv_impl_20261010，本机无 D 盘；未更改旧测试源码。
+- 可移植复跑：validation/run_full_portable.py 仅在测试进程将上述模块 TEMP_ROOT 指向会话 work/position_fixture_tmp，保留所有断言与业务源码。639 项 / 59.180 秒，0 failures、0 errors、1 skipped，即 638 项通过。跳过的是 coverage_analysis_report 的实际 Agg 图测试，缺 requirements/coverage-analysis.txt 中可选 Matplotlib 依赖。原始失败和适配后的日志、结构化结果均保留，不能写成原样全量全部通过。
+
+测试覆盖真实图默认漏报、显式候选与 ReplayCamera 离线消费、原文件/配置哈希、路径/标签/类别/分辨率、有限参数、context、冻结对象、重复/矛盾记录和失败输出。没有新增相机、主工作台或 ROI 实物验收；G1 未通过，原静态 raw_019 的 P95=0.263355px 超 0.25px 问题保留。A4 新会话采集、C/B 策略贯通及 G0 急停仍待完成。接口和操作见 [A 文档](../软件组/成员A/G1_对焦质量标定.md)。
+
 ## EXP-SW-THREE-VIEW-20261013：E2三图与导航
 
 基线fzh-branch@1107267，2份demo源码/2份测试增量；未提交/推送/实物操作。最终全量620项190.614秒OK，失败/错误/跳过0，含130项覆盖相关及10项覆盖真实Tk。新增4项Tk测试检查同帧完整输入、重算/无效时输入保留、强度不规划/导出快照、旧Options/最小布局、五页守卫/预览重开/MOVE/复检/结果路由。
