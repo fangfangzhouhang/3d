@@ -8,10 +8,11 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 from test_workbench_coverage import source_fixture
 from demo.station_window import WorkbenchWindow
 from demo.coverage_session import LatestCoverageWorker, compute_request
-from microcleaning.control_system.orchestration.workbench_events import EventBus
+from microcleaning.control_system.orchestration.workbench_events import EventBus, WorkbenchEvent
 from microcleaning.control_system.reporting.coverage_evidence import read_coverage_evidence
 
 
@@ -191,6 +192,77 @@ class WorkbenchCoverageTkTests(unittest.TestCase):
                 return False
             self.drive(window, tick)
             panel.export_thread.join(3)
+
+    def test_navigation_guards_preview_reopen_and_recheck_results_routes(self):
+        window, commands, reads = self.make_window()
+        for page in ("detection", "review", "monitor", "results"):
+            self.assertTrue(window.nav[page].instate(["disabled"]))
+            window.nav[page].invoke()
+            window.navigate(page)
+            self.assertEqual("cover", window.current_page)
+        with tempfile.TemporaryDirectory() as tmp:
+            source = source_fixture(tmp, manual=True)
+            self.bind(window, source)
+            window.coverage_open()
+            first = window.coverage.panel
+            first.root.withdraw()
+            self.assertEqual("review", window.current_page)
+            self.assertIsNone(window.root.grab_current())
+            self.assertIn("人工框选区域", first.mask_title.get())
+            first._alpha_changed(45)
+            first.original_only.set(True)
+            first.diameter.set("12")
+            generation = first.generation
+            first.close()
+            self.assertEqual("review", window.current_page)
+            window.coverage_open()
+            panel = window.coverage.panel
+            panel.root.withdraw()
+            self.assertIs(first.worker, panel.worker)
+            self.assertGreater(panel.generation, generation)
+            self.assertEqual(0.45, panel.alpha)
+            self.assertFalse(panel.original_only.get(), "temporary original-only viewing must not discard layer preferences")
+            self.assertFalse(panel.layers["target"].get())
+            np.testing.assert_array_equal(panel.input_images["original"], source.dataset.image_rgb)
+            self.assertEqual(source.dataset.input.frame_id, panel.dataset.input.frame_id)
+            def tick():
+                if panel.current_plan is None or panel.current_plan.model.profile.diameter != 12:
+                    return False
+                submitted = panel.worker.submitted_count
+                window._event(WorkbenchEvent("stage", {"phase": "MOVE", "current_target_id": "S0001", "explanation": "test stage only"}))
+                self.assertEqual("monitor", window.current_page)
+                window._event(WorkbenchEvent("recheck_choice", {"request_id": "test-recheck", "prompt": "test decision only",
+                    "choices": ("rewash", "next", "retake", "pause"), "facts": {"last_target": False}}))
+                self.assertEqual("monitor", window.current_page)
+                self.assertTrue(all(not button.instate(["disabled"]) for button in window.choice_buttons.values()))
+                window._event(WorkbenchEvent("confirmation_closed", {"request_id": "test-recheck"}))
+                snapshot = {"folder": tmp, "statistics": {"approved": 1, "executed_targets": 0, "cleaned": 0,
+                    "not_cleaned": 0, "uncertain": 1}, "quality_status": "UNCERTAIN", "workflow_status": "PAUSED",
+                    "targets": [], "report_ready": False}
+                window._event(WorkbenchEvent("results", {"snapshot": snapshot, "auto_navigate": False}))
+                self.assertEqual("monitor", window.current_page)
+                for page in window.PAGE_ORDER:
+                    self.assertFalse(window.nav[page].instate(["disabled"]))
+                    window.nav[page].invoke()
+                    self.assertEqual(page, window.current_page)
+                    self.assertEqual("grid", window.views[page].winfo_manager())
+                    self.assertTrue(all(not view.winfo_manager() for key, view in window.views.items() if key != page))
+                window._event(WorkbenchEvent("results", {"snapshot": {**snapshot, "report_ready": True}, "auto_navigate": True}))
+                self.assertEqual("results", window.current_page)
+                panel.close()
+                self.assertEqual("results", window.current_page)
+                window.nav["review"].invoke()
+                window.coverage_open()
+                reopened = window.coverage.panel
+                reopened.root.withdraw()
+                self.assertEqual("review", window.current_page)
+                self.assertEqual(0.45, reopened.alpha)
+                self.assertEqual(12, reopened.profile.diameter)
+                self.assertEqual(submitted + 1, reopened.worker.submitted_count)
+                self.assertEqual(commands, [])
+                self.assertEqual(reads, [])
+                return True
+            self.drive(window, tick)
 
 
 if __name__ == "__main__":

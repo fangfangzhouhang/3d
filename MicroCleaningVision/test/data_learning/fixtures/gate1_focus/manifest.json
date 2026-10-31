@@ -1,0 +1,62 @@
+{
+  "schema": "focus-manifest-v1",
+  "purpose": "development_regression",
+  "context": {
+    "setup_id": "gate1-fixed-setup-20261030",
+    "device": {
+      "name": "USB2.0 UVC PC Camera",
+      "hardware_id": "VID_A16F/PID_0304",
+      "device_index": 1,
+      "backend": 1400
+    },
+    "resolution_px": [
+      640,
+      480
+    ],
+    "sample_material": "unknown",
+    "magnification": "unknown",
+    "lighting": "unknown",
+    "setup_id_semantics": "Local record identifier; physical optical settings not independently verified"
+  },
+  "source": {
+    "evidence_folder": "Gate1_20261030T132255Z",
+    "source_commit": "c8320cbab3bbcd4f3b55c92d410dfc413bb6bf5e",
+    "labels_from": "Operator replies in this conversation; all images already seen",
+    "independent_validation": "not_performed"
+  },
+  "images": [
+    {
+      "sample_id": "normal_000",
+      "path": "normal.png",
+      "sha256": "1a1b376a34b2481a039bf38081d26b487a6a45edc24b5115aba05a35c713ffbe",
+      "label": "clear",
+      "label_source": "operator_confirmed",
+      "session_id": "gate1-20261030-operator-session",
+      "batch_id": "normal-static",
+      "condition": "operator_focused_fixed",
+      "original_evidence_ref": "raw_000.png"
+    },
+    {
+      "sample_id": "defocus",
+      "path": "defocus.png",
+      "sha256": "25d6088c2f2f591d35a0938614cd7033755ea8dd10d602b03a556c511e937c69",
+      "label": "defocused",
+      "label_source": "operator_confirmed",
+      "session_id": "gate1-20261030-operator-session",
+      "batch_id": "defocus-control",
+      "condition": "defocus",
+      "original_evidence_ref": "outputs/Gate1_20261030T132255Z/quality_controls/Gate1_20261030T132255Z/defocus_20261030T133228381294Z_d344d589.png"
+    },
+    {
+      "sample_id": "restored",
+      "path": "restored.png",
+      "sha256": "b9b879c095a6207d2332b1071a8f45bb75a5442873e868def202036efd34ed87",
+      "label": "clear",
+      "label_source": "operator_confirmed",
+      "session_id": "gate1-20261030-operator-session",
+      "batch_id": "restored-control",
+      "condition": "restored",
+      "original_evidence_ref": "outputs/Gate1_20261030T132255Z/quality_controls/Gate1_20261030T132255Z/restored_20261030T133627451735Z_b98ad366.png"
+    }
+  ]
+}

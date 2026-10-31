@@ -1,5 +1,21 @@
 # INTERFACES｜模块之间怎样传数据
 
+## 2026-10-30：工作台仅连接接口（主机局部）
+
+新增 CLI 模式 --connect-only，与 --mock / --real 互斥；必须显式 --serial-port / --camera-index，可指定现有相机参数和 --output-root。运动/泵武装、归零、非默认位置路径、尺度/偏移/工作坐标配置一律拒绝。没有新增串口命令、共享合同或位置字段。
+
+demo.device_connection.QueryOnlyConnection.query(command) 接受精确 HELLO / READXY / MCV1|PING / MCV1|STATUS，按对应完整换行回复核验；异常关闭，未经白名单的字符串或非字符串在开口前拒绝。close() 只关闭传输。READXY/STATUS 是固件计数和逻辑状态，不是台面反馈或安全批准。
+
+新增 workbench-connection-v1 的 connection.json：mode=connection_only、status=CONNECTING/CONNECTED/DISCONNECTED/ERROR、设备请求参数、冻结分割参数/哈希、查询回执、采图索引、原始 serial_events、错误与时间，executable/motion_armed/pump_armed/position_reference_established=false。不是清洗报告，也不写 summary.json。
+
+connection-capture-v1 保存同帧身份/来源/实际设置、原始 PNG/Mask/叠加各文件 SHA、像素测量、原有质量评分/flags。connection_device 允许单独更新相机或串口状态，避免相机事件覆盖真实串口结果；connection_capture 只显示采图结果，不生成动作。文件仅本机，详见 EXPERIMENTS。
+
+## 当前交接：2026-10-13，显示选项兼容
+
+StandaloneCoveragePanel.options可省略/为None：新UI采用RenderOptions(target=False, stations=False, alpha=0.25)。显式Options原样使用；旧归档CLI传archive.options，headless export-only保留原默认。Profile/Kernel/Plan/Renderer/归档schema、共享合同与串口均未改。
+
+三图共用image_rgb/input.mask和原frame_id/mask_kind；标题区分分割污渍、人工框、框内分割、参考标注和合成Mask。_options读取普通偏好，_display_options在临时原图查看时返回纯原图Options；导出冻结后者。Hub.view_options仅用于显示，不进入Profile/Policy/Plan ID。[字段和边界](../软件组/覆盖预览三图同屏与导航验收_2026-10-13.md)。
+
 ## 当前交接：2026-10-13，P6 可选观察与证据绑定
 
 CleaningLoop新增可选on_coverage_input=None；WorkbenchRuntime明确接入。payload有task/target、folder、stage(pre/post)、cycle/recheck、frame、原尺寸BGR、完整同域Mask、mask_kind、metadata、input_valid/reasons；图/Mask/metadata是独立副本，回调异常不影响执行。首次/补框由runtime直接冻结，同样不修改task_model或共享contracts/ports。

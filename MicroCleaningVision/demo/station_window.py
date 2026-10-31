@@ -320,7 +320,8 @@ class WorkbenchWindow:
         header = tk.Frame(outer, bg=BG)
         header.grid(row=0, column=0, sticky="ew")
         tk.Label(header, text="MicroCleaningVision", bg=BG, fg=INK, font=("Segoe UI", 19, "bold")).pack(side="left")
-        mode = "REAL · 实物模式" if runtime.args.real else "MOCK · 软件模拟"
+        mode = ("REAL · 真实设备·仅连接" if getattr(runtime, "connection_only", False)
+            else "REAL · 实物模式" if runtime.args.real else "MOCK · 软件模拟")
         tk.Label(header, text=f"  WORKBENCH v3   /   {mode}", bg=BG, fg=TEAL, font=(FONT, 10)).pack(side="left", padx=12)
         self.stop = button(header, "停止 / 取消任务  [Q]", lambda: runtime.submit("cancel"))
         self.stop.pack(side="right")
@@ -385,6 +386,14 @@ class WorkbenchWindow:
         self.root.bind("<space>", lambda event: self._shortcut(event, "capture"))
         self.root.bind("<Key-q>", lambda event: self._shortcut(event, "cancel"))
         self.root.bind("<Escape>", lambda event: runtime.submit("cancel") if runtime.active else None)
+        if getattr(runtime, "connection_only", False):
+            self.root.title("MicroCleaningVision · 真实设备·仅连接")
+            self.pump_state = "未武装；仅连接模式"
+            for control in (self.views["review"].begin, self.views["review"].lock,
+                    self.views["review"].all, *self.views["review"].edit_buttons,
+                    self.confirm_yes, self.confirm_no, *self.choice_buttons.values()):
+                control.state(["disabled"])
+            self._device_update()
         self.navigate("cover")
         self._pump()
 
@@ -397,6 +406,8 @@ class WorkbenchWindow:
             self.runtime.submit(action)
 
     def navigate(self, page):
+        if getattr(self.runtime, "connection_only", False) and page not in {"cover", "detection"}:
+            return
         if page == "review" and self.task is None:
             return
         if page == "results" and self.snapshot is None:
@@ -423,6 +434,8 @@ class WorkbenchWindow:
             allowed.update(("review", "monitor"))
         if self.snapshot is not None:
             allowed.add("results")
+        if getattr(self.runtime, "connection_only", False):
+            allowed.intersection_update({"cover", "detection"})
         for name, control in self.nav.items():
             control.state(["!disabled"] if name in allowed else ["disabled"])
 
@@ -491,7 +504,11 @@ class WorkbenchWindow:
 
     def _capture_buttons(self, available):
         for key in ("detection", "monitor"):
-            self.views[key].capture.state(["!disabled"] if available else ["disabled"])
+            if key == "monitor" and getattr(self.runtime, "connection_only", False):
+                available_for_page = False
+            else:
+                available_for_page = available
+            self.views[key].capture.state(["!disabled"] if available_for_page else ["disabled"])
 
     def decide(self, decision):
         stable = self.views["review"].selected
@@ -503,6 +520,9 @@ class WorkbenchWindow:
             self.runtime.submit("manual_add", bbox=bbox, reason=self.note.get().strip())
 
     def begin(self):
+        if getattr(self.runtime, "connection_only", False):
+            self.write("仅连接模式不提供清洗执行。")
+            return
         self.views["review"].begin.state(["disabled"])
         self.runtime.submit("begin")
         self.write("提交执行请求。锁定名单不替代每次运动和短喷的人工确认。")
@@ -568,6 +588,22 @@ class WorkbenchWindow:
 
     def _event(self, event):
         payload, kind = event.payload, event.kind
+        if getattr(self.runtime, "connection_only", False):
+            if kind in {"candidates", "task", "confirmation", "recheck_choice", "stage",
+                    "motion", "position", "geometry", "verification"} or "task" in payload:
+                self.write("仅连接模式忽略执行流程事件：" + kind)
+                return
+            if kind == "connection_device":
+                self.camera_state = payload.get("camera", self.camera_state)
+                self.serial_state = payload.get("serial", self.serial_state)
+                self.pump_state = payload.get("pump", self.pump_state)
+                self._device_update()
+                return
+            if kind == "connection_capture":
+                result = payload["result"]
+                self.write("已保存采图/识别：" + result["files"]["raw"]["path"]
+                    + "；面积 " + str(result["measurement"]["area_px"]) + " px；不会执行清洗。")
+                return
         if "task" in payload:
             self._task_update(payload["task"])
         if kind == "log":
@@ -589,6 +625,8 @@ class WorkbenchWindow:
             self.capture_ready = True
             self._capture_buttons(True)
             self.views["detection"].message.config(text="实时画面已准备。按空格或点击采集，冻结用于本轮审核的图像。")
+            if getattr(self.runtime, "connection_only", False):
+                self.views["detection"].message.config(text="真实设备·仅连接：空格只采图和识别；移动、喷水禁用。")
             self.views["monitor"].current.config(text=f"{self.current_target or '首次检测'} · 等待采集{'后' if payload['phase']=='post' else '前'}图。按空格或点击采集。")
         elif kind == "capture_closed":
             self.capture_ready = False
@@ -715,6 +753,10 @@ class WorkbenchWindow:
         elif kind == "idle":
             self.stop.state(["disabled"])
             self.views["cover"].start.config(text="开始新任务  →")
+            if getattr(self.runtime, "connection_only", False):
+                self.views["cover"].start.config(text="重新连接设备  →")
+                self.progress.stop()
+                self.progress_text.config(text="设备连接已结束")
             if self.restart_requested:
                 self.restart_requested = False
                 self.root.after(50, self.start_task)
@@ -750,6 +792,8 @@ class WorkbenchWindow:
     def _device_update(self):
         status = self.views["monitor"].position_data.get("status")
         xy = {"READY": "累计步数账本可用", "MOVING": "移动估算中", "POSITION_UNCERTAIN": "位置不可信", "UNHOMED": "参考待建立"}.get(status, "人工参考待确认")
+        if getattr(self.runtime, "connection_only", False):
+            xy = "禁用（不建立零点）"
         self.device.config(text=f"相机：{self.camera_state}　|　COM：{self.serial_state}　|　XY：{xy}　|　泵：{self.pump_state}")
 
     def _pump(self):
@@ -765,7 +809,9 @@ class WorkbenchWindow:
             try:
                 if self.current_page == "detection":
                     self.views["detection"].canvas.set_image(image)
-                    self.views["detection"].message.config(text="显微画面已打开。确认视野和焦点后按空格采集。")
+                    self.views["detection"].message.config(text="真实设备·仅连接：空格只采图和识别；移动、喷水禁用。"
+                        if getattr(self.runtime, "connection_only", False)
+                        else "显微画面已打开。确认视野和焦点后按空格采集。")
                     if self.progress_text.cget("text") == "正在准备显微视野":
                         self.progress.stop()
                         self.progress_text.config(text="显微视野已打开")

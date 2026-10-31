@@ -1,7 +1,132 @@
 # 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
 # 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
-updated_at: 2026-10-13
-current_phase: "覆盖规划P1-P6已随功能提交b36b505推送origin/fzh-branch并只读核验一致。工作台完整输入绑定、固定输入模拟预览、显式保存与可选报告完成，专项126/全量616项OK。所有覆盖输出不可执行，软件E2，实物E0。"
+updated_at: 2026-10-30
+current_phase: "真实设备仅连接工作台已实现，并在2026-10-30接入COM5/显微镜1；无运动/泵武装、无归零。A1-A3已完成，A4与C/B质量贯通待完成，G0/G1仍未过。本轮main@c8320cb加未提交改动，无提交/推送；历史覆盖验收数字保留。"
+
+workbench_connection_only_20261030:
+  status: implemented_and_real_connection_observed
+  observation_time: "2026-10-30T23:19:31+08:00"
+  observation_is_continuous_online_guarantee: false
+  baseline_commit: c8320cbab3bbcd4f3b55c92d410dfc413bb6bf5e
+  changes_committed: false
+  cli: demo.closed_loop_station_--connect-only
+  implementation: demo/device_connection.py
+  serial_port: COM5
+  serial_baudrate: 115200
+  camera_index: 1
+  requested_camera_backend: 1400
+  real_camera_read_observed: true
+  connection_queries:
+    - HELLO
+    - READXY
+    - "MCV1|PING"
+    - "MCV1|STATUS"
+  hello_reply: STEP_OK v0.3
+  ping_reply: "MCV1|PONG"
+  status_reply: "MCV1|STATUS|ESTOP=0|PUMP=0"
+  connection_errors_at_observation: []
+  actuator_supply_state: operator_confirmed_both_off_USB_only
+  actuator_commands_sent: 0
+  motion_armed: false
+  pump_armed: false
+  establishes_position_reference: false
+  uses_historical_motion_calibration: false
+  executable: false
+  specialist_tests_passed: 15
+  final_full_tests_run: 654
+  final_full_tests_passed: 653
+  final_full_failures: 0
+  final_full_errors: 0
+  final_full_skipped: 1
+  final_full_seconds: 57.733
+  full_fixture_directory_adapted_in_test_process: true
+  original_full_errors_absent_D_drive: 16
+  skipped_reason: optional_Matplotlib_dependency_missing
+  observed_connection_record: C:/Users/lin43/Documents/Codex/2026-10-28/new-chat-2/outputs/Workbench_ConnectOnly_20261030/connection_20261030_231931_37070c89/connection.json
+  evidence_sharing_status: local_only_not_uploaded_or_committed
+  emergency_stop_accepted: false
+  gate1_accepted: false
+
+focus_calibration_a_20261030:
+  baseline_branch: main
+  baseline_commit: c8320cbab3bbcd4f3b55c92d410dfc413bb6bf5e
+  status: a1_a3_offline_implemented_a4_pending
+  changes_committed: false
+  implementation: microcleaning/data_learning/focus_calibration.py
+  tests: test/data_learning/test_focus_calibration.py
+  regression_manifest: test/data_learning/fixtures/gate1_focus/manifest.json
+  documentation: 说明文档/软件组/成员A/G1_对焦质量标定.md
+  evidence_directory: C:/Users/lin43/Documents/Codex/2026-10-28/new-chat-2/outputs/G1_A_20261030/
+  original_evidence_zip_sha256: 14515b523831dbef5e8575a2f76214c9a950889b55b37f913c8b7f0915372daa
+  evidence_sharing_status: local_only_not_committed_or_uploaded
+  development_image_count: 22
+  development_clear_count: 21
+  development_defocused_count: 1
+  declared_session_count: 1
+  material_magnification_lighting: unknown
+  default_focus_reference: 100.0
+  default_policy_changed: false
+  default_missed_defocused: 1
+  production_reference_selected: false
+  device_candidate_profile_exported: false
+  profile_supported_status: candidate
+  independent_validation_status: not_performed
+  mainline_quality_policy_integrated: false
+  roi_quality_policy_integrated: false
+  gate1_status: not_passed
+  gate0_status: blocked_no_emergency_stop
+  emergency_stop_installed: false
+  observed_pb12_connection: gnd
+  physical_devices_used_this_implementation: false
+  new_tests_passed: 19
+  a_module_tests_passed: 80
+  original_full_regression:
+    tests_run: 639
+    failures: 0
+    errors: 16
+    skipped: 1
+    error_cause: old_test_TEMP_ROOT_on_absent_D_drive
+  portable_full_regression:
+    tests_run: 639
+    passed: 638
+    failures: 0
+    errors: 0
+    skipped: 1
+    seconds: 59.180
+    directory_adapter: runtime_TEMP_ROOT_override_only_no_source_or_assertion_changes
+    skipped_reason: optional_Matplotlib_dependency_missing
+    result: C:/Users/lin43/Documents/Codex/2026-10-28/new-chat-2/outputs/G1_A_20261030/validation/full_portable_results.json
+  next_step: freeze_conditions_candidate_and_evaluation_then_A4_new_session_acquisition
+
+coverage_preview_ui_v1:
+  baseline_commit: 1107267a9e3036c2fd069e5e23a5fb5a2071c5b5
+  status: implemented_and_software_validated
+  changes_committed: false
+  layout_scope: existing_coverage_preview_window
+  source_views: same_frozen_frame_and_complete_target_mask
+  profile_structure: existing_FootprintProfile
+  default_real_nozzle_diameter: null
+  nozzle_recommendation_added: false
+  new_ui_fill_alpha: 0.25
+  new_ui_target_underfill: false
+  new_ui_station_badges: false
+  recorded_render_options_preserved: true
+  render_archive_schema_changed: false
+  five_page_navigation_changed: false
+  five_page_routes_tested: true
+  preview_save_forces_navigation: false
+  new_real_tk_tests: 4
+  full_regression_tests: 620
+  full_regression_seconds: 190.614
+  failures: 0
+  errors: 0
+  skipped: 0
+  coverage_cases_in_full_regression: 130
+  coverage_real_tk_cases_in_full_regression: 10
+  log: D:/大创/work/coverage_ui_20261013/full_release_validation.log
+  evidence_directory: D:/大创/work/coverage_ui_20261013/
+  physical_devices_used: false
+  documentation: 说明文档/软件组/覆盖预览三图同屏与导航验收_2026-10-13.md
 
 current_evidence_level:
   overall_hardware: E0
@@ -276,11 +401,11 @@ hardware_boundary:
   camera_model: U500_USB数码显微镜
   camera_connection: USB
   camera_adapter: microcleaning/data_learning/usb_camera.py
-  camera_adapter_status: implemented_and_fake_capture_tested
+  camera_adapter_status: implemented_and_real_capture_observed_gate1_unaccepted
   camera_probe_entry: scripts/probe_usb_camera.py
-  camera_integration_status: integration_not_verified
-  physical_capture_verified: false
-  capture_evidence_note: "formal acceptance未完成；并非完全没有抓帧文件。本机有USB probe PNG与历史camera Demo，设备身份/条件与重复性仍需补证。"
+  camera_integration_status: real_capture_observed_quality_gate_unaccepted
+  physical_capture_verified: true
+  capture_evidence_note: "2026-10-30 G1有640x480真实原图，Windows记录USB2.0 UVC PC Camera/VID_A16F/PID_0304；不据此认证厂商型号。材料/倍率/灯光未知，默认策略漏报真实失焦。静态采集观测已完成，G1总体未通过，原图仅本机；本轮A实现只读图未开设备。"
   controller_port: microcleaning/ports.py
   real_hardware_armed: false
   stm32_board: STM32F103C8T6

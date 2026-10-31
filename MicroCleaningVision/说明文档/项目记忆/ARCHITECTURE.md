@@ -1,5 +1,19 @@
 # ARCHITECTURE｜整个系统怎么工作
 
+## 2026-10-30：真实设备只连接支路
+
+用户批准新增 --connect-only，closed_loop_station 在原完整 Real/Mock 分支之前校验独立能力：指定 COM/相机，拒绝运动/泵武装、归零、位置账本覆盖及运动几何配置。WorkbenchRuntime 冻结 connection_only，并将任务分流到 demo/device_connection.run_connection_task；不构造 CleaningLoop、HardwareExecutor、Stage2SerialLink 或 STM32SerialController。
+
+连接线程复用 COM ResourceLease 与 F103SerialSession，QueryOnlyConnection 只允许四项完整单行查询；相机仍由既有 CameraBroker 独占。Tk 主线程通过 connection_device / connection_capture 更新画面、状态和日志；后台和界面同时拒绝执行。串口保持到取消或关闭，关闭只释放传输、不发送 STOP/CLEAR/ARM，不建立位置零点。
+
+保存独立 connection_* 目录及原图/Mask/识别叠加，不伪装为清洗 summary/Episode 或正式位置账本。原完整 Real 仍有运动/标定与人工授权要求，旧 Mock 路径保持。操作见 [工作台手册](../软件组/可视化工作台操作手册.md)。
+
+## 当前交接：2026-10-13，三图显示支路
+
+StandaloneCoveragePanel从同一CoverageDataset读取原RGB/完整Mask，独立绘制并按数据身份/画布尺寸缓存两张输入图；初始化、重算、无模型与缩放均不依赖current_plan。中央继续用原render_coverage。参数移至可滚动右侧，高级项可展开，底部播放/导出优先保留空间。
+
+图层/强度只重绘，临时原图查看用于显示和导出快照，不覆盖普通偏好。Hub关闭重开保存普通Options，原worker/代次/源身份及五页事件路由保持。三图位于既有预览弹窗，未重排五页。[实现与验证](../软件组/覆盖预览三图同屏与导航验收_2026-10-13.md)。
+
 ## 当前交接：2026-10-13，P6 模拟预览接入工作台
 
 新增demo/workbench_coverage：审核首次原图/该S完整Mask、人工矩形，以及CleaningLoop最大残片筛选前/复检的mask & measurement_domain→不可变Source/绑定→既有P1–P4→固定输入Toplevel→审核叠加/监控入口。设备线程只复制发布观察，参数和模拟Plan不进入执行器；on_coverage_input默认关闭且异常隔离。
