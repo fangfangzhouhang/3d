@@ -1,5 +1,9 @@
 # INTERFACES｜模块之间怎样传数据
 
+## 2026-11-01：main归档局部接口原样保留
+
+合并引入上游microcleaning-run-archive-v1、microcleaning-retention-v1及RunArchiveExporter/verify_archive、demo.run_archive_worker.export_and_verify入口，未在冲突处理中变更它们。归档保留源树与来源分类，selection_records单独记录选择目的/理由，training_eligibility_override仍false。WASD字段、四项步进命令和共享contracts/ports不改；test_coverage_panel采用main等待播放/导出控件映射及初始高度的版本，全部原验收断言保留。
+
 ## 2026-11-01：修饰键与发送日志语义
 
 WASD映射保持W/S=X正/反、A/D=Y反/正；Ctrl/Alt/系统组合键不创建JogRequest，大小写仍接受。局部stdout JSON message新增TX_PENDING表示待发送意图；TX改为完整write返回后的记录，不证明物理运动。输出通道错误保留UI事件、触发STOP/锁定并拒绝重新启用，需重启恢复日志。串口协议、共享合同、原维护YES和固件均未改。

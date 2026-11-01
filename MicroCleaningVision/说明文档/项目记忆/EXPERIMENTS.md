@@ -1,5 +1,15 @@
 # EXPERIMENTS｜做过什么，结果怎样
 
+## EXP-MERGE-456-MAIN-20261101
+
+基线456@cb7f7b713d2cf5c0af28d8b8b4b4da68e8a10245，main@f3b8cf112a2aa712a388f17f3bf5a81260adfc69，共同基线56a32cf9395c67535bc9ca1692fb3e0b42d647a3。merge-tree预演与实际merge均只有test/test_coverage_panel.py冲突；审阅后选main包含播放/导出按钮映射与初始高度等待的原版本，尺寸/可见性断言未弱化。合并前创建backup/456-before-main-sync-20261101_121918。
+
+- 合并暂存树54e29aa7efbbf463fec6c8caa5826d5978068cd2；main18份变更均与main blob相同，456除冲突外14份独有变更均与cb7f7b71 blob相同，无未解决路径。保留上游归档/保留数据功能及WASD/日志故障修复。
+- 完整离线discover 762项/93.446秒：761通过、0失败、0错误、1项可选Matplotlib跳过，跳过原因仍缺requirements/coverage-analysis.txt。未注入旧D盘TEMP_ROOT，进程TEMP/TMP用工作区。新增上游归档/生命周期/数据保留测试参与全量；无实物串口/运动/喷水操作。最初验证启动曾因自动审批额度失败而未执行，用户继续后同一审批成功，未改执行路径绕过审批。
+- 合并提交7ff38b7954bb7ea17aeabe3127865c1a5b8d29c1已普通推送456，远端SHA一致且main已是456祖先。本轮不改main，不强推、不提交根目录商业计划书/调研。
+
+仅本机证据work/merge_456_main_20261101/：merge_plan.json、preservation_proof.json、full_merged.log、full_results.json、merge_result.json、verify_merge.py。原始日志未上传；该记录随附文档发布。软件合并通过不证明急停、位移或清洗有效。
+
 ## EXP-WASD-REVIEW-20261101：修复并准备上传456
 
 基线456@56a32cf9395c67535bc9ca1692fb3e0b42d647a3，加本轮未提交WASD成果。用户授权检查修复并推送456；本轮只用协议替身、合成图与自身Tk测试，没有连接或发令到实物。

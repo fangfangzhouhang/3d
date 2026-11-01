@@ -1,7 +1,29 @@
 # 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
 # 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
 updated_at: 2026-11-01
-current_phase: "WASD及输入/日志故障修复已提交并推送origin/456，功能提交1bab3eb9已核验；全量681项680通过/1可选跳过，旧布局/临时目录测试已修复。本轮无实物动作，G0/G1仍未验收。"
+current_phase: "456已合入最新main并解决单一测试冲突，合并提交7ff38b79已推送核验；归档/数据保留与WASD均保留。全量762项761通过/1可选跳过。本轮无实物操作，G0/G1未升级。"
+
+main_sync_456_20261101:
+  merge_commit: 7ff38b7954bb7ea17aeabe3127865c1a5b8d29c1
+  merged_main_commit: f3b8cf112a2aa712a388f17f3bf5a81260adfc69
+  branch: "456"
+  pushed_and_remote_verified: true
+  main_is_ancestor: true
+  resolved_conflict_files: 1
+  conflict_file: MicroCleaningVision/test/test_coverage_panel.py
+  resolution: reviewed_main_superset_preserving_all_dimension_assertions
+  main_changed_files_blob_identical: 18
+  own_changed_files_blob_identical_except_conflict: 14
+  full_tests_run: 762
+  full_tests_passed: 761
+  full_failures: 0
+  full_errors: 0
+  full_skipped_optional_dependency: 1
+  full_seconds: 93.446
+  fixture_module_override: false
+  main_reference_modified: false
+  hardware_actions: false
+  raw_evidence_shared: false
 
 wasd_publication_20261101:
   feature_commit: 1bab3eb97a5485f983041944b0e903ebfdb4b4b2
