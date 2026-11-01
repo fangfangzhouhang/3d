@@ -324,8 +324,15 @@ class CoveragePanelTests(unittest.TestCase):
         panel.root.deiconify()
         panel.root.geometry("1080x730")
         def drive():
+            playback = (panel.previous_button, panel.play_button, panel.next_button, panel.full_button)
             if panel.current_plan is None or not panel.root.winfo_ismapped() or any(
                     canvas.winfo_width() <= 1 for canvas in (panel.original_canvas, panel.mask_canvas, panel.canvas)):
+                return False
+            # Windows can map the canvases before packing the playback buttons.
+            # Wait only for mapping/initial geometry; the existing size and
+            # visibility assertions below remain the acceptance criteria.
+            if any(not widget.winfo_ismapped() or widget.winfo_height() <= 1
+                    for widget in (*playback, panel.export_button)):
                 return False
             # Assert after real WM mapping/configure events in the mainloop.
             root_bottom = panel.root.winfo_rooty() + panel.root.winfo_height()
