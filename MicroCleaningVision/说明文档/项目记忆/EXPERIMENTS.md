@@ -1,5 +1,16 @@
 # EXPERIMENTS｜做过什么，结果怎样
 
+## EXP-MANUAL-JOG-20261102：无头点动核心与既有回归对照
+
+源码基线 `feat/touch-jog-core@f3b8cf112a2aa712a388f17f3bf5a81260adfc69`，本轮新增 `demo/manual_jog.py` / `test/test_manual_jog.py`；Python3.13.14、NumPy2.5.4、OpenCV4.14.0、Pillow12.3.0。全部串口使用现有MockF103Serial/factory，无真实相机/COM/电机/泵、固件操作或UI实现。
+
+- 专项命令：`python -B -m unittest discover -s test -p test_manual_jog.py -v`。首轮22项/2.610秒OK；保存干净原始日志再跑22项/1.880秒OK，0跳过。覆盖四档/全部单轴对角、超限整条拒绝、坏参数/注入、未知/损坏/在途位置、人工记零、一次武装、严格布尔确认、拒绝不开口且再武装成功、原关卡标定拒绝、短计数STOP/未知、异常/中断解除武装、重入/资源互斥、参数加载、独立进程阻断tkinter/_tkinter仍可导入和构造。
+- 原样全量命令：`python -B -m unittest discover -s test -p 'test*.py' -v`。757项/208.736秒，0 errors、0 skipped，原文 `FAILED (failures=4)`。按测试方法计754通过、3方法失败，其中归档方法两项子场景失败，另为覆盖预览最小布局及数据保存按钮映射。任务中的654/653/1为旧基线；当前HEAD原有735项，本轮增加22项；可选Agg图在本机可运行，无新增跳过。
+- 三项旧UI测试单独运行3项/17.950秒，仍为同4条失败，且确认 `demo.manual_jog` 未导入。测试桌面为1024×768、Tk scaling约1.333；断言是旧按钮未映射或布局等待超时，不能将此写成全量通过，也未更改旧UI或测试判据。
+- 一次基线快照从错误子目录启动，空归档导致误跑标准库test；已停止该子进程，`baseline_full.log`作废，不计入项目验收。更正后从仓库根归档精确HEAD，验证含项目测试、不含新增点动模块，再作全量对照：735项/205.938秒，732通过、3方法失败（4条失败断言）、0错误/跳过；原文同为 `FAILED (failures=4)`。新旧四条失败标识逐项完全一致，新增失败为0、通过数增加22；259份既有Python/固件文件按Git换行规范化后与HEAD快照一致。
+
+日志与HEAD快照仅本机、被Git忽略：`output/manual_jog_validation/` 的 `special_initial.log`、`special_final.log`、`full_initial.log`、`legacy_ui_isolated.log`、`baseline_head_full.log`。`results.json`保存计数、完整失败标识和日志/新增源码SHA256；全量日志SHA256为 `0836329b5fe2851c3c9b67535048899dfaf466ebe3209fcfcf7d9863ecf0b387`，HEAD对照日志为 `56b8f053dac0ee1bdde9455d88358a0c5be59b0825332f894efcd122111d6878`。测试仅证明软件控制路径、协议计数与账本生命周期；不证明320步/mm实测、台面定位、机械回零/行程、急停或真实清洁效果。API与分工见 [README](../../README.md)。
+
 ## EXP-CONNECTION-ONLY-20261030：工作台连接模式与真实设备查询
 
 用户批准仅连接方案；main@c8320cbab3bbcd4f3b55c92d410dfc413bb6bf5e，加原有 A 未提交成果及本轮 demo 改动。未提交/推送、未修改固件、C/B、质量默认或标定。此前 --real --arm-stage2-xy 启动因扩大到运动武装被自动审批拒绝，未执行；本次新增不带武装的独立能力模式，未重试被拒绝命令。
