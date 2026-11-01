@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
 
@@ -565,9 +566,22 @@ class ResultsPage(Page):
     def __init__(self, owner):
         super().__init__(owner)
         self.attempt_index, self.recheck_index = None, None
-        heading(self, "04  结果与报告", "原始记录自动保存。报告由你选择导出或打印；流程结束和清洗质量分别显示。")
+        heading(self, "04  结果与报告", "原始记录先暂存，正式保留由你决定。报告可另行导出；流程结束和清洗质量分别显示。")
         self.summary = tk.Label(self, text="尚无任务结果", bg=PALE, fg=INK, anchor="w", padx=12, pady=9, font=(FONT, 12, "bold"))
         self.summary.pack(fill="x", pady=(0, 8))
+        save_bar = tk.Frame(self, bg=PALE, padx=10, pady=8)
+        save_bar.pack(fill="x", pady=(0, 8))
+        self.save_data_button = button(save_bar, "保存实验数据…", owner.show_data_save, primary=True)
+        self.save_data_button.pack(side="right", padx=(12, 0))
+        tk.Label(save_bar, text="原始记录已暂存。是否正式保留，由你在保存面板决定。", bg=PALE,
+            fg=INK, font=(FONT, 10), anchor="w").pack(side="left", fill="x", expand=True)
+        self.archive_state = tk.Label(self, text="共享数据目录未配置" if getattr(owner.runtime, "dataset_root", None) is None else "共享目录已配置；正式保留仍需用户确认",
+            bg=CARD, fg=MUTED, anchor="w", justify="left", wraplength=900, font=(FONT, 9))
+        self.archive_state.pack(fill="x", pady=(0, 8))
+        self.archive_state.bind("<Configure>", lambda event: self.archive_state.config(wraplength=max(300, event.width - 20)))
+        # Reserve fixed action rows before allocating the expanding evidence body.
+        export_controls = tk.Frame(self, bg=CARD)
+        export_controls.pack(side="bottom", fill="x")
         body = tk.Frame(self, bg=CARD)
         body.pack(fill="both", expand=True)
         body.columnconfigure(0, weight=3)
@@ -576,14 +590,14 @@ class ResultsPage(Page):
         left, right = tk.Frame(body, bg=CARD), tk.Frame(body, bg=CARD)
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
         right.grid(row=0, column=1, sticky="nsew")
-        self.tree = ttk.Treeview(left, columns=("quality",), show="tree headings", height=6, selectmode="browse")
+        self.tree = ttk.Treeview(left, columns=("quality",), show="tree headings", height=4, selectmode="browse")
         self.tree.heading("#0", text="目标 / 操作决定")
         self.tree.column("#0", width=165)
         self.tree.heading("quality", text="质量")
         self.tree.column("quality", width=110)
         self.tree.pack(fill="both", expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.selected)
-        self.detail = tk.Text(left, height=9, bg=BG, fg=INK, wrap="word", relief="flat",
+        self.detail = tk.Text(left, height=6, bg=BG, fg=INK, wrap="word", relief="flat",
                               padx=10, pady=8, font=(FONT, 9), state="disabled")
         self.detail.pack(fill="both", expand=True, pady=7)
         self.review_options = {"待质量复核": "UNCERTAIN", "人工确认已洗净": "CLEANED", "人工确认有残留": "NOT_CLEANED", "撤销人工结论": "REVOKED"}
@@ -619,9 +633,9 @@ class ResultsPage(Page):
         button(image_actions, "全图", lambda: owner.result_images(False)).pack(side="left", padx=(0, 7))
         button(image_actions, "分割 Mask", lambda: owner.result_images(True)).pack(side="left", padx=(0, 7))
         button(image_actions, "本轮同位置放大图", lambda: owner.result_images(crop=True)).pack(side="left")
-        self.export_state = tk.Label(self, text="尚未导出。可任选格式，不会自动打印。", bg=CARD, fg=MUTED, anchor="w", font=(FONT, 9))
+        self.export_state = tk.Label(export_controls, text="尚未导出。可任选格式，不会自动打印。", bg=CARD, fg=MUTED, anchor="w", font=(FONT, 9))
         self.export_state.pack(fill="x", pady=8)
-        actions = tk.Frame(self, bg=CARD)
+        actions = tk.Frame(export_controls, bg=CARD)
         actions.pack(fill="x")
         self.export_buttons = []
         for text, formats, printing in (("HTML 报告", ("html",), False), ("CSV 数据", ("csv",), False), ("HTML + CSV", ("html", "csv"), False), ("打印 / 另存 PDF", ("html",), True)):
@@ -630,7 +644,7 @@ class ResultsPage(Page):
             self.export_buttons.append(control)
         self.print_button = self.export_buttons[-1]
         button(actions, "新任务  →", lambda: owner.navigate("cover")).pack(side="right")
-        footer = tk.Frame(self, bg=CARD)
+        footer = tk.Frame(export_controls, bg=CARD)
         footer.pack(fill="x", pady=(8, 0))
         button(footer, "← 查看执行记录", lambda: owner.navigate("monitor")).pack(side="left", padx=(0, 8))
         button(footer, "打开历史任务", owner.choose_history).pack(side="left", padx=(0, 8))
@@ -638,6 +652,7 @@ class ResultsPage(Page):
         self.selected_id = None
 
     def update_snapshot(self, snapshot):
+        self.save_data_button.state(["disabled"] if self.owner.runtime.active else ["!disabled"])
         stats = {key: value if value is not None else "未记录" for key, value in snapshot["statistics"].items()}
         self.summary.config(text=f"{label(snapshot['quality_status'])}    |    {label(snapshot['workflow_status'])}    |    确认 {stats['approved']} · 输出完成 {stats['executed_targets']} · 通过 {stats['cleaned']} · 残留 {stats['not_cleaned']} · 待复核 {stats['uncertain']}")
         previous = self.selected_id
@@ -652,6 +667,27 @@ class ResultsPage(Page):
             self.pre.set_image(None)
             self.post.set_image(None)
         self.refresh_exports()
+
+    def update_archive(self, state):
+        """Tk-thread only. Archival status never changes task quality/printing."""
+        local = {True: "已保存", False: "未确认完整保存"}.get(state.get("local_saved"), "历史档案，未重新核验")
+        shared = {"awaiting_selection": "等待用户决定正式保留", "deferred": "暂不正式保留，原始记录仍暂存", "pending": "等待后台归档", "archiving": "正在后台归档",
+            "exported": "归档成功", "skipped": "已有一致归档，已跳过",
+            "failed": "归档失败", "interrupted": "归档未完成 / 已中断", "not_configured": "共享数据目录未配置"}.get(state.get("status"), "尚无共享归档记录")
+        verification = {"verified": "逐文件哈希校验通过", "not_checked": "尚未校验",
+            "not_verified": "未通过完整校验"}.get(state.get("verification"), "尚未校验")
+        destination_kind = state.get("destination_kind")
+        archive_label = "正式保留（本机）" if destination_kind == "local" else "共享归档"
+        location_label = "正式副本位置" if destination_kind == "local" else "共享档案位置"
+        if state.get("retention") in {"pending", "deferred"}:
+            local = "已暂存，尚未正式保留"
+        text = f"本地实验档案：{local}　|　{archive_label}：{shared}　|　文件校验：{verification}\n{location_label}：{state.get('path') or '—'}"
+        if state.get("retention") in {"pending", "deferred"} and getattr(self.owner.runtime, "dataset_root", None) is None:
+            text += "\n共享数据目录未配置；仍可由你选择本机正式保留目录。"
+        if state.get("status") in {"failed", "interrupted"}:
+            text += "\n本地原始档案仍然保留，需要稍后重新归档。\n" + str(state.get("error") or "")
+        text += "\n共享归档为保存时的快照；之后新增报告、复核和覆盖预览仅保存在本地。"
+        self.archive_state.config(text=text)
 
     def print_ready(self):
         snapshot = self.owner.snapshot or {}
@@ -751,3 +787,173 @@ class ResultsPage(Page):
         self.detail.delete("1.0", "end")
         self.detail.insert("1.0", text)
         self.detail.config(state="disabled")
+
+
+def retention_advice(snapshot):
+    """Explain evidence limitations, not a learned score or training approval."""
+    metadata = (snapshot.get("run_config") or {}).get("metadata") or snapshot.get("metadata") or {}
+    origin = metadata.get("data_origin", "unknown")
+    mode = snapshot.get("mode") or metadata.get("mode") or (snapshot.get("run_config") or {}).get("mode")
+    if mode == "mock" or origin in {"mock", "synthetic"}:
+        return "仅适合软件验证", "这是模拟实验，可用于界面、协议或异常回归；不能作为真实清洗效果样本。"
+    if snapshot.get("workflow_status") not in {"COMPLETED", "SUCCESS"}:
+        return "可作为失败案例保留", "中断、取消或失败也可能有研究价值。请记录触发条件；不会自动获得训练资格。"
+    if origin not in {"real", "manual_change"}:
+        return "请先核对数据来源", "没有可靠来源就保持 unknown；不能由运行模式或文件名推断为真实清洗数据。"
+    attempts = snapshot.get("attempts") or []
+    if (snapshot.get("evidence_issues") or snapshot.get("issues") or not snapshot.get("targets") or not attempts
+            or any(a.get("issues") or not a.get("pre") or not a.get("post") for a in attempts)):
+        return "建议补齐证据", "请核对前后图、任务记录和文件引用；证据不完整的数据仍可用于排查问题。"
+    if not metadata.get("sample_id") or metadata["sample_id"] in {"unknown", "未记录"}:
+        return "建议补充样本身份", "样本身份不明会影响追溯和数据划分；可按排查用途保留，不能自动提升训练资格。"
+    return "可考虑正式保留", "优先保留新样本、关键对照、代表性失败或可复现实验。还需你判断价值；清洗成功并非唯一标准。"
+
+
+class DataSaveDialog:
+    """Explicit human retention workflow. All Tk access stays on its owner thread."""
+    def __init__(self, owner):
+        self.owner, self.snapshot = owner, owner.snapshot
+        self.folder = Path(self.snapshot["folder"])
+        self.closed, self.saved_path = False, None
+        self.window = tk.Toplevel(owner.root)
+        self.window.title("保存实验数据 · 用户确认版")
+        self.window.configure(bg=CARD)
+        scale = getattr(owner, "scale", 1)
+        width = min(int(880 * scale), self.window.winfo_screenwidth() - 80)
+        height = min(int(790 * scale), self.window.winfo_screenheight() - 100)
+        self.window.geometry(f"{width}x{height}")
+        self.window.minsize(min(800, width), min(650, height))
+        self.window.protocol("WM_DELETE_WINDOW", self.close)
+        # Fixed footer remains visible; form scrolls on short screens.
+        footer = tk.Frame(self.window, bg=CARD, padx=15, pady=12)
+        footer.pack(side="bottom", fill="x")
+        canvas = tk.Canvas(self.window, bg=CARD, highlightthickness=0)
+        scroll = ttk.Scrollbar(self.window, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="right", fill="y")
+        canvas.pack(fill="both", expand=True)
+        form = tk.Frame(canvas, bg=CARD, padx=16, pady=16)
+        item = canvas.create_window((0, 0), window=form, anchor="nw")
+        form.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(item, width=e.width))
+        heading(form, "保存实验数据", "运行记录已暂存。只有经你确认的数据才进入本地正式库或共享目录。")
+        self.status = tk.Label(form, bg=PALE, fg=INK, anchor="w", justify="left", padx=10, pady=10,
+            font=(FONT, 10), text="原始记录可查看，是否正式保留由你决定")
+        self.status.pack(fill="x", pady=(0, 10))
+        title, detail = retention_advice(self.snapshot)
+        tk.Label(form, text=f"价值建议：{title}", bg=CARD, fg=TEAL, font=(FONT, 12, "bold"), anchor="w").pack(fill="x")
+        advice = tk.Label(form, text=detail, bg=CARD, fg=MUTED, justify="left", anchor="w", font=(FONT, 10))
+        advice.pack(fill="x", pady=(5, 12))
+        advice.bind("<Configure>", lambda e: advice.config(wraplength=max(250, e.width - 5)))
+        self.status.bind("<Configure>", lambda e: self.status.config(wraplength=max(250, e.width - 25)))
+        tk.Label(form, text="暂存位置（原始图片、动作、复检和日志）", bg=CARD, fg=MUTED, anchor="w").pack(fill="x")
+        self.source = tk.StringVar(value=str(self.folder))
+        ttk.Entry(form, textvariable=self.source, state="readonly").pack(fill="x", pady=5)
+        button(form, "打开暂存文件夹", lambda: owner.open_data_location(self.folder, str(self.folder))).pack(anchor="w")
+        choices = tk.Frame(form, bg=CARD)
+        choices.pack(fill="x", pady=(15, 5))
+        self.destination_kind = tk.StringVar(value="local")
+        output_root = Path(owner.runtime.args.output_root)
+        local = output_root.parent / "精选实验数据" if output_root.is_absolute() else Path.home() / "MicroCleaningData"
+        self.destinations = {"local": str(local), "shared": str(owner.runtime.dataset_root or "")}
+        self.last_kind = "local"
+        for kind, caption in (("local", "正式保留到本机"), ("shared", "正式保留到共享目录")):
+            ttk.Radiobutton(choices, text=caption, value=kind, variable=self.destination_kind,
+                command=self._destination_changed).pack(side="left", padx=(0, 15))
+        location = tk.Frame(form, bg=CARD)
+        location.pack(fill="x")
+        self.destination = tk.StringVar(value=self.destinations["local"])
+        ttk.Entry(location, textvariable=self.destination).pack(side="left", fill="x", expand=True)
+        button(location, "选择文件夹…", self.choose_destination).pack(side="right", padx=(7, 0))
+        tk.Label(form, text="请选择仓库外的目标目录。已有快照不会覆盖；此选择只作用于本次保留。", bg=CARD,
+            fg=MUTED, anchor="w", font=(FONT, 9)).pack(fill="x", pady=(5, 14))
+        tk.Label(form, text="保留用途", bg=CARD, fg=INK, anchor="w").pack(fill="x")
+        self.purpose = tk.StringVar(value="")
+        purposes = ("实验分析", "代表性失败 / 异常排查", "候选训练数据（仍需独立审核）", "软件回归测试", "演示教学")
+        if (self.snapshot.get("mode") or (self.snapshot.get("metadata") or {}).get("mode")) == "mock":
+            purposes = ("软件回归测试", "代表性失败 / 异常排查", "演示教学")
+        ttk.Combobox(form, textvariable=self.purpose, values=purposes, state="readonly").pack(fill="x", pady=5)
+        tk.Label(form, text="为什么值得保留？例如：新样本、关键对照、代表性失败。", bg=CARD,
+            fg=INK, anchor="w", font=(FONT, 10)).pack(fill="x", pady=(5, 0))
+        self.reason = tk.StringVar()
+        ttk.Entry(form, textvariable=self.reason).pack(fill="x", pady=7)
+        self.confirmed = tk.BooleanVar(value=False)
+        ttk.Checkbutton(form, text="我已确认这次数据值得正式保留（不等于已审核为训练数据）", variable=self.confirmed).pack(anchor="w", pady=5)
+        self.feedback = tk.Label(form, text="不做选择不会自动进入正式库；暂不保留也不会删除原始记录。", bg=CARD,
+            fg=MUTED, anchor="w", justify="left", font=(FONT, 10))
+        self.feedback.pack(fill="x", pady=8)
+        self.feedback.bind("<Configure>", lambda e: self.feedback.config(wraplength=max(250, e.width - 5)))
+        self.defer_button = button(footer, "暂不保留", self.defer)
+        self.defer_button.pack(side="left")
+        self.save_button = button(footer, "确认并保存实验数据", self.save, primary=True)
+        self.save_button.pack(side="right")
+        self.open_button = button(footer, "打开正式副本", self.open_saved)
+        self.open_button.pack(side="right", padx=8)
+        self.open_button.state(["disabled"])
+        state = owner.runtime.archive_status(self.folder)
+        if state:
+            self.update_archive(state)
+
+    def _destination_changed(self):
+        self.destinations[self.last_kind] = self.destination.get()
+        self.last_kind = self.destination_kind.get()
+        self.destination.set(self.destinations[self.last_kind])
+
+    def choose_destination(self):
+        from tkinter import filedialog
+        chosen = filedialog.askdirectory(parent=self.window, title="选择正式保留目录", mustexist=False)
+        if chosen:
+            self.destination.set(chosen)
+
+    def save(self):
+        if not self.confirmed.get() or not self.destination.get().strip() or not self.purpose.get().strip() or not self.reason.get().strip():
+            self.feedback.config(text="请选择目标目录和用途，填写保留理由，并勾选人工确认。", fg=AMBER)
+            return
+        accepted = self.owner.runtime.save_archive(self.folder, self.destination.get().strip(),
+            purpose=self.purpose.get(), reason=self.reason.get(), destination_kind=self.destination_kind.get(),
+            operator=(self.snapshot.get("metadata") or {}).get("operator", ""))
+        if accepted:
+            self.update_archive({"status": "pending"})
+        else:
+            self.feedback.config(text="当前任务或归档仍在运行，请等待结束后再保存。", fg=AMBER)
+
+    def defer(self):
+        if self.owner.runtime.defer_retention(self.folder):
+            self.update_archive({"status": "deferred"})
+        else:
+            self.feedback.config(text="正在保存或已有正式副本；此按钮不会删除或撤回已有数据。", fg=AMBER)
+
+    def update_archive(self, state):
+        status = state.get("status")
+        busy = status in {"pending", "archiving"}
+        self.save_button.state(["disabled"] if busy else ["!disabled"])
+        self.defer_button.state(["disabled"] if busy else ["!disabled"])
+        if state.get("path"):
+            self.saved_path = state["path"]
+            self.open_button.state(["!disabled"])
+        if status in {"exported", "skipped"}:
+            self.status.config(text=f"已正式保留 · 逐文件 SHA256 校验通过\n正式副本：{self.saved_path}")
+            self.feedback.config(text="归档是保存时的快照；此后新增报告、复核和预览仍只保存在原始目录。", fg=MUTED)
+        elif status in {"failed", "interrupted"}:
+            self.status.config(text="正式保存未完成。原始档案仍然保留，需要稍后重新归档。")
+            self.feedback.config(text=str(state.get("error") or "") + "\n可检查权限或选择新的空目录重试；已有内容不会覆盖。", fg=AMBER)
+        elif busy:
+            self.status.config(text="正在后台保存并校验；你可以继续查看页面。")
+            self.feedback.config(text="保存期间不重复发起。归档结果不会改变清洗结果。", fg=MUTED)
+        elif status == "deferred":
+            self.status.config(text="暂不正式保留 · 原始记录仍在暂存目录")
+            self.feedback.config(text="未创建正式副本，未删除原始记录。之后可再次打开本面板决定。", fg=MUTED)
+        else:
+            self.status.config(text="原始记录已暂存 · 等待你决定是否正式保留")
+
+    def open_saved(self):
+        if self.saved_path:
+            self.owner.open_data_location(self.folder, self.saved_path)
+
+    def close(self):
+        if self.closed:
+            return
+        self.closed = True
+        self.window.destroy()
+        if getattr(self.owner, "data_save_window", None) is self:
+            self.owner.data_save_window = None
