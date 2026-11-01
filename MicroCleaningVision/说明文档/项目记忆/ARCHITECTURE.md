@@ -1,5 +1,21 @@
 # ARCHITECTURE｜整个系统怎么工作
 
+## 2026-11-01：合入main已有归档支路
+
+本轮解决单一测试冲突，main已有demo/run_archive_worker.py、data_learning/run_archive.py及工作台归档/用户确认数据保留分支原样进入456；工作台可调用文件归档子进程做快照、哈希/校验与发布，独立选择回执与原始源树分开。来源是上游main，而非本轮重写。原WASD独立窗口、查询连接分支、资源互斥与固件均保留；本轮手工修改只用于统一测试等待语义。架构合并验证为软件集成，不升级硬件证据。
+
+## 2026-11-01：点动输入与日志故障收口
+
+Tk层仅将无Ctrl/Alt/系统修饰的WASD交给控制器，Shift/CapsLock兼容；空格STOP保持可用。_emit日志通道异常不再逃出worker清理路径，而是请求STOP并保留UI错误，之后禁止重新启用；_write在TX_PENDING后再次核对取消，完整write后才发TX事件。唯一设备所有者、请求冻结、位置失效/互斥与原执行入口保持。既有覆盖UI无需业务改动，其测试补齐子按钮映射等待。
+
+## 2026-10-31后续：WASD显式启用方式修订
+
+用户覆盖原主机急停验收前置要求后，真实窗口移除不实硬件核验框、显示未验收事实，按钮直接以operator_authorized=True启用。显式--enable在Tk启动空闲回调中仅请求一次open/握手，不生成运动，STOP后不自动消费启动授权。JogController统一_emit向UI与stdout JSON行发布状态和TX/RX；单设备线程、ResourceLease、发送前位置失效和短步/STOP不变。当前未因授权改变而更新任何硬件验收结论。
+
+## 2026-10-31：独立键盘维护窗口
+
+scripts/keyboard_stepper.py → demo.stepper_jog：Tk仅接收当前窗口键盘，JogController以固定不可变单步请求交给唯一设备线程；STOP事件优先，不积压移动队列。默认模拟不打开COM/不改正式账本。真实分支复用原编码/解析、ResourceLease和mark_unknown，首次发令前作废正式参考，成功也不恢复可信。失焦/取消/异常停止并锁定，人工重新启用后重新握手。没有改相机预览、工作台仅连接白名单、原执行链或固件。当前仅模拟/替身验证，[详情](../软件组/WASD维护点动.md)。
+
 ## 2026-10-30：真实设备只连接支路
 
 用户批准新增 --connect-only，closed_loop_station 在原完整 Real/Mock 分支之前校验独立能力：指定 COM/相机，拒绝运动/泵武装、归零、位置账本覆盖及运动几何配置。WorkbenchRuntime 冻结 connection_only，并将任务分流到 demo/device_connection.run_connection_task；不构造 CleaningLoop、HardwareExecutor、Stage2SerialLink 或 STM32SerialController。

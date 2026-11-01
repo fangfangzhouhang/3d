@@ -1,7 +1,100 @@
 # 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
 # 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
-updated_at: 2026-10-31
-current_phase: "A离线对焦和真实工作台仅连接模式已提交并推送origin/456；已有三图UI保留，功能提交b9c27047已核验。G0/G1与真实清洁仍未过，A4与主线质量贯通待完成。完整实验资产仍本机。"
+updated_at: 2026-11-01
+current_phase: "456已合入最新main并解决单一测试冲突，合并提交7ff38b79已推送核验；归档/数据保留与WASD均保留。全量762项761通过/1可选跳过。本轮无实物操作，G0/G1未升级。"
+
+main_sync_456_20261101:
+  merge_commit: 7ff38b7954bb7ea17aeabe3127865c1a5b8d29c1
+  merged_main_commit: f3b8cf112a2aa712a388f17f3bf5a81260adfc69
+  branch: "456"
+  pushed_and_remote_verified: true
+  main_is_ancestor: true
+  resolved_conflict_files: 1
+  conflict_file: MicroCleaningVision/test/test_coverage_panel.py
+  resolution: reviewed_main_superset_preserving_all_dimension_assertions
+  main_changed_files_blob_identical: 18
+  own_changed_files_blob_identical_except_conflict: 14
+  full_tests_run: 762
+  full_tests_passed: 761
+  full_failures: 0
+  full_errors: 0
+  full_skipped_optional_dependency: 1
+  full_seconds: 93.446
+  fixture_module_override: false
+  main_reference_modified: false
+  hardware_actions: false
+  raw_evidence_shared: false
+
+wasd_publication_20261101:
+  feature_commit: 1bab3eb97a5485f983041944b0e903ebfdb4b4b2
+  branch: "456"
+  remote: origin
+  normal_push_completed_and_sha_verified: true
+  force_push: false
+  main_modified: false
+  feature_files: 14
+  full_tests_run: 681
+  full_tests_passed: 680
+  failures: 0
+  errors: 0
+  skipped_optional_dependency: 1
+  fixture_module_override: false
+  original_test_logs_shared: false
+  hardware_actions_for_review_or_publication: false
+
+keyboard_stepper_20261031:
+  status: real_COM5_ready_observed_after_explicit_user_override
+  baseline_commit: 56a32cf9395c67535bc9ca1692fb3e0b42d647a3
+  branch: "456"
+  changes_committed: true
+  entrypoint: scripts/keyboard_stepper.py
+  default_mode: simulation_no_COM_no_position_write
+  default_pulses_per_key: 20
+  key_axes: {w: X_positive, s: X_negative, a: Y_negative, d: Y_positive}
+  axes_mapping_user_changed_on: 2026-10-31
+  latest_mapping_ready_observed_at: "2026-10-31T23:47:30+08:00"
+  latest_mapping_launch_record: C:/Users/lin43/Documents/Codex/2026-10-28/new-chat-2/work/wasd_20261031/axes_swapped_launch.json
+  latest_mapping_specialist_tests_passed: 27
+  full_test_result_applies_to_previous_mapping: false
+  maintenance_step_cap_per_key: 1000
+  held_key_repeat_enabled: false
+  busy_move_queue_enabled: false
+  specialist_tests_passed: 27
+  full_tests_run: 681
+  full_tests_passed: 680
+  full_failures: 0
+  full_errors: 0
+  full_skipped: 1
+  full_result: successful_with_one_optional_dependency_skip
+  full_seconds: 57.214
+  full_fixture_override_required: false
+  modified_shortcuts_create_motion_request: false
+  stdout_failure_stops_and_prevents_reenable: true
+  layout_test_waits_for_child_buttons_mapped: true
+  position_tests_use_standard_tempfile: true
+  isolated_old_mock_tests_passed_without_sandbox_chdir_restriction: 16
+  isolated_old_UI_failure_reproduced_without_importing_WASD: true
+  existing_source_test_firmware_files_changed: 2
+  agent_generated_real_motion: false
+  operator_motion_protocol_records_exist: true
+  physical_motion_accepted: false
+  serial_port_opened_for_this_task: true
+  emergency_stop_accepted: false
+  real_mode_requires_operator_hardware_confirmation: false
+  real_mode_requires_explicit_operator_enable: true
+  user_explicitly_overrode_host_estop_precondition: true
+  hardware_acceptance_claimed_by_override: false
+  startup_enable_generates_motion_request: false
+  last_requested_real_port: COM5
+  requested_port_currently_enumerated: true
+  real_ready_observed_at: "2026-10-31T23:39:07+08:00"
+  observed_startup_tx: [HELLO, READXY]
+  observed_hello_reply: "STEP_OK v0.3"
+  observed_idle_reply: "STEP2 X=0 BX=0 Y=0 BY=0"
+  real_window_title: "WASD 步进点动 · 真实设备"
+  agent_generated_motion_keys: false
+  modifies_existing_cleaning_or_connect_only_path: false
+  documentation: 说明文档/软件组/WASD维护点动.md
 
 main_sync_456_20261031:
   merge_commit: 38caf656269e41980462adf86bbbfa978f8924a8
