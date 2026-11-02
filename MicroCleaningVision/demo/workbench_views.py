@@ -814,8 +814,8 @@ def retention_advice(snapshot):
 class JogPage(Page):
     """05 手动点动（触屏）。
 
-    布局对标成熟开源运动控制触屏界面的交互模式（借模式不借皮）；配色为
-    本页专属低饱和灰咖 palette（见下方类常量），不改模块级共享常量：KlipperScreen 式「读数置顶大字 + 点动盘居中 +
+    布局对标成熟开源运动控制触屏界面的交互模式（借模式不借皮）；配色套
+    theme-factory「Arctic Frost」主题（本页专属 palette，见下方类常量），不改模块级共享常量：KlipperScreen 式「读数置顶大字 + 点动盘居中 +
     档位成排」；UGS/CNCjs jog pendant 式「轴向分组、步长预设独立区、
     归零独立区」。危险/状态动作（武装、归零、停止）集中在独立安全区，
     与点动按钮视觉分离防误触；「停止」不放在方向盘中心。
@@ -832,23 +832,28 @@ class JogPage(Page):
         ("↙", "REV", "REV"), ("↓  Y-", None, "REV"), ("↘", "FWD", "REV"),
     )
 
-    # 本页专属配色（ark 定版低饱和灰咖；不改模块级共享常量 BG/CARD/INK/…，
-    # 以免波及其他五页）。黑白灰为骨、咖色点缀，全页无高饱和色。
-    _PAGE_BG = "#f4f2ef"     # 页面底：暖浅灰
-    _CARD_BG = "#ffffff"     # 读数区/卡片底
-    _PANEL_BG = "#e9e6e1"    # 次级面板 / 按钮未选态
-    _INK = "#1c1a17"         # 主文字
-    _MUTED = "#7a7368"       # 次级文字
-    _PAD_BG = "#d9d4cc"      # 方向键常态
-    _PAD_ACTIVE = "#cbc4b8"  # 方向键按下
-    _PAD_EDGE = "#b8b1a4"    # 方向键边框
-    _PRESET_ON = "#5d4a36"   # 档位选中：深咖（配白字）
-    _ACCENT = "#8c6d4f"      # 武装/确认的激活强调：咖
-    _SAFETY_BG = "#ece7de"   # 底部安全区底
-    _STOP_BG = "#9e4f43"     # 停止：低饱和砖红（配白字，全页最醒目）
+    # 本页专属配色（theme-factory「Arctic Frost」主题，ark 选定；不改模块级
+    # 共享常量 BG/CARD/INK/…，以免波及其他五页）。主题四色：Ice Blue #d4e4f7 /
+    # Steel Blue #4a6fa5 / Silver #c0c0c0 / Crisp White #fafafa；另衍生深钢蓝
+    # #2e4a73 作主文字（保触屏可读性）与两档 Ice Blue 淡色阶 #eef3fa/#e8eef5。
+    # 「停止」砖红为安全例外，不套主题色（须与全页蓝灰拉开识别距离）。
+    # 字体不换：主题指定 DejaVu Sans 无中文字形，保持工作台现有字体。
+    _PAGE_BG = "#fafafa"     # 页面底：Crisp White
+    _CARD_BG = "#d4e4f7"     # 读数区底 / 盘心档位标签底：Ice Blue
+    _PANEL_BG = "#e8eef5"    # 档位未选 / 武装未武装：Ice Blue 淡色阶
+    _INK = "#2e4a73"         # 主文字 / 读数大字：深钢蓝（Steel Blue 衍生）
+    _MUTED = "#4a6fa5"       # 次级文字：Steel Blue
+    _PAD_BG = "#eef3fa"      # 方向键常态：Ice Blue 淡色阶
+    _PAD_ACTIVE = "#d4e4f7"  # 方向键按下：Ice Blue
+    _PAD_EDGE = "#c0c0c0"    # 方向键边框：Silver
+    _PRESET_ON = "#4a6fa5"   # 档位选中：Steel Blue（配白字）
+    _ACCENT = "#4a6fa5"      # 模式标签 / 武装已武装 / 确认键：Steel Blue（配白字）
+    _SAFETY_BG = "#eef3fa"   # 底部安全区底：Ice Blue 淡色阶
+    _STOP_BG = "#9e4f43"     # 停止：低饱和砖红（配白字，全页最醒目；安全例外不套主题）
     _STOP_ACTIVE = "#8a4238"  # 停止按下
-    _WARN_BG = "#e3ddd2"     # 警告条/确认弹窗：灰咖底
-    _WARN_FG = "#4a3f31"     # 警告文字：深咖
+    _WARN_BG = "#d4e4f7"     # G0 警告条底：Ice Blue
+    _WARN_FG = "#2e4a73"     # 警告条字 / 安全区标题字：深钢蓝
+    _POPUP_BG = "#eef3fa"    # 确认弹窗底：Ice Blue 淡色阶
 
     def __init__(self, owner):
         super().__init__(owner)
@@ -887,7 +892,7 @@ class JogPage(Page):
         self.pos_x_label.pack(side="left", padx=(18, 10))
         self.pos_y_label = tk.Label(readout, text="Y  —", bg=self._CARD_BG, fg=self._INK, font=(FONT, 19, "bold"))
         self.pos_y_label.pack(side="left", padx=(0, 18))
-        self.mode_label = tk.Label(readout, text=mode_banner(self.mode), bg=self._CARD_BG, fg=self._ACCENT, font=(FONT, 10, "bold"))
+        self.mode_label = tk.Label(readout, text=mode_banner(self.mode), bg=self._ACCENT, fg="white", font=(FONT, 10, "bold"))
         self.mode_label.pack(side="left")
         # ── 点动区：左方向盘、右档位，分区带标题 ──
         body = tk.Frame(self, bg=CARD)
@@ -901,7 +906,7 @@ class JogPage(Page):
         for index, (caption, dx_dir, dy_dir) in enumerate(self._PAD):
             row, column = divmod(index, 3)
             if caption is None:
-                self.center_label = tk.Label(pad, text="1 mm\n320 步", bg=self._PANEL_BG, fg=self._INK,
+                self.center_label = tk.Label(pad, text="1 mm\n320 步", bg=self._CARD_BG, fg=self._INK,
                     font=(FONT, 13, "bold"), width=8, height=3, justify="center")
                 self.center_label.grid(row=row, column=column, padx=5, pady=5)
                 continue
@@ -1089,15 +1094,15 @@ class JogPage(Page):
         popup = tk.Toplevel(self)
         self._popup, self._popup_id = popup, request["id"]
         popup.title("确认点动" if request["kind"] == "motion" else "确认归零")
-        popup.configure(bg=self._WARN_BG)
+        popup.configure(bg=self._POPUP_BG)
         popup.geometry("640x380")
         popup.transient(self.winfo_toplevel())
         for line in request["lines"]:
-            tk.Label(popup, text=line, bg=self._WARN_BG, fg=self._INK, font=(FONT, 13), anchor="w",
+            tk.Label(popup, text=line, bg=self._POPUP_BG, fg=self._INK, font=(FONT, 13), anchor="w",
                 justify="left", wraplength=590).pack(fill="x", padx=18, pady=(10, 0))
-        tk.Label(popup, text="20 秒内不确认自动取消，不会运动。", bg=self._WARN_BG, fg=self._MUTED,
+        tk.Label(popup, text="20 秒内不确认自动取消，不会运动。", bg=self._POPUP_BG, fg=self._MUTED,
             font=(FONT, 10), anchor="w").pack(fill="x", padx=18, pady=(10, 0))
-        bar = tk.Frame(popup, bg=self._WARN_BG)
+        bar = tk.Frame(popup, bg=self._POPUP_BG)
         bar.pack(side="bottom", fill="x", padx=18, pady=16)
         confirm_caption = "确认移动" if request["kind"] == "motion" else "确认归零"
         tk.Button(bar, text=confirm_caption, font=(FONT, 15, "bold"), width=14, height=2,
