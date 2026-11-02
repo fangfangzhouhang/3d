@@ -1,5 +1,40 @@
 # MicroCleaningVision
 
+## 2026-11-02：触摸屏点动与在途停止
+
+新增 `demo.manual_jog.JogController`，由 demo/C 集成人维护；不依赖 Tk，不自动建立零点或批准动作。
+`single_move_dispatch` 构造一条 MOVEXY，`demo.motion_mode._stage2_move` 负责原运动关卡、人工确认、串口、回执和位置账本。
+沿用当前六档 32/160/320/1600/3200/6400 步，标签 0.1/0.5/1/5/10/20 mm 仅按名义 320 步/mm 换算。
+核心接受任意正整数步数，任一轴超过单条固件上限 20000 步整条拒绝，不截断；原 motion_gate 与固件规则不变。
+
+```python
+from demo.manual_jog import JogController
+
+controller = JogController(
+    stage2_calibration="path/to/mm_per_px.json",  # 原电机标定 loader，缺失/警告仍被关卡拒绝
+    serial_port="COMx",                         # 人明确指定，不扫描
+    confirm=confirm_from_operator,               # 调用方实现 confirm(request, plan) -> bool
+)
+# 人已经对位，并明确确认参考点后，才可调用：
+controller.set_zero(confirmed=operator_confirmed_reference)
+controller.arm()
+result = controller.jog("FWD", None, 32)         # 单 X；None 表示该轴不运动
+# 对角示例：重新 arm() 后 jog("FWD", "REV", 160)，每轴各 160 步。
+```
+
+`get_position()` 每次读取原账本；未知、损坏、MOVING 或故障状态均拒发，归零仅复用软件账本逻辑，并非机械回零。
+`arm()` 只放行下一次尝试，参数错误/拒绝/失败也消耗；`disarm()` 清除未使用的武装，不代替硬件急停。
+确认必须明确返回布尔 `True`；无回调、不确认或字符串答案均不开串口。COM/账本复用现有跨进程互斥。
+结果包含 `status`（sent/failed/declined/denied）、`reason_codes`、`message`、`position`、`run_dir` 和原始 `motion`。
+每次进入原执行器使用独立目录，保留 `stage2_intent.json` 与发送后的 `stage2_receipt.json`；面板预检拒绝不创建执行档案。
+现有工作台点动页在设备线程调用核心；本轮不修改 UI 逻辑，沿用其 `controller.stop()` 接口。
+另一线程调用 `stop()` 会解除武装、取消待确认，并在当前连接直接写入/刷新 STOP；不开新口、不排在运动任务队列后。
+link 只锁住 write+flush，等回执时释放锁；运动线程保持唯一读者，随后沿原异常路径再发一次 STOP 并确认。
+停止后的在途结果为 failed，`reason_codes=("OPERATOR_STOPPED",)`，STOP 确认失败不会覆盖原因。
+已尝试 MOVEXY 时原账本置未知，人工重新对位并显式记零后才可再动；握手期停止则撤销 pending、保留原参考点。
+`stop()` 返回当时账本快照，最终状态以运动结果/回执为准。STOP 写出、STEP_STOPPED 和 READXY 都不是物理停止或位置反馈证明。
+测试命令和证据边界见 [EXPERIMENTS](说明文档/项目记忆/EXPERIMENTS.md)。
+
 ## 2026-10-13：覆盖预览三图同屏
 
 既有预览窗口同时显示原图、完整目标Mask和预计覆盖，新UI默认25%轻填色并可调，输入图在重算/无效参数时保留。复用单一FootprintProfile，直径显式输入，无多喷头推荐；旧档案选项/重放及五页导航保持。

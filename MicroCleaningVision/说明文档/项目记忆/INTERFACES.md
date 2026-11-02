@@ -1,5 +1,19 @@
 # INTERFACES｜模块之间怎样传数据
 
+## 2026-11-02：停止局部接口与原因码
+
+- Stage2SerialLink.request_stop() -> bool：记录停止事件，仅使用当前已持有连接写入并刷新 STOP；True 只表示立即写入/刷新完成（重复成功调用不再写），False 表示无当前连接或写入异常；不打开/重连/读回执。停止事件不因写入失败撤销。
+- _stage2_move(..., on_link=None)：可选 Callable[[Stage2SerialLink | None], None]，批准后/发送前注册 link，finally 以 None 注销；旧调用默认关闭。
+- JogController.stop() -> Stage2Position 签名不变：解除武装、取消确认、请求当前 link 停止，返回当时账本快照。JogResult.status=failed，reason_codes 含原 error.reason_code=OPERATOR_STOPPED；motion.error.stopped 独立表示协议确认结果，失败不覆盖停止原因。待确认被取消继续沿原 declined 结果。
+- motion_attempted 在 MOVEXY write 前置真（包括部分写入异常）；真走 mark_unknown，假走 record_not_started。无新账本字段，不改 motion_gate/contracts/固件。当前预置六档/单条20000上限沿用基线，旧四档1600描述只作历史。
+
+MCV1 交错容忍只在 link 读取层，每次交换最多 read_limit（默认40）次 readline；只有 MCV1、没有 STEP 回复仍报 WRONG_PROTOCOL，未知非MCV1内容仍由原解析器拒绝。线上 STEP v0.3/MCV1 句子与共享合同版本均不变。
+
+## 2026-11-02：点动核心局部 API
+
+`JogController(..., confirm=callback)` 接受 `confirm(request: MotionRequest, plan: dict) -> bool`；只有明确布尔True放行。`jog(dx_dir,dy_dir,steps)`：方向FWD/REV，None禁用轴，两轴共用32/160/320/1600档位；超过1600整条拒绝，标签按320步/mm名义换算。
+`arm()/disarm()/armed` 管一次尝试；`get_position()` 返回原Stage2Position；`set_zero(confirmed=True)` 仅在人工对位确认后复用原记零。JogResult含status、reason_codes、message、position、run_dir与原Stage2MotionOutcome；状态统一sent/failed/declined/denied，原human_declined/human_pending仍可从motion读取。不改变共享合同、线上协议或固件，详见 [README](../../README.md)。
+
 ## 2026-10-30：工作台仅连接接口（主机局部）
 
 新增 CLI 模式 --connect-only，与 --mock / --real 互斥；必须显式 --serial-port / --camera-index，可指定现有相机参数和 --output-root。运动/泵武装、归零、非默认位置路径、尺度/偏移/工作坐标配置一律拒绝。没有新增串口命令、共享合同或位置字段。

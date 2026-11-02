@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from threading import Event, Lock
 from typing import Any, Callable
 
 from microcleaning.contracts import SafetyDecision
@@ -133,6 +134,12 @@ class Stage2SerialLink:
         self._lease = object()
         self._read_limit = read_limit
         self._connection: Any = None
+        # Only writes (including flush) and close share this lock. The sole
+        # reader must never hold it while waiting for a board response.
+        self._write_lock = Lock()
+        self._stop_requested = Event()
+        self._stop_sent = False
+        self._motion_attempted = False
         self.on_progress: Callable[[dict[str, str]], None] | None = None
         self.on_motion_progress: Callable[[dict[str, object]], None] | None = None
         self._active_segment: dict[str, object] | None = None
@@ -152,6 +159,33 @@ class Stage2SerialLink:
             raise RuntimeError("运动链路已绑定其他会话")
         self._session = session
         self._owns_connection = False
+
+    def request_stop(self) -> bool:
+        """Latch cancellation and write STOP on the current connection only.
+
+        No open, reconnect or read is allowed here. True means write+flush
+        completed, not that the board acknowledged or physically stopped.
+        Repeated calls do not duplicate a successful immediate STOP; transmit's
+        exception path still sends its own STOP and reads the confirmation.
+        """
+        self._stop_requested.set()
+        with self._write_lock:
+            connection = self._connection
+            if connection is None:
+                return False
+            if self._stop_sent:
+                return True
+            try:
+                self._write_payload(connection, encode_stop())
+            except Exception:
+                return False
+            self._stop_sent = True
+        self._emit("tx", "STOP")
+        return True
+
+    def _check_stop(self) -> None:
+        if self._stop_requested.is_set():
+            raise Stage2ProtocolError("OPERATOR_STOPPED", "操作者请求停止")
 
     def transmit(
         self,
@@ -176,9 +210,10 @@ class Stage2SerialLink:
         sent: list[str] = []
         replies: list[str] = []
         in_flight: str | None = None
-        motion_attempted = False
+        self._motion_attempted = False
         try:
             try:
+                self._check_stop()
                 self._clear_input()
                 hello = self._exchange(encode_hello())
                 replies.append(hello.raw)
@@ -195,7 +230,6 @@ class Stage2SerialLink:
                         "x_direction": parts[2], "y_direction": parts[4]}
                     self._emit_motion("segment_start", x_sent=0, y_sent=0)
                     in_flight = line
-                    motion_attempted = True
                     start = self._exchange(payload)
                     replies.append(start.raw)
                     if (
@@ -218,18 +252,21 @@ class Stage2SerialLink:
                     in_flight = None
                 # 持久化提交须在连接关闭前进行；提交失败仍由同一串口尝试 STOP。
                 result = Stage2TransmitResult("STEP_OK v0.3", tuple(sent), tuple(replies), False)
+                self._check_stop()
                 if on_completed is not None:
                     on_completed(result)
+                self._check_stop()
             except (Exception, KeyboardInterrupt) as exc:
+                reason = "OPERATOR_STOPPED" if self._stop_requested.is_set() else _reason_code(exc)
                 stopped = self._stop_into(replies)
                 raise Stage2TransmitError(
-                    _reason_code(exc),
+                    reason,
                     str(exc),
                     sent_lines=tuple(sent),
                     in_flight_line=in_flight,
                     replies=tuple(replies),
                     stopped=stopped,
-                    motion_attempted=motion_attempted,
+                    motion_attempted=self._motion_attempted,
                 ) from exc
         finally:
             self._active_segment = None
@@ -239,8 +276,9 @@ class Stage2SerialLink:
     def close(self) -> None:
         session = self._session
         owns = self._owns_connection
-        connection = self._connection
-        self._connection = None
+        with self._write_lock:
+            connection = self._connection
+            self._connection = None
         if session is not None:
             session.release(self._lease)
         if not owns or connection is None:
@@ -283,6 +321,10 @@ class Stage2SerialLink:
             return self._stop_without_cancel(replies)
 
     def _stop_without_cancel(self, replies: list[str]) -> bool:
+        # A stop requested before opening a connection must not open one just
+        # for cleanup, either. Only the transmit thread reads the confirmation.
+        if self._connection is None:
+            return False
         try:
             stopped = self._exchange(encode_stop())
             replies.append(stopped.raw)
@@ -293,19 +335,50 @@ class Stage2SerialLink:
     def _exchange(self, payload: bytes) -> Stage2Reply:
         if b"MCV1" in payload or b"PUMP" in payload:
             raise Stage2ProtocolError("UNSAFE_LINE", "步进口拒绝喷水报文")
+        stopping = payload == encode_stop()
+        if not stopping:
+            self._check_stop()
         connection = self._ensure_connection()
+        with self._write_lock:
+            if not stopping:
+                self._check_stop()
+            if payload.startswith(b"MOVEXY "):
+                # An attempted write can fail after sending a partial command.
+                self._motion_attempted = True
+            self._write_payload(connection, payload)
+        sent = payload.decode("ascii", errors="replace").strip()
+        self._emit("tx", sent)
+        foreign_seen = False
+        for _ in range(self._read_limit):
+            if not stopping:
+                self._check_stop()
+            raw = connection.readline()
+            if raw:
+                text = raw.decode("ascii", errors="strict").strip() if isinstance(raw, bytes) else raw.strip()
+                self._emit("rx", text)
+            if not stopping:
+                self._check_stop()
+            if not raw:
+                break
+            # The common firmware may report an aborted pump before the STEP
+            # STOP reply. Keep tolerance here; the STEP parser stays strict.
+            if text.startswith("MCV1|"):
+                foreign_seen = True
+                continue
+            reply = parse_stage2_reply(raw)
+            if stopping and reply.kind in {"STEP_OK", "STEP2_START", "STEP2"}:
+                continue  # Replies already queued before the immediate STOP.
+            return reply
+        if foreign_seen:
+            raise Stage2ProtocolError("WRONG_PROTOCOL", "读取上限/超时内没有收到步进回复")
+        raise TimeoutError("RESPONSE_TIMEOUT_OR_READ_LIMIT")
+
+    @staticmethod
+    def _write_payload(connection: Any, payload: bytes) -> None:
         connection.write(payload)
         flush = getattr(connection, "flush", None)
         if callable(flush):
             flush()
-        sent = payload.decode("ascii", errors="replace").strip()
-        self._emit("tx", sent)
-        raw = connection.readline()
-        if not raw:
-            raise TimeoutError("RESPONSE_TIMEOUT")
-        reply = parse_stage2_reply(raw)
-        self._emit("rx", reply.raw.strip())
-        return reply
 
     def _emit(self, phase: str, message: str) -> None:
         callback = self.on_progress

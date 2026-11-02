@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 from microcleaning.contracts import Episode
 from microcleaning.contracts import FailureRecord
@@ -97,6 +97,7 @@ def _stage2_move(
     baudrate: int,
     serial_timeout: float,
     serial_factory: SerialFactory | None,
+    on_link: Callable[[Stage2SerialLink | None], None] | None = None,
 ) -> Stage2MotionOutcome:
     """运动关卡 → 人确认 → 武装 → 发送。打开 COM 前先落盘意图，发送后无论成败都落盘回执。"""
 
@@ -167,6 +168,8 @@ def _stage2_move(
         position_after = record_completed(position_path, sent.sent_lines, run_id=run_id,
                                           motion_id=request.request_id)
     try:
+        if on_link is not None:
+            on_link(link)
         begin_motion(position_path, dispatch.lines, run_id=run_id, motion_id=request.request_id,
                      expected_before=request.position_before_steps)
         result = link.transmit(dispatch, request=request, decision=decision, on_completed=commit_completed)
@@ -200,6 +203,8 @@ def _stage2_move(
             pass
         raise
     finally:
+        if on_link is not None:
+            on_link(None)
         # 写盘失败时也保留盘上的 PENDING/未知状态，而不是把旧 READY 写进回执。
         position_after = load_position(position_path)
         _write_json(

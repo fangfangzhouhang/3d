@@ -1,5 +1,18 @@
 # ARCHITECTURE｜整个系统怎么工作
 
+## 2026-11-02：点动停止抢占路径
+
+现有 UI → JogController.stop → 状态锁内解除武装/记停止/取在途 link → 锁外取消确认、link.request_stop → 当前串口 write+flush。_stage2_move 通过默认 None 的 on_link 注册句柄，finally 注销；注册前收到的停止在注册时补交，确认返回后再检查停止，防止迟到的 True 放行。
+
+Stage2SerialLink 的写锁仅覆盖 write+flush 与关闭时摘除连接，readline 不持锁，所以 STOP 不等长运动回执或设备队列；它最多等待当前写入/刷新。停止事件持续禁止本 link 后续 MOVEXY，实际写入前才标记 motion_attempted。唯一运动读者检测停止后抛原 Stage2TransmitError(OPERATOR_STOPPED)，原异常路径第二次 STOP 及原账本处理保留。最终回执仍可能等待正在进行的 readline 返回/超时，不能据此承诺实物停止时延。
+
+link 读取层有界跳过 MCV1 交错行；STOP 确认还可越过已排入的 STEP_OK/START/READXY，只接受 STEP_STOPPED。解析器语义、F103 会话所有权和 UI 逻辑不变。C负责串口机制，集成人负责句柄生命周期/回执，H1/H2后续才验证真实停止。下方无UI/四档描述为首轮历史。
+
+## 2026-11-02：无头点动适配层
+
+`JogController.jog → 四档/单轴1600上限/一次性武装/位置预检 → single_move_dispatch → demo.motion_mode._stage2_move → 原 motion_gate/确认/Stage2SerialLink/回执/账本`。start_reference 固定 image_center，控制器不构造审批或直接写串口。
+同步调用、同一控制器忙时拒绝重入/重武装/归零；点动与显式 set_zero 均持有原 COM/位置 ResourceLease。标定复用 load_motor_calibration，串口默认115200/2秒，与 closed_loop_station 一致；无 nozzle 偏移、相机或 Tk 依赖。调用方法见 [README](../../README.md)。
+
 ## 2026-10-30：真实设备只连接支路
 
 用户批准新增 --connect-only，closed_loop_station 在原完整 Real/Mock 分支之前校验独立能力：指定 COM/相机，拒绝运动/泵武装、归零、位置账本覆盖及运动几何配置。WorkbenchRuntime 冻结 connection_only，并将任务分流到 demo/device_connection.run_connection_task；不构造 CleaningLoop、HardwareExecutor、Stage2SerialLink 或 STM32SerialController。

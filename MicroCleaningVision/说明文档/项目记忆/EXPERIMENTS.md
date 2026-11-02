@@ -1,5 +1,37 @@
 # EXPERIMENTS｜做过什么，结果怎样
 
+## EXP-JOG-STOP-20261102：在途抢占与账本的软件验证
+
+负责人 ark 明确批准；源码基线 jog-stop-local@b237287bbdfe17536896e5da749ddb633c0d6d00（含已有核心与触屏页），本轮三份业务源码和新增 test/test_jog_stop.py。Python3.13.14，复用现有项目虚拟环境解释器，-B禁写字节码，不更改其他worktree。串口均为Event替身，未打开真实COM、相机、运动/泵或固件；仅软件集成证据，物理停止延迟、位置和急停未验收。
+
+- 专项：`python -B -m unittest discover -s test -p test_jog_stop.py -v`，26项/1.048秒OK。threading.Event固定等待点，不用sleep猜时序。覆盖START/READXY阻塞时STOP先写、write+flush成对互斥、控制器锁在串口IO期间可获取、重复停止、握手/开口/注册前停止、迟到True取消、串口读/写/flush/STOP确认失败、段间停止、发令前motion_attempted分界、未知账本/显式记零恢复、句柄finally注销、MCV1交错/读取上限与解析器仍严格。
+- 原点动核心25项/1.811秒、面板13项/1.528秒、`discover -s test/control_system/serial -v`既有串口59项/0.166秒，全部OK，0跳过。
+- 全量：`python -B -m unittest discover -s test -p 'test*.py' -v`，stdout/stderr直接重定向到full_final.log后读取。799项/155.729秒，原文 `FAILED (failures=4)`；0错误/0跳过，按方法计796通过/3失败。失败严格为既有archive_lifecycle的fail=False/True两个子测、coverage_panel最小布局、data_retention保存按钮映射，完整标识在results.json。开工同解释器完整收集773项/0加载错误，本轮新增26项，799=773+26，无删减测试、无修改旧断言或UI。
+- 首跑26项有1个新fixture断言失败：同一测试先成功一次再停止一次，工厂累计opens=2，helper误写为1；改为显式预期累计次数后上述专项和全量通过。special_initial.log保留原记录（首跑PowerShell重定向含其stderr包装），正式日志由subprocess原字节重定向。
+
+仅本机、Git忽略：output/jog_stop_validation/ 的special_initial.log、special_final.log、core_final.log、panel_final.log、serial_final.log、full_final.log、results.json、review.json及对应运行/汇总/检查脚本。results.json保存计数、4条失败标识和4份源码SHA256；review.json核对测试版本源码哈希/语法、260份其余既有Python/固件按Git换行规则不变、新链接和YAML解析。原始日志未共享，随本地提交的是源码/测试和本文证据索引。
+
+| 日志 | SHA256 |
+|---|---|
+| special_final.log | 8a529bf6d1b7bb5e6418df68589549955a6ac49a07c685792b7b47e398a2cdbe |
+| core_final.log | 1c5c1439fa90c2d130cb49dec3e63941648604ad863bb0bae75df50f1e98b17d |
+| panel_final.log | 4ef1fa740162602ebcb25668e07b776f2ec1f71403dae51fe902c8824d795a7e |
+| serial_final.log | 198125e6c7fbf2038815941569bf7164933454bdf6f3630ba8853fdeec6f1d4a |
+| full_final.log | 49418d25e174429b8b4e2085b15089ae0164bc6287aa26d25f63b244f7a5842b |
+
+核心结论：STOP写入不等待运动回执，停止原因与协议确认结果分开记录；是否尝试MOVEXY决定未知/保留参考账本。不能把这些替身断言当作物理已停或实物恢复验收。接口见 [README](../../README.md) 与 [共同协议](../硬件组/串口协议与参数.md)。
+
+## EXP-MANUAL-JOG-20261102：无头点动核心与既有回归对照
+
+源码基线 `feat/touch-jog-core@f3b8cf112a2aa712a388f17f3bf5a81260adfc69`，本轮新增 `demo/manual_jog.py` / `test/test_manual_jog.py`；Python3.13.14、NumPy2.5.4、OpenCV4.14.0、Pillow12.3.0。全部串口使用现有MockF103Serial/factory，无真实相机/COM/电机/泵、固件操作或UI实现。
+
+- 专项命令：`python -B -m unittest discover -s test -p test_manual_jog.py -v`。首轮22项/2.610秒OK；保存干净原始日志再跑22项/1.880秒OK，0跳过。覆盖四档/全部单轴对角、超限整条拒绝、坏参数/注入、未知/损坏/在途位置、人工记零、一次武装、严格布尔确认、拒绝不开口且再武装成功、原关卡标定拒绝、短计数STOP/未知、异常/中断解除武装、重入/资源互斥、参数加载、独立进程阻断tkinter/_tkinter仍可导入和构造。
+- 原样全量命令：`python -B -m unittest discover -s test -p 'test*.py' -v`。757项/208.736秒，0 errors、0 skipped，原文 `FAILED (failures=4)`。按测试方法计754通过、3方法失败，其中归档方法两项子场景失败，另为覆盖预览最小布局及数据保存按钮映射。任务中的654/653/1为旧基线；当前HEAD原有735项，本轮增加22项；可选Agg图在本机可运行，无新增跳过。
+- 三项旧UI测试单独运行3项/17.950秒，仍为同4条失败，且确认 `demo.manual_jog` 未导入。测试桌面为1024×768、Tk scaling约1.333；断言是旧按钮未映射或布局等待超时，不能将此写成全量通过，也未更改旧UI或测试判据。
+- 一次基线快照从错误子目录启动，空归档导致误跑标准库test；已停止该子进程，`baseline_full.log`作废，不计入项目验收。更正后从仓库根归档精确HEAD，验证含项目测试、不含新增点动模块，再作全量对照：735项/205.938秒，732通过、3方法失败（4条失败断言）、0错误/跳过；原文同为 `FAILED (failures=4)`。新旧四条失败标识逐项完全一致，新增失败为0、通过数增加22；259份既有Python/固件文件按Git换行规范化后与HEAD快照一致。
+
+日志与HEAD快照仅本机、被Git忽略：`output/manual_jog_validation/` 的 `special_initial.log`、`special_final.log`、`full_initial.log`、`legacy_ui_isolated.log`、`baseline_head_full.log`。`results.json`保存计数、完整失败标识和日志/新增源码SHA256；全量日志SHA256为 `0836329b5fe2851c3c9b67535048899dfaf466ebe3209fcfcf7d9863ecf0b387`，HEAD对照日志为 `56b8f053dac0ee1bdde9455d88358a0c5be59b0825332f894efcd122111d6878`。测试仅证明软件控制路径、协议计数与账本生命周期；不证明320步/mm实测、台面定位、机械回零/行程、急停或真实清洁效果。API与分工见 [README](../../README.md)。
+
 ## EXP-CONNECTION-ONLY-20261030：工作台连接模式与真实设备查询
 
 用户批准仅连接方案；main@c8320cbab3bbcd4f3b55c92d410dfc413bb6bf5e，加原有 A 未提交成果及本轮 demo 改动。未提交/推送、未修改固件、C/B、质量默认或标定。此前 --real --arm-stage2-xy 启动因扩大到运动武装被自动审批拒绝，未执行；本次新增不带武装的独立能力模式，未重试被拒绝命令。

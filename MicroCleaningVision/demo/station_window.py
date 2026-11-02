@@ -259,7 +259,7 @@ def _fit(image, max_w: int = 520, max_h: int = 390):
 class WorkbenchWindow:
     """新的 mainloop 工作台；旧 StationPanel 仍服务旧入口和兼容测试。"""
 
-    PAGE_ORDER = ("cover", "detection", "review", "monitor", "results")
+    PAGE_ORDER = ("cover", "detection", "review", "monitor", "results", "jog")
 
     def __init__(self, runtime):
         import gc
@@ -267,7 +267,7 @@ class WorkbenchWindow:
         import tkinter as tk
         from tkinter import ttk
         from demo.workbench_views import BG, CARD, INK, MUTED, TEAL, PALE, FONT
-        from demo.workbench_views import CoverPage, DetectionPage, ReviewPage, MonitorPage, ResultsPage, button
+        from demo.workbench_views import CoverPage, DetectionPage, ReviewPage, MonitorPage, ResultsPage, JogPage, button
         self.tk, self.runtime = tk, runtime
         import sys
         if sys.platform == "win32":
@@ -337,7 +337,7 @@ class WorkbenchWindow:
         navigation = tk.Frame(progress, bg=BG)
         navigation.pack(fill="x")
         self.nav = {}
-        for page, caption in zip(self.PAGE_ORDER, ("封面", "01 实时检测", "02 目标审核", "03 清洗监控", "04 结果报告")):
+        for page, caption in zip(self.PAGE_ORDER, ("封面", "01 实时检测", "02 目标审核", "03 清洗监控", "04 结果报告", "05 手动点动")):
             control = button(navigation, caption, lambda page=page: self.navigate(page))
             control.pack(side="left", padx=(0, 7))
             self.nav[page] = control
@@ -351,7 +351,7 @@ class WorkbenchWindow:
         self.pages.grid(row=3, column=0, sticky="nsew")
         self.pages.rowconfigure(0, weight=1)
         self.pages.columnconfigure(0, weight=1)
-        self.views = {name: view(self) for name, view in zip(self.PAGE_ORDER, (CoverPage, DetectionPage, ReviewPage, MonitorPage, ResultsPage))}
+        self.views = {name: view(self) for name, view in zip(self.PAGE_ORDER, (CoverPage, DetectionPage, ReviewPage, MonitorPage, ResultsPage, JogPage))}
         for view in self.views.values():
             view.grid(row=0, column=0, sticky="nsew")
         self.confirm_card = tk.Frame(outer, bg="#fff2d9", padx=12, pady=9)
@@ -409,7 +409,7 @@ class WorkbenchWindow:
             self.runtime.submit(action)
 
     def navigate(self, page):
-        if getattr(self.runtime, "connection_only", False) and page not in {"cover", "detection"}:
+        if getattr(self.runtime, "connection_only", False) and page not in {"cover", "detection", "jog"}:
             return
         if page == "review" and self.task is None:
             return
@@ -430,7 +430,7 @@ class WorkbenchWindow:
         self._refresh_nav()
 
     def _refresh_nav(self):
-        allowed = {"cover"}
+        allowed = {"cover", "jog"}
         if self.runtime.active or self.reference is not None:
             allowed.add("detection")
         if self.task is not None:
@@ -438,7 +438,7 @@ class WorkbenchWindow:
         if self.snapshot is not None:
             allowed.add("results")
         if getattr(self.runtime, "connection_only", False):
-            allowed.intersection_update({"cover", "detection"})
+            allowed.intersection_update({"cover", "detection", "jog"})
         for name, control in self.nav.items():
             control.state(["!disabled"] if name in allowed else ["disabled"])
 
