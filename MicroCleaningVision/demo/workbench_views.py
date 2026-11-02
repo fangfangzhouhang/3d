@@ -814,8 +814,8 @@ def retention_advice(snapshot):
 class JogPage(Page):
     """05 手动点动（触屏）。
 
-    布局对标成熟开源运动控制触屏界面的交互模式（借模式不借皮，视觉仍用
-    本工作台既有 Tk 风格）：KlipperScreen 式「读数置顶大字 + 点动盘居中 +
+    布局对标成熟开源运动控制触屏界面的交互模式（借模式不借皮）；配色为
+    本页专属低饱和灰咖 palette（见下方类常量），不改模块级共享常量：KlipperScreen 式「读数置顶大字 + 点动盘居中 +
     档位成排」；UGS/CNCjs jog pendant 式「轴向分组、步长预设独立区、
     归零独立区」。危险/状态动作（武装、归零、停止）集中在独立安全区，
     与点动按钮视觉分离防误触；「停止」不放在方向盘中心。
@@ -832,8 +832,27 @@ class JogPage(Page):
         ("↙", "REV", "REV"), ("↓  Y-", None, "REV"), ("↘", "FWD", "REV"),
     )
 
+    # 本页专属配色（ark 定版低饱和灰咖；不改模块级共享常量 BG/CARD/INK/…，
+    # 以免波及其他五页）。黑白灰为骨、咖色点缀，全页无高饱和色。
+    _PAGE_BG = "#f4f2ef"     # 页面底：暖浅灰
+    _CARD_BG = "#ffffff"     # 读数区/卡片底
+    _PANEL_BG = "#e9e6e1"    # 次级面板 / 按钮未选态
+    _INK = "#1c1a17"         # 主文字
+    _MUTED = "#7a7368"       # 次级文字
+    _PAD_BG = "#d9d4cc"      # 方向键常态
+    _PAD_ACTIVE = "#cbc4b8"  # 方向键按下
+    _PAD_EDGE = "#b8b1a4"    # 方向键边框
+    _PRESET_ON = "#5d4a36"   # 档位选中：深咖（配白字）
+    _ACCENT = "#8c6d4f"      # 武装/确认的激活强调：咖
+    _SAFETY_BG = "#ece7de"   # 底部安全区底
+    _STOP_BG = "#9e4f43"     # 停止：低饱和砖红（配白字，全页最醒目）
+    _STOP_ACTIVE = "#8a4238"  # 停止按下
+    _WARN_BG = "#e3ddd2"     # 警告条/确认弹窗：灰咖底
+    _WARN_FG = "#4a3f31"     # 警告文字：深咖
+
     def __init__(self, owner):
         super().__init__(owner)
+        self.config(bg=self._PAGE_BG)
         from queue import Queue
         from demo.jog_panel import (G0_WARNING, JogConfirmBridge, build_jog_controller,
             jog_block_reason, jog_mode, mode_banner)
@@ -855,41 +874,46 @@ class JogPage(Page):
         self._popup_id = None
         self._tick = 0
         heading(self, "05  手动点动", "每次点动都是一条 MOVEXY：运动关卡评估 → 本页弹窗人工确认 → 发送 → 回执与账本更新，一关不少。")
-        tk.Label(self, text=G0_WARNING, bg="#fff2d9", fg="#8a5a13", font=(FONT, 11, "bold"),
+        _title, _subtitle = self.winfo_children()[:2]  # heading() 刚建的两个标签，只改本页实例配色
+        _title.config(bg=self._PAGE_BG, fg=self._INK)
+        _subtitle.config(bg=self._PAGE_BG, fg=self._MUTED)
+        tk.Label(self, text=G0_WARNING, bg=self._WARN_BG, fg=self._WARN_FG, font=(FONT, 11, "bold"),
             anchor="w", justify="left", wraplength=1180, padx=10, pady=7).pack(fill="x", pady=(0, 8))
         # ── 读数区（置顶、大字、双轴分开；KlipperScreen 式位置读数） ──
-        readout = tk.Frame(self, bg=PALE, padx=14, pady=8)
+        readout = tk.Frame(self, bg=self._CARD_BG, padx=14, pady=8)
         readout.pack(fill="x", pady=(0, 10))
-        tk.Label(readout, text="当前位置（账本估算）", bg=PALE, fg=MUTED, font=(FONT, 10, "bold")).pack(side="left")
-        self.pos_x_label = tk.Label(readout, text="X  —", bg=PALE, fg=INK, font=(FONT, 19, "bold"))
+        tk.Label(readout, text="当前位置（账本估算）", bg=self._CARD_BG, fg=self._MUTED, font=(FONT, 10, "bold")).pack(side="left")
+        self.pos_x_label = tk.Label(readout, text="X  —", bg=self._CARD_BG, fg=self._INK, font=(FONT, 19, "bold"))
         self.pos_x_label.pack(side="left", padx=(18, 10))
-        self.pos_y_label = tk.Label(readout, text="Y  —", bg=PALE, fg=INK, font=(FONT, 19, "bold"))
+        self.pos_y_label = tk.Label(readout, text="Y  —", bg=self._CARD_BG, fg=self._INK, font=(FONT, 19, "bold"))
         self.pos_y_label.pack(side="left", padx=(0, 18))
-        self.mode_label = tk.Label(readout, text=mode_banner(self.mode), bg=PALE, fg=TEAL, font=(FONT, 10, "bold"))
+        self.mode_label = tk.Label(readout, text=mode_banner(self.mode), bg=self._CARD_BG, fg=self._ACCENT, font=(FONT, 10, "bold"))
         self.mode_label.pack(side="left")
         # ── 点动区：左方向盘、右档位，分区带标题 ──
         body = tk.Frame(self, bg=CARD)
         body.pack(fill="both", expand=True)
         pad_zone = tk.Frame(body, bg=CARD)
         pad_zone.pack(side="left", padx=(0, 30))
-        tk.Label(pad_zone, text="点动方向（点一次 = 一次点动）", bg=CARD, fg=MUTED, font=(FONT, 10, "bold"), anchor="w").pack(fill="x", pady=(0, 6))
+        tk.Label(pad_zone, text="点动方向（点一次 = 一次点动）", bg=CARD, fg=self._MUTED, font=(FONT, 10, "bold"), anchor="w").pack(fill="x", pady=(0, 6))
         pad = tk.Frame(pad_zone, bg=CARD)
         pad.pack()
         self.dir_buttons = []
         for index, (caption, dx_dir, dy_dir) in enumerate(self._PAD):
             row, column = divmod(index, 3)
             if caption is None:
-                self.center_label = tk.Label(pad, text="1 mm\n320 步", bg=PALE, fg=INK,
+                self.center_label = tk.Label(pad, text="1 mm\n320 步", bg=self._PANEL_BG, fg=self._INK,
                     font=(FONT, 13, "bold"), width=8, height=3, justify="center")
                 self.center_label.grid(row=row, column=column, padx=5, pady=5)
                 continue
             control = tk.Button(pad, text=caption, font=(FONT, 15, "bold"), width=7, height=3,
+                bg=self._PAD_BG, fg=self._INK, activebackground=self._PAD_ACTIVE,
+                highlightbackground=self._PAD_EDGE, highlightcolor=self._PAD_EDGE,
                 command=lambda dx=dx_dir, dy=dy_dir: self.press_direction(dx, dy))
             control.grid(row=row, column=column, padx=5, pady=5)
             self.dir_buttons.append(control)
         side = tk.Frame(body, bg=CARD)
         side.pack(side="left", fill="y")
-        tk.Label(side, text="步长档位（预设独立区，账本估算）", bg=CARD, fg=MUTED, font=(FONT, 10, "bold"), anchor="w").pack(fill="x")
+        tk.Label(side, text="步长档位（预设独立区，账本估算）", bg=CARD, fg=self._MUTED, font=(FONT, 10, "bold"), anchor="w").pack(fill="x")
         presets = tk.Frame(side, bg=CARD)
         presets.pack(fill="x", pady=(6, 10))
         self.preset_buttons = []
@@ -898,13 +922,13 @@ class JogPage(Page):
                 command=lambda value=steps: self.select_steps(value))
             control.grid(row=index // 3, column=index % 3, padx=4, pady=4)
             self.preset_buttons.append((steps, control))
-        self.result_label = tk.Label(side, text="尚未点动。", bg=CARD, fg=INK, font=(FONT, 11), anchor="w",
+        self.result_label = tk.Label(side, text="尚未点动。", bg=CARD, fg=self._INK, font=(FONT, 11), anchor="w",
             justify="left", wraplength=430)
         self.result_label.pack(fill="x", pady=(4, 0))
         # ── 安全与状态动作区（与点动视觉分离：独立底色 + 间隔，防误触） ──
-        safety = tk.Frame(self, bg="#fdf3e3", padx=14, pady=10)
+        safety = tk.Frame(self, bg=self._SAFETY_BG, padx=14, pady=10)
         safety.pack(fill="x", pady=(12, 0))
-        tk.Label(safety, text="安全与状态动作", bg="#fdf3e3", fg="#8a5a13", font=(FONT, 10, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 6))
+        tk.Label(safety, text="安全与状态动作", bg=self._SAFETY_BG, fg=self._WARN_FG, font=(FONT, 10, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 6))
         self.arm_button = tk.Button(safety, text="武装点动", font=(FONT, 14, "bold"), width=16, height=2,
             command=self.toggle_arm)
         self.arm_button.grid(row=1, column=0, padx=(0, 14))
@@ -912,10 +936,10 @@ class JogPage(Page):
             command=self.press_zero)
         self.zero_button.grid(row=1, column=1, padx=(0, 14))
         self.stop_button = tk.Button(safety, text="停止", font=(FONT, 15, "bold"), width=12, height=2,
-            bg="#b3402e", fg="white", activebackground="#93331f", command=self.press_stop)
+            bg=self._STOP_BG, fg="white", activebackground=self._STOP_ACTIVE, command=self.press_stop)
         self.stop_button.grid(row=1, column=2, padx=(0, 14))
         tk.Label(safety, text="「停止」当前只解除武装并取消待确认的点动，不能停已发出的运动；串口真停由 stop 分支替换控制器入口实现，本页不改。\n「急停」指外置物理急停装置，不在本页；归零前必须先人工对位；武装后点动仍须弹窗确认，确认后武装自动回落。",
-            bg="#fdf3e3", fg=MUTED, font=(FONT, 9), justify="left", anchor="w").grid(row=1, column=3, sticky="w")
+            bg=self._SAFETY_BG, fg=self._MUTED, font=(FONT, 9), justify="left", anchor="w").grid(row=1, column=3, sticky="w")
         if self.build_error:
             self.result_label.config(text=self.build_error)
         self.select_steps(320)
@@ -954,15 +978,15 @@ class JogPage(Page):
         self.zero_button.config(state="normal" if idle else "disabled")
         self.arm_button.config(state="normal" if idle else "disabled",
             text="已武装 · 再点解除" if armed else "武装点动",
-            bg="#167f77" if armed else "#f0f0f0", fg="white" if armed else "#173d3e")
+            bg=self._ACCENT if armed else self._PANEL_BG, fg="white" if armed else self._INK)
         return reason
 
     def select_steps(self, value):
         from demo.manual_jog import STEP_LABELS, STEP_PRESETS
         self.steps.set(value)
         for steps, control in self.preset_buttons:
-            control.config(bg="#167f77" if steps == value else "#f0f0f0",
-                fg="white" if steps == value else "#173d3e")
+            control.config(bg=self._PRESET_ON if steps == value else self._PANEL_BG,
+                fg="white" if steps == value else self._INK)
         label = STEP_LABELS[STEP_PRESETS.index(value)] if value in STEP_PRESETS else f"{value} 步"
         self.center_label.config(text=f"{label}\n{value} 步")
 
@@ -1065,19 +1089,19 @@ class JogPage(Page):
         popup = tk.Toplevel(self)
         self._popup, self._popup_id = popup, request["id"]
         popup.title("确认点动" if request["kind"] == "motion" else "确认归零")
-        popup.configure(bg="#fff2d9")
+        popup.configure(bg=self._WARN_BG)
         popup.geometry("640x380")
         popup.transient(self.winfo_toplevel())
         for line in request["lines"]:
-            tk.Label(popup, text=line, bg="#fff2d9", fg=INK, font=(FONT, 13), anchor="w",
+            tk.Label(popup, text=line, bg=self._WARN_BG, fg=self._INK, font=(FONT, 13), anchor="w",
                 justify="left", wraplength=590).pack(fill="x", padx=18, pady=(10, 0))
-        tk.Label(popup, text="20 秒内不确认自动取消，不会运动。", bg="#fff2d9", fg=MUTED,
+        tk.Label(popup, text="20 秒内不确认自动取消，不会运动。", bg=self._WARN_BG, fg=self._MUTED,
             font=(FONT, 10), anchor="w").pack(fill="x", padx=18, pady=(10, 0))
-        bar = tk.Frame(popup, bg="#fff2d9")
+        bar = tk.Frame(popup, bg=self._WARN_BG)
         bar.pack(side="bottom", fill="x", padx=18, pady=16)
         confirm_caption = "确认移动" if request["kind"] == "motion" else "确认归零"
         tk.Button(bar, text=confirm_caption, font=(FONT, 15, "bold"), width=14, height=2,
-            bg="#167f77", fg="white", command=lambda: self._answer_popup(True)).pack(side="right", padx=(10, 0))
+            bg=self._ACCENT, fg="white", command=lambda: self._answer_popup(True)).pack(side="right", padx=(10, 0))
         tk.Button(bar, text="取消", font=(FONT, 15, "bold"), width=14, height=2,
             command=lambda: self._answer_popup(False)).pack(side="right")
         popup.protocol("WM_DELETE_WINDOW", lambda: self._answer_popup(False))
