@@ -809,6 +809,291 @@ def retention_advice(snapshot):
     return "可考虑正式保留", "优先保留新样本、关键对照、代表性失败或可复现实验。还需你判断价值；清洗成功并非唯一标准。"
 
 
+
+
+class JogPage(Page):
+    """05 手动点动（触屏）。
+
+    布局对标成熟开源运动控制触屏界面的交互模式（借模式不借皮，视觉仍用
+    本工作台既有 Tk 风格）：KlipperScreen 式「读数置顶大字 + 点动盘居中 +
+    档位成排」；UGS/CNCjs jog pendant 式「轴向分组、步长预设独立区、
+    归零独立区」。危险/状态动作（武装、归零、停止）集中在独立安全区，
+    与点动按钮视觉分离防误触；「停止」不放在方向盘中心。
+
+    jog()/set_zero() 在 worker 线程执行；人工确认经 JogConfirmBridge 桥回
+    本页在主线程渲染的弹窗。「停止」按钮只调用 JogController.stop() 单一
+    入口；当前实现为解除武装 + 取消待确认，不声称能停已发出的运动，
+    串口真停由 stop 分支替换该入口实现，本页零返工。
+    """
+
+    _PAD = (
+        ("↖", "REV", "FWD"), ("↑  Y+", None, "FWD"), ("↗", "FWD", "FWD"),
+        ("←  X-", "REV", None), (None, None, None), ("X+  →", "FWD", None),
+        ("↙", "REV", "REV"), ("↓  Y-", None, "REV"), ("↘", "FWD", "REV"),
+    )
+
+    def __init__(self, owner):
+        super().__init__(owner)
+        from queue import Queue
+        from demo.jog_panel import (G0_WARNING, JogConfirmBridge, build_jog_controller,
+            jog_block_reason, jog_mode, mode_banner)
+        from demo.manual_jog import STEP_LABELS, STEP_PRESETS
+        self._block_reason = jog_block_reason
+        self.mode = jog_mode(owner.runtime.args)
+        self.bridge = JogConfirmBridge()
+        self.build_error = None
+        try:
+            self.controller = build_jog_controller(owner.runtime.args, confirm=self.bridge.ask,
+                confirm_canceller=self.bridge.cancel_all)
+        except Exception as exc:  # 标定缺失/非法时整页禁用并写明原因，不许崩窗
+            self.controller = None
+            self.build_error = f"点动控制器装配失败：{exc}"
+        self.steps = tk.IntVar(value=320)
+        self._done = Queue()
+        self.busy = False
+        self._popup = None
+        self._popup_id = None
+        self._tick = 0
+        heading(self, "05  手动点动", "每次点动都是一条 MOVEXY：运动关卡评估 → 本页弹窗人工确认 → 发送 → 回执与账本更新，一关不少。")
+        tk.Label(self, text=G0_WARNING, bg="#fff2d9", fg="#8a5a13", font=(FONT, 11, "bold"),
+            anchor="w", justify="left", wraplength=1180, padx=10, pady=7).pack(fill="x", pady=(0, 8))
+        # ── 读数区（置顶、大字、双轴分开；KlipperScreen 式位置读数） ──
+        readout = tk.Frame(self, bg=PALE, padx=14, pady=8)
+        readout.pack(fill="x", pady=(0, 10))
+        tk.Label(readout, text="当前位置（账本估算）", bg=PALE, fg=MUTED, font=(FONT, 10, "bold")).pack(side="left")
+        self.pos_x_label = tk.Label(readout, text="X  —", bg=PALE, fg=INK, font=(FONT, 19, "bold"))
+        self.pos_x_label.pack(side="left", padx=(18, 10))
+        self.pos_y_label = tk.Label(readout, text="Y  —", bg=PALE, fg=INK, font=(FONT, 19, "bold"))
+        self.pos_y_label.pack(side="left", padx=(0, 18))
+        self.mode_label = tk.Label(readout, text=mode_banner(self.mode), bg=PALE, fg=TEAL, font=(FONT, 10, "bold"))
+        self.mode_label.pack(side="left")
+        # ── 点动区：左方向盘、右档位，分区带标题 ──
+        body = tk.Frame(self, bg=CARD)
+        body.pack(fill="both", expand=True)
+        pad_zone = tk.Frame(body, bg=CARD)
+        pad_zone.pack(side="left", padx=(0, 30))
+        tk.Label(pad_zone, text="点动方向（点一次 = 一次点动）", bg=CARD, fg=MUTED, font=(FONT, 10, "bold"), anchor="w").pack(fill="x", pady=(0, 6))
+        pad = tk.Frame(pad_zone, bg=CARD)
+        pad.pack()
+        self.dir_buttons = []
+        for index, (caption, dx_dir, dy_dir) in enumerate(self._PAD):
+            row, column = divmod(index, 3)
+            if caption is None:
+                self.center_label = tk.Label(pad, text="1 mm\n320 步", bg=PALE, fg=INK,
+                    font=(FONT, 13, "bold"), width=8, height=3, justify="center")
+                self.center_label.grid(row=row, column=column, padx=5, pady=5)
+                continue
+            control = tk.Button(pad, text=caption, font=(FONT, 15, "bold"), width=7, height=3,
+                command=lambda dx=dx_dir, dy=dy_dir: self.press_direction(dx, dy))
+            control.grid(row=row, column=column, padx=5, pady=5)
+            self.dir_buttons.append(control)
+        side = tk.Frame(body, bg=CARD)
+        side.pack(side="left", fill="y")
+        tk.Label(side, text="步长档位（预设独立区，账本估算）", bg=CARD, fg=MUTED, font=(FONT, 10, "bold"), anchor="w").pack(fill="x")
+        presets = tk.Frame(side, bg=CARD)
+        presets.pack(fill="x", pady=(6, 10))
+        self.preset_buttons = []
+        for index, (steps, label) in enumerate(zip(STEP_PRESETS, STEP_LABELS)):
+            control = tk.Button(presets, text=f"{label}\n{steps} 步", font=(FONT, 11), width=9, height=2,
+                command=lambda value=steps: self.select_steps(value))
+            control.grid(row=index // 3, column=index % 3, padx=4, pady=4)
+            self.preset_buttons.append((steps, control))
+        self.result_label = tk.Label(side, text="尚未点动。", bg=CARD, fg=INK, font=(FONT, 11), anchor="w",
+            justify="left", wraplength=430)
+        self.result_label.pack(fill="x", pady=(4, 0))
+        # ── 安全与状态动作区（与点动视觉分离：独立底色 + 间隔，防误触） ──
+        safety = tk.Frame(self, bg="#fdf3e3", padx=14, pady=10)
+        safety.pack(fill="x", pady=(12, 0))
+        tk.Label(safety, text="安全与状态动作", bg="#fdf3e3", fg="#8a5a13", font=(FONT, 10, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 6))
+        self.arm_button = tk.Button(safety, text="武装点动", font=(FONT, 14, "bold"), width=16, height=2,
+            command=self.toggle_arm)
+        self.arm_button.grid(row=1, column=0, padx=(0, 14))
+        self.zero_button = tk.Button(safety, text="人工对位后归零", font=(FONT, 12), width=16, height=2,
+            command=self.press_zero)
+        self.zero_button.grid(row=1, column=1, padx=(0, 14))
+        self.stop_button = tk.Button(safety, text="停止", font=(FONT, 15, "bold"), width=12, height=2,
+            bg="#b3402e", fg="white", activebackground="#93331f", command=self.press_stop)
+        self.stop_button.grid(row=1, column=2, padx=(0, 14))
+        tk.Label(safety, text="「停止」当前只解除武装并取消待确认的点动，不能停已发出的运动；串口真停由 stop 分支替换控制器入口实现，本页不改。\n「急停」指外置物理急停装置，不在本页；归零前必须先人工对位；武装后点动仍须弹窗确认，确认后武装自动回落。",
+            bg="#fdf3e3", fg=MUTED, font=(FONT, 9), justify="left", anchor="w").grid(row=1, column=3, sticky="w")
+        if self.build_error:
+            self.result_label.config(text=self.build_error)
+        self.select_steps(320)
+        self.refresh_position()
+        self._poll()
+
+    # ---- 状态与门控（主线程） ----
+    def current_block_reason(self):
+        if self.controller is None:
+            return self.build_error or "仅连接模式禁用点动与归零：该模式只连接设备、预览与采图，禁止运动。"
+        return self._block_reason(mode=self.mode, runtime_active=bool(self.owner.runtime.active),
+            busy=self.busy, position_known=self.controller.get_position().xy() is not None)
+
+    def refresh_position(self):
+        if self.controller is None:
+            self.pos_x_label.config(text="X  —")
+            self.pos_y_label.config(text="Y  —")
+            return
+        xy = self.controller.get_position().xy()
+        if xy is None:
+            self.pos_x_label.config(text="X  未知")
+            self.pos_y_label.config(text="Y  未知")
+            return
+        x, y = xy
+        self.pos_x_label.config(text=f"X  {x:,} 步 · ≈{x / 320:.2f} mm")
+        self.pos_y_label.config(text=f"Y  {y:,} 步 · ≈{y / 320:.2f} mm")
+
+    def _sync_controls(self):
+        reason = self.current_block_reason()
+        armed = bool(self.controller and self.controller.armed)
+        jog_state = "normal" if reason is None and armed else "disabled"
+        for control in self.dir_buttons:
+            control.config(state=jog_state)
+        idle = self.controller is not None and not self.busy \
+            and self.mode != "connect_only" and not self.owner.runtime.active
+        self.zero_button.config(state="normal" if idle else "disabled")
+        self.arm_button.config(state="normal" if idle else "disabled",
+            text="已武装 · 再点解除" if armed else "武装点动",
+            bg="#167f77" if armed else "#f0f0f0", fg="white" if armed else "#173d3e")
+        return reason
+
+    def select_steps(self, value):
+        from demo.manual_jog import STEP_LABELS, STEP_PRESETS
+        self.steps.set(value)
+        for steps, control in self.preset_buttons:
+            control.config(bg="#167f77" if steps == value else "#f0f0f0",
+                fg="white" if steps == value else "#173d3e")
+        label = STEP_LABELS[STEP_PRESETS.index(value)] if value in STEP_PRESETS else f"{value} 步"
+        self.center_label.config(text=f"{label}\n{value} 步")
+
+    # ---- 操作入口（主线程，只做校验与启 worker） ----
+    def toggle_arm(self):
+        if self.controller is None or self.busy or self.mode == "connect_only" or self.owner.runtime.active:
+            return
+        if self.controller.armed:
+            self.controller.disarm()
+            self.result_label.config(text="已解除武装。")
+        elif self.controller.arm():
+            self.result_label.config(text="已武装：下一次点动仍须弹窗确认；确认后武装自动回落。")
+        self._sync_controls()
+
+    def press_direction(self, dx_dir, dy_dir):
+        import threading
+        if self.controller is None or self.busy:
+            return
+        if not self.controller.armed:
+            self.result_label.config(text="请先在下方安全区点「武装点动」，再按方向键。")
+            return
+        reason = self.current_block_reason()
+        if reason is not None:
+            self.controller.disarm()
+            self.result_label.config(text=reason)
+            self._sync_controls()
+            return
+        self.bridge.reset_cancel()
+        self.busy = True
+        self._sync_controls()
+        steps = int(self.steps.get())
+        def work():
+            result = self.controller.jog(dx_dir, dy_dir, steps)
+            self._done.put(("jog", result))
+        threading.Thread(target=work, name="mcv-jog-worker", daemon=True).start()
+
+    def press_zero(self):
+        import threading
+        if self.controller is None or self.busy or self.mode == "connect_only" or self.owner.runtime.active:
+            return
+        self.bridge.reset_cancel()
+        self.busy = True
+        self._sync_controls()
+        def work():
+            try:
+                if not self.bridge.ask_zero():
+                    self._done.put(("zero", "已取消归零，未写入账本。"))
+                    return
+                position = self.controller.set_zero(confirmed=True)
+                self._done.put(("zero", f"已记录人工零点：{position.xy()} 步。此后点动以此为账本原点。"))
+            except Exception as exc:
+                self._done.put(("zero", f"归零未完成：{exc}"))
+        threading.Thread(target=work, name="mcv-jog-zero", daemon=True).start()
+
+    def press_stop(self):
+        # 停止逻辑只走 JogController.stop() 单一入口（解除武装 + 取消待确认
+        # 都收敛在控制器内）；本页只负责呈现结果。弹窗由 _poll 在桥取消后
+        # 自动关闭；stop() 返回未知位置时读数区呈现未知态并要求重新归零。
+        if self.controller is None:
+            return
+        position = self.controller.stop()
+        self.refresh_position()
+        if position.xy() is None:
+            self.result_label.config(text="已停止：当前位置未知，请重新人工对位并归零后再点动。")
+        else:
+            self.result_label.config(text="已停止：已解除武装并取消待确认的点动。若运动已发出，本按钮当前不能停它——请等待回执或用物理急停处理。")
+        self._sync_controls()
+
+    # ---- 确认弹窗与结果回收（主线程轮询） ----
+    def _poll(self):
+        if getattr(self.owner, "destroyed", True):
+            return
+        from queue import Empty
+        try:
+            while True:
+                kind, payload = self._done.get_nowait()
+                self.busy = False
+                if kind == "jog":
+                    self.result_label.config(text=f"点动结果：{payload.message}")
+                else:
+                    self.result_label.config(text=str(payload))
+                self.refresh_position()
+        except Empty:
+            pass
+        request = self.bridge.poll_request()
+        if request is not None and self._popup is None:
+            self._open_popup(request)
+        if request is None and self._popup is not None:
+            self._close_popup()
+        self._tick += 1
+        if self._tick % 15 == 0 and not self.busy:
+            self.refresh_position()
+        self._sync_controls()
+        try:
+            self.after(60, self._poll)
+        except tk.TclError:
+            pass
+
+    def _open_popup(self, request):
+        popup = tk.Toplevel(self)
+        self._popup, self._popup_id = popup, request["id"]
+        popup.title("确认点动" if request["kind"] == "motion" else "确认归零")
+        popup.configure(bg="#fff2d9")
+        popup.geometry("640x380")
+        popup.transient(self.winfo_toplevel())
+        for line in request["lines"]:
+            tk.Label(popup, text=line, bg="#fff2d9", fg=INK, font=(FONT, 13), anchor="w",
+                justify="left", wraplength=590).pack(fill="x", padx=18, pady=(10, 0))
+        tk.Label(popup, text="20 秒内不确认自动取消，不会运动。", bg="#fff2d9", fg=MUTED,
+            font=(FONT, 10), anchor="w").pack(fill="x", padx=18, pady=(10, 0))
+        bar = tk.Frame(popup, bg="#fff2d9")
+        bar.pack(side="bottom", fill="x", padx=18, pady=16)
+        confirm_caption = "确认移动" if request["kind"] == "motion" else "确认归零"
+        tk.Button(bar, text=confirm_caption, font=(FONT, 15, "bold"), width=14, height=2,
+            bg="#167f77", fg="white", command=lambda: self._answer_popup(True)).pack(side="right", padx=(10, 0))
+        tk.Button(bar, text="取消", font=(FONT, 15, "bold"), width=14, height=2,
+            command=lambda: self._answer_popup(False)).pack(side="right")
+        popup.protocol("WM_DELETE_WINDOW", lambda: self._answer_popup(False))
+
+    def _answer_popup(self, answer):
+        self.bridge.reply(answer)
+        self._close_popup()
+
+    def _close_popup(self):
+        if self._popup is not None:
+            try:
+                self._popup.destroy()
+            except tk.TclError:
+                pass
+            self._popup, self._popup_id = None, None
+
 class DataSaveDialog:
     """Explicit human retention workflow. All Tk access stays on its owner thread."""
     def __init__(self, owner):

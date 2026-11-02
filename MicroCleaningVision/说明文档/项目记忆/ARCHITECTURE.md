@@ -1,5 +1,10 @@
 # ARCHITECTURE｜整个系统怎么工作
 
+## 2026-11-02：无头点动适配层
+
+`JogController.jog → 四档/单轴1600上限/一次性武装/位置预检 → single_move_dispatch → demo.motion_mode._stage2_move → 原 motion_gate/确认/Stage2SerialLink/回执/账本`。start_reference 固定 image_center，控制器不构造审批或直接写串口。
+同步调用、同一控制器忙时拒绝重入/重武装/归零；点动与显式 set_zero 均持有原 COM/位置 ResourceLease。标定复用 load_motor_calibration，串口默认115200/2秒，与 closed_loop_station 一致；无 nozzle 偏移、相机或 Tk 依赖。调用方法见 [README](../../README.md)。
+
 ## 2026-10-30：真实设备只连接支路
 
 用户批准新增 --connect-only，closed_loop_station 在原完整 Real/Mock 分支之前校验独立能力：指定 COM/相机，拒绝运动/泵武装、归零、位置账本覆盖及运动几何配置。WorkbenchRuntime 冻结 connection_only，并将任务分流到 demo/device_connection.run_connection_task；不构造 CleaningLoop、HardwareExecutor、Stage2SerialLink 或 STM32SerialController。

@@ -142,6 +142,8 @@ class TkWorkbenchTests(unittest.TestCase):
                             first = window.snapshot["targets"][0]
                             self.assertEqual(2, len(first["attempts"]))
                             self.assertEqual(2, len(first["attempts"][1]["rechecks"]))
+                            window.navigate("jog")
+                            visited.add(window.current_page)
                             self.assertIn(window.snapshot["quality_status"], {"FAIL", "PASS", "UNCERTAIN", "PARTIAL"})
                             self.assertFalse((Path(window.snapshot["folder"]) / "reports").exists())
                             self.assertEqual(visited, set(window.PAGE_ORDER))

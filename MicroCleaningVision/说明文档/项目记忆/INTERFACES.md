@@ -1,5 +1,10 @@
 # INTERFACES｜模块之间怎样传数据
 
+## 2026-11-02：点动核心局部 API
+
+`JogController(..., confirm=callback)` 接受 `confirm(request: MotionRequest, plan: dict) -> bool`；只有明确布尔True放行。`jog(dx_dir,dy_dir,steps)`：方向FWD/REV，None禁用轴，两轴共用32/160/320/1600档位；超过1600整条拒绝，标签按320步/mm名义换算。
+`arm()/disarm()/armed` 管一次尝试；`get_position()` 返回原Stage2Position；`set_zero(confirmed=True)` 仅在人工对位确认后复用原记零。JogResult含status、reason_codes、message、position、run_dir与原Stage2MotionOutcome；状态统一sent/failed/declined/denied，原human_declined/human_pending仍可从motion读取。不改变共享合同、线上协议或固件，详见 [README](../../README.md)。
+
 ## 2026-10-30：工作台仅连接接口（主机局部）
 
 新增 CLI 模式 --connect-only，与 --mock / --real 互斥；必须显式 --serial-port / --camera-index，可指定现有相机参数和 --output-root。运动/泵武装、归零、非默认位置路径、尺度/偏移/工作坐标配置一律拒绝。没有新增串口命令、共享合同或位置字段。

@@ -138,7 +138,7 @@ class WorkbenchCoverageTkTests(unittest.TestCase):
                     self.assertIn("输入位置/可比性未通过", window.views["monitor"].coverage_text.cget("text"))
                     self.assertIn("输入位置/可比性未通过", panel.provenance.get())
                     self.assertEqual(commands, [])
-                    self.assertEqual(window.PAGE_ORDER, ("cover", "detection", "review", "monitor", "results"))
+                    self.assertEqual(window.PAGE_ORDER, ("cover", "detection", "review", "monitor", "results", "jog"))
                     return True
                 return False
             self.drive(window, tick)

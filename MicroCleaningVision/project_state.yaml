@@ -1,7 +1,48 @@
 # 机器可读快照。完整共同上下文在 说明文档/项目记忆/ 的六份文件。
 # 提交顺序查Git和提交日志；运行/串口查总流程与共同协议；实验结论查原始证据，冲突先核对。
-updated_at: 2026-10-31
-current_phase: "A离线对焦和真实工作台仅连接模式已提交并推送origin/456；已有三图UI保留，功能提交b9c27047已核验。G0/G1与真实清洁仍未过，A4与主线质量贯通待完成。完整实验资产仍本机。"
+updated_at: 2026-11-02
+current_phase: "feat/touch-jog-core新增无Tk点动控制核心，复用Stage2链；无UI接入与实物操作。22项专项通过，全量及HEAD基线对照见EXPERIMENTS。G0/G1、真实标定与清洁验收仍未过。"
+
+manual_jog_core_20261102:
+  branch: feat/touch-jog-core
+  baseline_commit: f3b8cf112a2aa712a388f17f3bf5a81260adfc69
+  implementation: demo/manual_jog.py
+  tests: test/test_manual_jog.py
+  owner: demo_integration_C
+  ui_implemented: false
+  tkinter_dependency: false
+  dispatch: single_move_dispatch
+  executor: demo.motion_mode._stage2_move
+  start_reference: image_center
+  steps_presets: [32, 160, 320, 1600]
+  nominal_steps_per_mm: 320
+  maximum_steps_per_axis_per_jog: 1600
+  clipping_allowed: false
+  one_attempt_per_arm: true
+  confirmation: injected_callback_explicit_bool_true_only
+  zero_reference: human_confirmed_software_ledger_only
+  specialist_tests_passed: 22
+  specialist_tests_skipped: 0
+  specialist_seconds: 1.880
+  full_tests_run: 757
+  full_tests_passed: 754
+  full_tests_skipped: 0
+  full_failed_methods: 3
+  full_failure_assertions: 4
+  full_errors: 0
+  full_seconds: 208.736
+  baseline_tests_run: 735
+  baseline_tests_passed: 732
+  baseline_failed_methods: 3
+  baseline_failure_assertions: 4
+  baseline_seconds: 205.938
+  new_failures: 0
+  known_failure_scope: existing_Tk_layout_and_mapping_tests
+  test_display_pixels: [1024, 768]
+  protected_python_firmware_files_unchanged: 259
+  evidence_directory: output/manual_jog_validation
+  evidence_shared: false
+  hardware_actions_performed: false
 
 main_sync_456_20261031:
   merge_commit: 38caf656269e41980462adf86bbbfa978f8924a8
