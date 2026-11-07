@@ -1,5 +1,7 @@
 # INTERFACES｜模块之间怎样传数据
 
+> ⚠️ 口径注记（2026-11-07）：本文件描述的是代码与接口现状，其中 `contamination` / 污染 / 清洗等词是现有代码的字段名与流程名，属事实记录；课题的任务定义已于 2026-11-07 更正为微纳 3D 打印聚焦显影（见 PROJECT.md 文首更正与 DECISIONS 的 D-017），不要把本文件的代码词汇当作任务目标。特别注意：文中「去除率」是现有 `verify_single_target` 代码里的单块复检规则，不是课题级合格标准；显影口径的合格判据（通畅、关键尺寸对设计文件的偏差、过显损伤）待指导老师确认后另行定义，确认前不得把去除率当作显影达标指标。
+
 ## 2026-11-01：main归档局部接口原样保留
 
 合并引入上游microcleaning-run-archive-v1、microcleaning-retention-v1及RunArchiveExporter/verify_archive、demo.run_archive_worker.export_and_verify入口，未在冲突处理中变更它们。归档保留源树与来源分类，selection_records单独记录选择目的/理由，training_eligibility_override仍false。WASD字段、四项步进命令和共享contracts/ports不改；test_coverage_panel采用main等待播放/导出控件映射及初始高度的版本，全部原验收断言保留。
