@@ -1,5 +1,7 @@
 # EXPERIMENTS｜做过什么，结果怎样
 
+> ⚠️ 口径注记（2026-11-07）：本文件是带日期的历史实验记录，按 DECISIONS 的 D-017 保留原文、不追改。文中「清洗 / 污染 / 去除率」均是实验当时（多为代理场景）的用法；课题任务定义已更正为微纳 3D 打印聚焦显影，引用本文件数字时须注明其代理场景属性，不得表述为显影效果证据。
+
 ## EXP-MERGE-456-MAIN-20261101
 
 基线456@cb7f7b713d2cf5c0af28d8b8b4b4da68e8a10245，main@f3b8cf112a2aa712a388f17f3bf5a81260adfc69，共同基线56a32cf9395c67535bc9ca1692fb3e0b42d647a3。merge-tree预演与实际merge均只有test/test_coverage_panel.py冲突；审阅后选main包含播放/导出按钮映射与初始高度等待的原版本，尺寸/可见性断言未弱化。合并前创建backup/456-before-main-sync-20261101_121918。
