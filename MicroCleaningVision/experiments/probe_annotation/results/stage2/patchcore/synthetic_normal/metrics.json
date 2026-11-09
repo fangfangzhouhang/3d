@@ -1,0 +1,133 @@
+{
+  "task_id": "stage2-20261109T101923Z-71c07242",
+  "observation_id": "synthetic_normal:08b62f7395cd",
+  "frame_id": "synthetic_normal",
+  "raw_image_ref": "dataset/stage2_synthetic/query_normal.png",
+  "input_sha256": "08b62f7395cdfdbc0ace1b4f86e6fa00d5c34984f88637ed1a57c4aafbf688a1",
+  "probe_name": "patchcore",
+  "model_info": {
+    "model_name": "DINOv2 ViT-S/14 + PatchCore-style memory bank",
+    "model_version": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+    "weights_version": "dinov2_vits14_pretrain / LVD-142M",
+    "weights_ref": "weights\\dinov2_vits14_pretrain.pth",
+    "weights_sha256": "b938bf1bc15cd2ec0feacfe3a1bb553fe8ea9ca46a7e1d8d00217f29aef60cd9",
+    "weights_bytes": 88283115,
+    "code_license": "Apache-2.0",
+    "weights_license": "Apache-2.0"
+  },
+  "started_at": "2026-11-09T10:19:58.596717+00:00",
+  "ended_at": "2026-11-09T10:20:00.727151+00:00",
+  "duration_ms": 1708.0156999982137,
+  "model_load_ms": 165.62859999976354,
+  "peak_allocated_mib": 123.498046875,
+  "peak_reserved_mib": 148.0,
+  "status": "ok",
+  "status_reason": "completed",
+  "reason_codes": [],
+  "output_files": [
+    {
+      "path": "gpu_memory_before_image.txt",
+      "sha256": "6630202e2da2c98567f27ee66cee0d370d2b590a3723fbd0fc5a98a2c462f3a3",
+      "bytes": 12
+    },
+    {
+      "path": "heatmap.npy",
+      "sha256": "49842a3a1249dcab5db8151f34adf5007deb7bec93ec5e9a4db98fb1fadd4662",
+      "bytes": 313728
+    },
+    {
+      "path": "heatmap.png",
+      "sha256": "2774aca3a7eb76122f9d770e2e22a37dae622c750f76b1e4dcd070fba84914e2",
+      "bytes": 22316
+    },
+    {
+      "path": "memory_bank.npy",
+      "sha256": "581597aab986bbabad159d9191af3d9e132f189ca198f2c509132e4f919b3420",
+      "bytes": 196736
+    },
+    {
+      "path": "memory_bank_indices.npy",
+      "sha256": "5117845e02df64746967695ad4e34e4b10291f582a0cd7ef8c39cd7549192c0a",
+      "bytes": 1152
+    },
+    {
+      "path": "nvidia_smi_before_image.txt",
+      "sha256": "cbc63d882ae02948445a61c288ae810434d22799ceeb8aaf4cdd090e9fa17594",
+      "bytes": 1880
+    },
+    {
+      "path": "overlay.png",
+      "sha256": "41796a9edd5dfdc2f3042de1198c2ed40a2f004a1961c6f41f76dbb964c2c096",
+      "bytes": 93460
+    },
+    {
+      "path": "patch_distances.npy",
+      "sha256": "c768c3c9c36fc17593500ce0653954a7bcdb7ad86b0df1fb129448da1e0e91b9",
+      "bytes": 1728
+    },
+    {
+      "path": "reference_provenance.json",
+      "sha256": "b1ed88948e91882771f0651ffdc77d3ebf5b1d9be3d879f833ac1cbdd5fb9766",
+      "bytes": 508
+    }
+  ],
+  "metrics": {
+    "patch_score_max": 28.816293716430664,
+    "patch_score_mean": 20.359210968017578,
+    "heatmap_score_max": 28.816293716430664,
+    "heatmap_score_mean": 20.35921287536621,
+    "feature_grid": [
+      20,
+      20
+    ],
+    "memory_bank_size": 128,
+    "memory_bank_cap": 128,
+    "memory_bank_identity": "ccc89ef6ca3bbdf8e6564f443a55936517c2414399bc2d890a110e780294495c",
+    "method": "frozen DINOv2 patch features; 3x3 local mean; unique farthest-first coreset; exact nearest Euclidean distance",
+    "canonical_patchcore": false,
+    "deviation": "DINOv2 replaces canonical PatchCore WideResNet backbone; no canonical performance claim",
+    "reference_provenance": [
+      {
+        "raw_image_ref": "dataset/stage2_synthetic/normal.png",
+        "sha256": "c74083562d123356fc52837a45475b0074361258acda078aae18d6ef37ed2344",
+        "design_id": "synthetic-periodic-v1",
+        "evidence_kind": "synthetic",
+        "feature_grid": [
+          19,
+          19
+        ],
+        "geometry": {
+          "feature_extract_seconds": 0.039243100000021514,
+          "input_width": 256,
+          "input_height": 256,
+          "padded_width": 266,
+          "padded_height": 266,
+          "patch_size": 14
+        }
+      }
+    ],
+    "reference_setup_seconds": 1.5628128999996989,
+    "cached_bank_build_seconds": 1.5628128999996989,
+    "first_infer_includes_reference_setup": true,
+    "inference_seconds": 0.04836980000254698,
+    "query_feature_extract_seconds": 0.02657779999935883,
+    "inference_timing_scope": "query read + frozen feature extraction + aggregation + nearest-bank distances + bilinear upsampling; excludes reference setup and output writes",
+    "visualization": {
+      "display_p99": 26.65348243713379,
+      "display_scale": 26.65348243713379,
+      "normalization": "per-image p99, clipped; only within-image visual contrast",
+      "cross_image_colors_comparable": false,
+      "raw_values": "Euclidean feature distances; not probabilities or material classes",
+      "upsampling": "bilinear patch-grid upsampling then crop to original dimensions"
+    },
+    "synthetic_only": true,
+    "training": false,
+    "network_parameters_updated": false,
+    "threshold_or_classifier_fitted": false
+  },
+  "interface_version": "probe-result-v1",
+  "annotation_status": "not_ground_truth",
+  "test_ground_truth_allowed": false,
+  "timing_scope": "synchronized infer including image read, computation and output writes; excludes model load; no warmup",
+  "memory_scope": "torch CUDA peak allocated/reserved during infer, includes resident model; excludes driver/context and other processes"
+}

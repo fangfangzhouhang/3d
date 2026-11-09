@@ -1,0 +1,8 @@
+{
+  "probe_name": "dino",
+  "load_status": "ok",
+  "release_status": "ok",
+  "model_load_peak_allocated_mib": 116.13916015625,
+  "model_load_peak_reserved_mib": 142.0,
+  "model_load_ms": 1578.012399997533
+}

@@ -1,0 +1,9 @@
+test_current_inference_pid_is_only_allowed_after_start (test_stage0.SmokeExportTest.test_current_inference_pid_is_only_allowed_after_start) ... ok
+test_foreign_gpu_process_stops_before_model (test_stage0.SmokeExportTest.test_foreign_gpu_process_stops_before_model) ... ok
+test_overlapping_masks_preserve_individual_pixels (test_stage0.SmokeExportTest.test_overlapping_masks_preserve_individual_pixels) ... ok
+test_zero_proposals_still_export_valid_images (test_stage0.SmokeExportTest.test_zero_proposals_still_export_valid_images) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.265s
+
+OK

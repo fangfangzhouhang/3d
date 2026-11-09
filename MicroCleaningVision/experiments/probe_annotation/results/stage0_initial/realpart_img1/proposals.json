@@ -1,0 +1,137 @@
+[
+  {
+    "area": 2198,
+    "bbox": [
+      0.0,
+      0.0,
+      103.0,
+      47.0
+    ],
+    "predicted_iou": 0.94140625,
+    "point_coords": [
+      [
+        30.0,
+        7.5
+      ]
+    ],
+    "stability_score": 0.9551310539245605,
+    "crop_box": [
+      0.0,
+      0.0,
+      640.0,
+      480.0
+    ],
+    "proposal_id": 1,
+    "mask": "masks/0001.png",
+    "semantic_class": null,
+    "annotation_status": "unlabeled_prediction"
+  },
+  {
+    "area": 3928,
+    "bbox": [
+      557.0,
+      424.0,
+      82.0,
+      55.0
+    ],
+    "predicted_iou": 0.93359375,
+    "point_coords": [
+      [
+        630.0,
+        442.5
+      ]
+    ],
+    "stability_score": 0.953911304473877,
+    "crop_box": [
+      0.0,
+      0.0,
+      640.0,
+      480.0
+    ],
+    "proposal_id": 2,
+    "mask": "masks/0002.png",
+    "semantic_class": null,
+    "annotation_status": "unlabeled_prediction"
+  },
+  {
+    "area": 1560,
+    "bbox": [
+      0.0,
+      216.0,
+      38.0,
+      62.0
+    ],
+    "predicted_iou": 0.92578125,
+    "point_coords": [
+      [
+        30.0,
+        247.5
+      ]
+    ],
+    "stability_score": 0.9523809552192688,
+    "crop_box": [
+      0.0,
+      0.0,
+      640.0,
+      480.0
+    ],
+    "proposal_id": 3,
+    "mask": "masks/0003.png",
+    "semantic_class": null,
+    "annotation_status": "unlabeled_prediction"
+  },
+  {
+    "area": 303,
+    "bbox": [
+      359.0,
+      471.0,
+      44.0,
+      8.0
+    ],
+    "predicted_iou": 0.8671875,
+    "point_coords": [
+      [
+        390.0,
+        472.5
+      ]
+    ],
+    "stability_score": 0.9579287767410278,
+    "crop_box": [
+      0.0,
+      0.0,
+      640.0,
+      480.0
+    ],
+    "proposal_id": 4,
+    "mask": "masks/0004.png",
+    "semantic_class": null,
+    "annotation_status": "unlabeled_prediction"
+  },
+  {
+    "area": 928,
+    "bbox": [
+      0.0,
+      464.0,
+      111.0,
+      15.0
+    ],
+    "predicted_iou": 0.85546875,
+    "point_coords": [
+      [
+        30.0,
+        472.5
+      ]
+    ],
+    "stability_score": 0.9517819881439209,
+    "crop_box": [
+      0.0,
+      0.0,
+      640.0,
+      480.0
+    ],
+    "proposal_id": 5,
+    "mask": "masks/0005.png",
+    "semantic_class": null,
+    "annotation_status": "unlabeled_prediction"
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "probe_name": "patchcore",
+  "load_status": "ok",
+  "release_status": "ok",
+  "model_load_peak_allocated_mib": 32.0,
+  "model_load_peak_reserved_mib": 32.0,
+  "model_load_ms": 165.62859999976354
+}

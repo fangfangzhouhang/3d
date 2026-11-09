@@ -1,0 +1,70 @@
+{
+  "status": "passed",
+  "errors": [],
+  "records": [
+    {
+      "probe": "micro_sam",
+      "image": "realpart_img1",
+      "status": "ok",
+      "artifacts_verified": 39
+    },
+    {
+      "probe": "micro_sam",
+      "image": "realpart_img2",
+      "status": "ok",
+      "artifacts_verified": 36
+    },
+    {
+      "probe": "dino",
+      "image": "realpart_img1",
+      "status": "ok",
+      "artifacts_verified": 15
+    },
+    {
+      "probe": "dino",
+      "image": "realpart_img2",
+      "status": "ok",
+      "artifacts_verified": 15
+    },
+    {
+      "probe": "patchcore",
+      "image": "realpart_img1",
+      "status": "blocked",
+      "artifacts_verified": 3
+    },
+    {
+      "probe": "patchcore",
+      "image": "realpart_img2",
+      "status": "blocked",
+      "artifacts_verified": 3
+    },
+    {
+      "probe": "patchcore",
+      "image": "synthetic_normal",
+      "status": "ok",
+      "artifacts_verified": 9
+    },
+    {
+      "probe": "patchcore",
+      "image": "synthetic_foreign",
+      "status": "ok",
+      "artifacts_verified": 9
+    }
+  ],
+  "synthetic_selfcheck": {
+    "synthetic_only": true,
+    "normal_max": 28.816293716430664,
+    "foreign_max": 51.09132766723633,
+    "inside_mean": 45.589630126953125,
+    "outside_mean": 26.5985107421875,
+    "foreign_max_gt_normal_max": true,
+    "inside_mean_gt_outside_mean": true
+  },
+  "scope": {
+    "protected_stage01_files": 284,
+    "changed_stage01": [],
+    "tracked_files": 380,
+    "changed_tracked": [],
+    "installed_packages_unchanged": true
+  }
+}

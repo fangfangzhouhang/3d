@@ -1,0 +1,21 @@
+{"probe": "micro_sam", "image": "realpart_img1", "status": "ok", "reason": "completed"}
+{"probe": "micro_sam", "image": "realpart_img2", "status": "ok", "reason": "completed"}
+D:\大创\3d\MicroCleaningVision\experiments\probe_annotation\vendor\dinov2\dinov2\layers\swiglu_ffn.py:45: UserWarning: xFormers is disabled (SwiGLU)
+  warnings.warn("xFormers is disabled (SwiGLU)")
+D:\大创\3d\MicroCleaningVision\experiments\probe_annotation\vendor\dinov2\dinov2\layers\swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+D:\大创\3d\MicroCleaningVision\experiments\probe_annotation\vendor\dinov2\dinov2\layers\attention.py:29: UserWarning: xFormers is disabled (Attention)
+  warnings.warn("xFormers is disabled (Attention)")
+D:\大创\3d\MicroCleaningVision\experiments\probe_annotation\vendor\dinov2\dinov2\layers\attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+D:\大创\3d\MicroCleaningVision\experiments\probe_annotation\vendor\dinov2\dinov2\layers\block.py:35: UserWarning: xFormers is disabled (Block)
+  warnings.warn("xFormers is disabled (Block)")
+D:\大创\3d\MicroCleaningVision\experiments\probe_annotation\vendor\dinov2\dinov2\layers\block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+{"probe": "dino", "image": "realpart_img1", "status": "ok", "reason": "Feature extraction completed; full three-class separability unavailable because draft classes are missing."}
+{"probe": "dino", "image": "realpart_img2", "status": "ok", "reason": "Feature extraction completed; full three-class separability unavailable because draft classes are missing."}
+{"probe": "patchcore", "image": "realpart_img1", "status": "blocked", "reason": "No gold-standard clean reference photographs of the same design; real inference is blocked."}
+{"probe": "patchcore", "image": "realpart_img2", "status": "blocked", "reason": "No gold-standard clean reference photographs of the same design; real inference is blocked."}
+{"probe": "patchcore", "image": "synthetic_normal", "status": "ok", "reason": "completed"}
+{"probe": "patchcore", "image": "synthetic_foreign", "status": "ok", "reason": "completed"}
+Completed batch: {'ok': 6, 'blocked': 2, 'failed': 0}; output=results/stage2

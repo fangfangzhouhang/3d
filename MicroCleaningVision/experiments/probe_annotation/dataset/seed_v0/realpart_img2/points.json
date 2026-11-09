@@ -1,0 +1,17 @@
+{
+  "schema": "sam2-points-v1",
+  "image_sha256": "591cfdadc06dce57dfe70a769ca79f25c605b6d865ca49bba18a0da126db8369",
+  "author": "codex_visual_point_draft",
+  "annotations": [
+    {"id": 1, "label": "structure", "name": "left circular platform visible top", "positive": [[160,256],[137,235],[190,274]], "negative": [[163,179],[242,255],[160,335],[83,258]]},
+    {"id": 2, "label": "structure", "name": "horizontal narrow connection to circular platform", "positive": [[10,261],[51,260],[90,259],[106,257]], "negative": [[50,236],[51,286],[160,255]]},
+    {"id": 3, "label": "structure", "name": "vertical straight groove and right horizontal branch", "positive": [[474,30],[474,90],[475,160],[475,210],[478,243],[479,290],[479,350],[480,420],[480,471],[540,243],[620,244]], "negative": [[446,95],[451,326],[441,200],[525,190],[540,290],[438,260],[520,452]]},
+    {"id": 10, "label": "ignore", "name": "circular platform dark rim and root ambiguity", "positive": [[109,245],[130,202],[197,208],[222,254],[199,302],[158,316]], "negative": [[160,255],[163,180],[240,256],[157,339]]},
+    {"id": 11, "label": "ignore", "name": "straight groove left boundary dark shadow excluding obvious clumps", "positive": [[455,42],[456,159],[457,205],[459,284],[460,375],[461,449]], "negative": [[446,95],[451,326],[475,90],[479,350],[435,190]]},
+    {"id": 12, "label": "ignore", "name": "straight groove right boundary and branch shadow", "positive": [[493,45],[494,173],[497,224],[548,228],[620,258],[499,304],[502,390]], "negative": [[475,90],[479,350],[540,243],[521,190],[520,300]]},
+    {"id": 13, "label": "ignore", "name": "horizontal connection edge shadow", "positive": [[50,248],[50,273],[99,277]], "negative": [[50,260],[50,232],[50,289],[160,255]]},
+    {"id": 14, "label": "ignore", "name": "ambiguous pits above platform; identity unknown", "positive": [[110,169],[94,184],[134,180]], "negative": [[160,255],[110,140],[74,164],[158,176]]},
+    {"id": 20, "label": "residue", "name": "only visually obvious dark-green clump near upper straight-groove edge", "positive": [[446,94],[447,106],[441,89]], "negative": [[429,94],[474,94],[456,49],[456,157],[450,73],[448,124],[461,101]]},
+    {"id": 21, "label": "residue", "name": "only visually obvious dark-green clump near lower straight-groove edge", "positive": [[449,326],[444,331],[454,323]], "negative": [[430,326],[477,326],[459,301],[459,357],[448,310],[446,344]]}
+  ]
+}

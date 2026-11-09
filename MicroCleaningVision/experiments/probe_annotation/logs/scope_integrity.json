@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "branch": "exp/probe-annotation",
+  "head": "a5b304903e54e008e948375d84f3f4c04a0290e0",
+  "tracked_changes": [],
+  "all_untracked_inside_experiment": true,
+  "locked_distributions_checked": 24,
+  "two_environment_freezes_identical": true,
+  "weight_ignored": true,
+  "vendor_source_clean": true
+}

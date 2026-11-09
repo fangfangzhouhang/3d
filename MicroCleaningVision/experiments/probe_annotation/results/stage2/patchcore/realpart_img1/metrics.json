@@ -1,0 +1,54 @@
+{
+  "task_id": "stage2-20261109T101923Z-71c07242",
+  "observation_id": "realpart_img1:d4ec9de39c45",
+  "frame_id": "realpart_img1",
+  "raw_image_ref": "inputs/realpart_img1.jpg",
+  "input_sha256": "d4ec9de39c4545a30888ace45d4638ee719e395350ea9b42ae7f8a60f2d30f93",
+  "probe_name": "patchcore",
+  "model_info": {
+    "model_name": "DINOv2 ViT-S/14 + PatchCore-style memory bank",
+    "model_version": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+    "weights_version": "dinov2_vits14_pretrain / LVD-142M",
+    "weights_ref": "weights/dinov2_vits14_pretrain.pth",
+    "weights_sha256": "b938bf1bc15cd2ec0feacfe3a1bb553fe8ea9ca46a7e1d8d00217f29aef60cd9",
+    "weights_bytes": 88283115,
+    "code_license": "Apache-2.0 (DINOv2 backbone)",
+    "weights_license": "Apache-2.0"
+  },
+  "started_at": "2026-11-09T10:19:57.994075+00:00",
+  "ended_at": "2026-11-09T10:19:58.300006+00:00",
+  "duration_ms": null,
+  "model_load_ms": 165.62859999976354,
+  "peak_allocated_mib": null,
+  "peak_reserved_mib": null,
+  "status": "blocked",
+  "status_reason": "No gold-standard clean reference photographs of the same design; real inference is blocked.",
+  "reason_codes": [
+    "missing-clean-reference"
+  ],
+  "output_files": [
+    {
+      "path": "failure.txt",
+      "sha256": "3b26f3d77bea3d89d818bafeccba2fdd2a69c46703e6d555da9c08fcbdc472d4",
+      "bytes": 839
+    },
+    {
+      "path": "gpu_memory_before_image.txt",
+      "sha256": "6630202e2da2c98567f27ee66cee0d370d2b590a3723fbd0fc5a98a2c462f3a3",
+      "bytes": 12
+    },
+    {
+      "path": "nvidia_smi_before_image.txt",
+      "sha256": "a45c31bc0c291ff1091a56d56ce303893affba57ba5c00896cde5c81055024f3",
+      "bytes": 1880
+    }
+  ],
+  "metrics": {
+    "blocked_check_duration_ms": 1.703799996903399
+  },
+  "interface_version": "probe-result-v1",
+  "annotation_status": "not_ground_truth",
+  "test_ground_truth_allowed": false,
+  "timing_scope": "synchronized infer including image read, computation and output writes; excludes model load; no warmup",
+  "memory_scope": "torch CUDA peak allocated/reserved during infer, includes resident model; excludes driver/context and other processes"
+}

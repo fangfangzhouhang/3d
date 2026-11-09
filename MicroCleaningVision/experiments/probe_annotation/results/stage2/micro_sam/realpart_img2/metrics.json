@@ -1,0 +1,863 @@
+{
+  "task_id": "stage2-20261109T101923Z-71c07242",
+  "observation_id": "realpart_img2:591cfdadc06d",
+  "frame_id": "realpart_img2",
+  "raw_image_ref": "inputs/realpart_img2.jpg",
+  "input_sha256": "591cfdadc06dce57dfe70a769ca79f25c605b6d865ca49bba18a0da126db8369",
+  "probe_name": "micro_sam",
+  "model_info": {
+    "model_name": "Micro-SAM vit_b_lm",
+    "model_version": "cb88e8d662bc0d988ff8d5f6f03d42f13dc07a51",
+    "weights_version": "BioImage.IO diplomatic-bug/1.2",
+    "weights_ref": "weights/micro_sam_vit_b_lm_1.2.pt",
+    "weights_sha256": "ffe862fa5b58d78375506041faf0eb3927ced5b5391e8be383e6d7ac07aed924",
+    "weights_bytes": 375023499,
+    "code_license": "MIT (Micro-SAM); Apache-2.0 (official SAM predictor)",
+    "weights_license": "CC-BY-4.0"
+  },
+  "started_at": "2026-11-09T10:19:45.624606+00:00",
+  "ended_at": "2026-11-09T10:19:49.749165+00:00",
+  "duration_ms": 3068.788999997196,
+  "model_load_ms": 9663.663899998937,
+  "peak_allocated_mib": 2535.9013671875,
+  "peak_reserved_mib": 3434.0,
+  "status": "ok",
+  "status_reason": "completed",
+  "reason_codes": [],
+  "output_files": [
+    {
+      "path": "agreement/0001_structure.png",
+      "sha256": "368dec989f58dee70f7b63916b733eda5e9f485bafa93177e25bc450f1deaf8e",
+      "bytes": 470778
+    },
+    {
+      "path": "agreement/0002_structure.png",
+      "sha256": "29ecdafcda6066e6cc7cef992dd23755837851327490cda50024d80225312467",
+      "bytes": 470541
+    },
+    {
+      "path": "agreement/0003_structure.png",
+      "sha256": "e9386f4d960281eb0ec213268c5004b8ed9e0b6725326cd391f3d15c5517fb9f",
+      "bytes": 473231
+    },
+    {
+      "path": "agreement/0010_ignore.png",
+      "sha256": "ab6039ec1e5fc122ec8a57d1a7161e72cce632e6a73b8b0cad094370adb35485",
+      "bytes": 472291
+    },
+    {
+      "path": "agreement/0011_ignore.png",
+      "sha256": "f481ec4b138c95ae5d4c3f28d74ad6f4884a42c4958cc7ad6f0151b1d2eb9456",
+      "bytes": 472176
+    },
+    {
+      "path": "agreement/0012_ignore.png",
+      "sha256": "402f71d1688dc2afa166e45aebff52d5b3461ea35ddc2e22deb9b2f1dcb98ed2",
+      "bytes": 479788
+    },
+    {
+      "path": "agreement/0013_ignore.png",
+      "sha256": "0111783e64334c207a9677e6570b63d0ec5fb5863ff0b17be31003c84c6eb560",
+      "bytes": 471614
+    },
+    {
+      "path": "agreement/0014_ignore.png",
+      "sha256": "a793afc950738209aee78e9a91a4d8a9e188b264a9e44252ff8932820c316490",
+      "bytes": 472702
+    },
+    {
+      "path": "agreement/0020_residue.png",
+      "sha256": "039074494c271218853f4092edba61ed2d3b479528f52a00867e6897c4b1cff7",
+      "bytes": 470487
+    },
+    {
+      "path": "agreement/0021_residue.png",
+      "sha256": "ed4f76c5e49888dbed9de5310cb946a476c12e8db64002453c4d20ce075d3b2f",
+      "bytes": 470341
+    },
+    {
+      "path": "candidates/0001_0.png",
+      "sha256": "8d17e8931cb78e36c72829ed3818eb9879f1b0d8b81d0b5e09153f92d13bc0ef",
+      "bytes": 1013
+    },
+    {
+      "path": "candidates/0002_0.png",
+      "sha256": "9b304215616eaf113b2dd9f0b5da88bf381ea96ea84719ca68e11ec82ce3dacd",
+      "bytes": 537
+    },
+    {
+      "path": "candidates/0003_0.png",
+      "sha256": "bec7f4c1c788cf786f0039b9cc0321dfd974c48d5fd15e1a838ac1e9fe3e45c9",
+      "bytes": 2181
+    },
+    {
+      "path": "candidates/0010_0.png",
+      "sha256": "233df77df1b8961b8effdbb8a9f676cf63b56e96858fe712bb427471ec1e1cf9",
+      "bytes": 1348
+    },
+    {
+      "path": "candidates/0011_0.png",
+      "sha256": "86885e9b8bfe8b082f60500de3e181305ad08c7f3d5a4024fe04593b697994ec",
+      "bytes": 1945
+    },
+    {
+      "path": "candidates/0012_0.png",
+      "sha256": "bd4876bb80ff2e3d0821629ac362cf6dc1654307346a653b021e966ccad39b7a",
+      "bytes": 4933
+    },
+    {
+      "path": "candidates/0013_0.png",
+      "sha256": "87eee5b9e95cafef041cd29423b996f9c3af25eff5b4035b8975423fce22c787",
+      "bytes": 688
+    },
+    {
+      "path": "candidates/0014_0.png",
+      "sha256": "d919920cad70484c322c6d685ff64f0c41f854ae18f96b54c9bfcd5ed96e18d2",
+      "bytes": 713
+    },
+    {
+      "path": "candidates/0020_0.png",
+      "sha256": "8cf56e7fdfd3869e964647bdbe2cc21d5a38399f7cd7c1094cc84f6d20ae0534",
+      "bytes": 504
+    },
+    {
+      "path": "candidates/0021_0.png",
+      "sha256": "a594cf257dbf81472286c8822a9b77987e2726fe37863070070ac6af9e2db983",
+      "bytes": 471
+    },
+    {
+      "path": "gpu_memory_before_image.txt",
+      "sha256": "5c41f1d0a0f81b1da6c0ecc7487236f693d3abfcccdbefbea3cf2bce28717c3f",
+      "bytes": 12
+    },
+    {
+      "path": "instances.json",
+      "sha256": "890a4c05efe429de9f825c5a8916022cb6cd02e498f3a52b97f429954347bac5",
+      "bytes": 12355
+    },
+    {
+      "path": "masks/0001_structure.png",
+      "sha256": "8d17e8931cb78e36c72829ed3818eb9879f1b0d8b81d0b5e09153f92d13bc0ef",
+      "bytes": 1013
+    },
+    {
+      "path": "masks/0002_structure.png",
+      "sha256": "9b304215616eaf113b2dd9f0b5da88bf381ea96ea84719ca68e11ec82ce3dacd",
+      "bytes": 537
+    },
+    {
+      "path": "masks/0003_structure.png",
+      "sha256": "bec7f4c1c788cf786f0039b9cc0321dfd974c48d5fd15e1a838ac1e9fe3e45c9",
+      "bytes": 2181
+    },
+    {
+      "path": "masks/0010_ignore.png",
+      "sha256": "233df77df1b8961b8effdbb8a9f676cf63b56e96858fe712bb427471ec1e1cf9",
+      "bytes": 1348
+    },
+    {
+      "path": "masks/0011_ignore.png",
+      "sha256": "86885e9b8bfe8b082f60500de3e181305ad08c7f3d5a4024fe04593b697994ec",
+      "bytes": 1945
+    },
+    {
+      "path": "masks/0012_ignore.png",
+      "sha256": "bd4876bb80ff2e3d0821629ac362cf6dc1654307346a653b021e966ccad39b7a",
+      "bytes": 4933
+    },
+    {
+      "path": "masks/0013_ignore.png",
+      "sha256": "87eee5b9e95cafef041cd29423b996f9c3af25eff5b4035b8975423fce22c787",
+      "bytes": 688
+    },
+    {
+      "path": "masks/0014_ignore.png",
+      "sha256": "d919920cad70484c322c6d685ff64f0c41f854ae18f96b54c9bfcd5ed96e18d2",
+      "bytes": 713
+    },
+    {
+      "path": "masks/0020_residue.png",
+      "sha256": "8cf56e7fdfd3869e964647bdbe2cc21d5a38399f7cd7c1094cc84f6d20ae0534",
+      "bytes": 504
+    },
+    {
+      "path": "masks/0021_residue.png",
+      "sha256": "a594cf257dbf81472286c8822a9b77987e2726fe37863070070ac6af9e2db983",
+      "bytes": 471
+    },
+    {
+      "path": "nvidia_smi_before_image.txt",
+      "sha256": "a745415936a8b0bdc84aeca73ebd07e6d809128f9eb7058fa4f9c83812529924",
+      "bytes": 1880
+    },
+    {
+      "path": "overlay.png",
+      "sha256": "7a03c3fe83000e5b48df6e2a2fe81db8887d2e65b70772b9f7ff09a3ab7ad476",
+      "bytes": 470383
+    },
+    {
+      "path": "points.json",
+      "sha256": "fa0aa62457a25c13818e41ed9faaa378c453038d970c432ddced67a313b06503",
+      "bytes": 2426
+    },
+    {
+      "path": "sam2_vs_micro_sam.png",
+      "sha256": "a4246e6b4e9ba655b0881a562be9b7c6ab3055b009ce10c9a885f323f28dba9b",
+      "bytes": 601230
+    }
+  ],
+  "metrics": {
+    "instance_count": 10,
+    "instances": [
+      {
+        "id": 1,
+        "label": "structure",
+        "name": "left circular platform visible top",
+        "positive": [
+          [
+            160,
+            256
+          ],
+          [
+            137,
+            235
+          ],
+          [
+            190,
+            274
+          ]
+        ],
+        "negative": [
+          [
+            163,
+            179
+          ],
+          [
+            242,
+            255
+          ],
+          [
+            160,
+            335
+          ],
+          [
+            83,
+            258
+          ]
+        ],
+        "sam2_area_px": 10389,
+        "micro_sam_area_px": 11536,
+        "intersection_px": 10318,
+        "union_px": 11607,
+        "model_output_agreement_iou_not_accuracy": 0.8889463254932368,
+        "mask_ref": "masks/0001_structure.png",
+        "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0001_structure.png",
+        "sam2_mask_sha256": "838c8b9c7846e4c712db78076dde55399f92e20d5d861ae5731d9fb9c936249a",
+        "decode_seconds": 0.0949092999981076,
+        "candidate_index": 0,
+        "model_internal_quality_scores_not_measured_accuracy": [
+          0.953125
+        ],
+        "annotation_status": "draft",
+        "human_verified": false
+      },
+      {
+        "id": 2,
+        "label": "structure",
+        "name": "horizontal narrow connection to circular platform",
+        "positive": [
+          [
+            10,
+            261
+          ],
+          [
+            51,
+            260
+          ],
+          [
+            90,
+            259
+          ],
+          [
+            106,
+            257
+          ]
+        ],
+        "negative": [
+          [
+            50,
+            236
+          ],
+          [
+            51,
+            286
+          ],
+          [
+            160,
+            255
+          ]
+        ],
+        "sam2_area_px": 2364,
+        "micro_sam_area_px": 2934,
+        "intersection_px": 2340,
+        "union_px": 2958,
+        "model_output_agreement_iou_not_accuracy": 0.7910750507099391,
+        "mask_ref": "masks/0002_structure.png",
+        "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0002_structure.png",
+        "sam2_mask_sha256": "f94710be8860dc8475da0a22c2b17859e0529e227726e5fdc8e52a8f74596671",
+        "decode_seconds": 0.06914749999850756,
+        "candidate_index": 0,
+        "model_internal_quality_scores_not_measured_accuracy": [
+          0.8515625
+        ],
+        "annotation_status": "draft",
+        "human_verified": false
+      },
+      {
+        "id": 3,
+        "label": "structure",
+        "name": "vertical straight groove and right horizontal branch",
+        "positive": [
+          [
+            474,
+            30
+          ],
+          [
+            474,
+            90
+          ],
+          [
+            475,
+            160
+          ],
+          [
+            475,
+            210
+          ],
+          [
+            478,
+            243
+          ],
+          [
+            479,
+            290
+          ],
+          [
+            479,
+            350
+          ],
+          [
+            480,
+            420
+          ],
+          [
+            480,
+            471
+          ],
+          [
+            540,
+            243
+          ],
+          [
+            620,
+            244
+          ]
+        ],
+        "negative": [
+          [
+            446,
+            95
+          ],
+          [
+            451,
+            326
+          ],
+          [
+            441,
+            200
+          ],
+          [
+            525,
+            190
+          ],
+          [
+            540,
+            290
+          ],
+          [
+            438,
+            260
+          ],
+          [
+            520,
+            452
+          ]
+        ],
+        "sam2_area_px": 19884,
+        "micro_sam_area_px": 20013,
+        "intersection_px": 17824,
+        "union_px": 22073,
+        "model_output_agreement_iou_not_accuracy": 0.8075023784714357,
+        "mask_ref": "masks/0003_structure.png",
+        "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0003_structure.png",
+        "sam2_mask_sha256": "ca9e81828f5d1f4166fbcda4139ea0f7152120e0743dfbf7f40caef67866fb63",
+        "decode_seconds": 0.07762580000053276,
+        "candidate_index": 0,
+        "model_internal_quality_scores_not_measured_accuracy": [
+          0.796875
+        ],
+        "annotation_status": "draft",
+        "human_verified": false
+      },
+      {
+        "id": 10,
+        "label": "ignore",
+        "name": "circular platform dark rim and root ambiguity",
+        "positive": [
+          [
+            109,
+            245
+          ],
+          [
+            130,
+            202
+          ],
+          [
+            197,
+            208
+          ],
+          [
+            222,
+            254
+          ],
+          [
+            199,
+            302
+          ],
+          [
+            158,
+            316
+          ]
+        ],
+        "negative": [
+          [
+            160,
+            255
+          ],
+          [
+            163,
+            180
+          ],
+          [
+            240,
+            256
+          ],
+          [
+            157,
+            339
+          ]
+        ],
+        "sam2_area_px": 4607,
+        "micro_sam_area_px": 3160,
+        "intersection_px": 2578,
+        "union_px": 5189,
+        "model_output_agreement_iou_not_accuracy": 0.4968201965696666,
+        "mask_ref": "masks/0010_ignore.png",
+        "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0010_ignore.png",
+        "sam2_mask_sha256": "6fd379a0ddfab75944905a0fe040749a68fded43a73c506aa785e466f6449187",
+        "decode_seconds": 0.05351909999808413,
+        "candidate_index": 0,
+        "model_internal_quality_scores_not_measured_accuracy": [
+          0.5078125
+        ],
+        "annotation_status": "draft",
+        "human_verified": false
+      },
+      {
+        "id": 11,
+        "label": "ignore",
+        "name": "straight groove left boundary dark shadow excluding obvious clumps",
+        "positive": [
+          [
+            455,
+            42
+          ],
+          [
+            456,
+            159
+          ],
+          [
+            457,
+            205
+          ],
+          [
+            459,
+            284
+          ],
+          [
+            460,
+            375
+          ],
+          [
+            461,
+            449
+          ]
+        ],
+        "negative": [
+          [
+            446,
+            95
+          ],
+          [
+            451,
+            326
+          ],
+          [
+            475,
+            90
+          ],
+          [
+            479,
+            350
+          ],
+          [
+            435,
+            190
+          ]
+        ],
+        "sam2_area_px": 2471,
+        "micro_sam_area_px": 5545,
+        "intersection_px": 2196,
+        "union_px": 5820,
+        "model_output_agreement_iou_not_accuracy": 0.37731958762886597,
+        "mask_ref": "masks/0011_ignore.png",
+        "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0011_ignore.png",
+        "sam2_mask_sha256": "28cd1af134a7ef682bffa5c4b5f20aef0685c1a2c0f582733b23c26e8eb2cf13",
+        "decode_seconds": 0.07691720000002533,
+        "candidate_index": 0,
+        "model_internal_quality_scores_not_measured_accuracy": [
+          0.5078125
+        ],
+        "annotation_status": "draft",
+        "human_verified": false
+      },
+      {
+        "id": 12,
+        "label": "ignore",
+        "name": "straight groove right boundary and branch shadow",
+        "positive": [
+          [
+            493,
+            45
+          ],
+          [
+            494,
+            173
+          ],
+          [
+            497,
+            224
+          ],
+          [
+            548,
+            228
+          ],
+          [
+            620,
+            258
+          ],
+          [
+            499,
+            304
+          ],
+          [
+            502,
+            390
+          ]
+        ],
+        "negative": [
+          [
+            475,
+            90
+          ],
+          [
+            479,
+            350
+          ],
+          [
+            540,
+            243
+          ],
+          [
+            521,
+            190
+          ],
+          [
+            520,
+            300
+          ]
+        ],
+        "sam2_area_px": 7136,
+        "micro_sam_area_px": 21152,
+        "intersection_px": 4070,
+        "union_px": 24218,
+        "model_output_agreement_iou_not_accuracy": 0.1680568172433727,
+        "mask_ref": "masks/0012_ignore.png",
+        "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0012_ignore.png",
+        "sam2_mask_sha256": "c5e974344b65467aa75819bb61d9413fd69897a6deb08bd53990c6899d54b3c1",
+        "decode_seconds": 0.07485830000223359,
+        "candidate_index": 0,
+        "model_internal_quality_scores_not_measured_accuracy": [
+          0.59375
+        ],
+        "annotation_status": "draft",
+        "human_verified": false
+      },
+      {
+        "id": 13,
+        "label": "ignore",
+        "name": "horizontal connection edge shadow",
+        "positive": [
+          [
+            50,
+            248
+          ],
+          [
+            50,
+            273
+          ],
+          [
+            99,
+            277
+          ]
+        ],
+        "negative": [
+          [
+            50,
+            260
+          ],
+          [
+            50,
+            232
+          ],
+          [
+            50,
+            289
+          ],
+          [
+            160,
+            255
+          ]
+        ],
+        "sam2_area_px": 2576,
+        "micro_sam_area_px": 1719,
+        "intersection_px": 1333,
+        "union_px": 2962,
+        "model_output_agreement_iou_not_accuracy": 0.450033760972316,
+        "mask_ref": "masks/0013_ignore.png",
+        "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0013_ignore.png",
+        "sam2_mask_sha256": "9a06c521568b11fd7a7955bd8f10f53edf122ac14549c9500e6d2cd111ac9f1d",
+        "decode_seconds": 0.07785839999996824,
+        "candidate_index": 0,
+        "model_internal_quality_scores_not_measured_accuracy": [
+          0.51171875
+        ],
+        "annotation_status": "draft",
+        "human_verified": false
+      },
+      {
+        "id": 14,
+        "label": "ignore",
+        "name": "ambiguous pits above platform; identity unknown",
+        "positive": [
+          [
+            110,
+            169
+          ],
+          [
+            94,
+            184
+          ],
+          [
+            134,
+            180
+          ]
+        ],
+        "negative": [
+          [
+            160,
+            255
+          ],
+          [
+            110,
+            140
+          ],
+          [
+            74,
+            164
+          ],
+          [
+            158,
+            176
+          ]
+        ],
+        "sam2_area_px": 8905,
+        "micro_sam_area_px": 2638,
+        "intersection_px": 2178,
+        "union_px": 9365,
+        "model_output_agreement_iou_not_accuracy": 0.23256807261078483,
+        "mask_ref": "masks/0014_ignore.png",
+        "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0014_ignore.png",
+        "sam2_mask_sha256": "02455abd955d224bc65b3881db6f343f42110b79cf40421998ce451f0ed1dc96",
+        "decode_seconds": 0.06625550000171643,
+        "candidate_index": 0,
+        "model_internal_quality_scores_not_measured_accuracy": [
+          0.65625
+        ],
+        "annotation_status": "draft",
+        "human_verified": false
+      },
+      {
+        "id": 20,
+        "label": "residue",
+        "name": "only visually obvious dark-green clump near upper straight-groove edge",
+        "positive": [
+          [
+            446,
+            94
+          ],
+          [
+            447,
+            106
+          ],
+          [
+            441,
+            89
+          ]
+        ],
+        "negative": [
+          [
+            429,
+            94
+          ],
+          [
+            474,
+            94
+          ],
+          [
+            456,
+            49
+          ],
+          [
+            456,
+            157
+          ],
+          [
+            450,
+            73
+          ],
+          [
+            448,
+            124
+          ],
+          [
+            461,
+            101
+          ]
+        ],
+        "sam2_area_px": 556,
+        "micro_sam_area_px": 358,
+        "intersection_px": 358,
+        "union_px": 556,
+        "model_output_agreement_iou_not_accuracy": 0.6438848920863309,
+        "mask_ref": "masks/0020_residue.png",
+        "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0020_residue.png",
+        "sam2_mask_sha256": "4fbf2ab506d56590984fb65986e48a5a3ccd62875d54a77beaf40aa9b12f9bdf",
+        "decode_seconds": 0.0711023000003479,
+        "candidate_index": 0,
+        "model_internal_quality_scores_not_measured_accuracy": [
+          0.75390625
+        ],
+        "annotation_status": "draft",
+        "human_verified": false
+      },
+      {
+        "id": 21,
+        "label": "residue",
+        "name": "only visually obvious dark-green clump near lower straight-groove edge",
+        "positive": [
+          [
+            449,
+            326
+          ],
+          [
+            444,
+            331
+          ],
+          [
+            454,
+            323
+          ]
+        ],
+        "negative": [
+          [
+            430,
+            326
+          ],
+          [
+            477,
+            326
+          ],
+          [
+            459,
+            301
+          ],
+          [
+            459,
+            357
+          ],
+          [
+            448,
+            310
+          ],
+          [
+            446,
+            344
+          ]
+        ],
+        "sam2_area_px": 326,
+        "micro_sam_area_px": 221,
+        "intersection_px": 221,
+        "union_px": 326,
+        "model_output_agreement_iou_not_accuracy": 0.6779141104294478,
+        "mask_ref": "masks/0021_residue.png",
+        "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0021_residue.png",
+        "sam2_mask_sha256": "2d56e21d2c49c42d454021468f7be4d18b7b1a4a41335e3e9d3a6805afb735bb",
+        "decode_seconds": 0.07995279999886407,
+        "candidate_index": 0,
+        "model_internal_quality_scores_not_measured_accuracy": [
+          0.734375
+        ],
+        "annotation_status": "draft",
+        "human_verified": false
+      }
+    ],
+    "encode_seconds": 0.27081270000053337,
+    "inference_seconds": 1.012958899998921,
+    "parameter_count": 93735472,
+    "points_sha256": "fa0aa62457a25c13818e41ed9faaa378c453038d970c432ddced67a313b06503",
+    "precision": "bfloat16 autocast; weights float32",
+    "empty_instance_ids": [],
+    "agreement_scope": "raw full-resolution corresponding masks by instance ID; both are model drafts; IoU is model-output agreement, NOT accuracy",
+    "agreement_colors": "magenta Micro-SAM only; cyan SAM2 only; white both",
+    "model_role": "microscopy LM pretrained point segmentation; classes supplied by unchanged stage1 prompt author",
+    "adapter": "official SAM SamPredictor, equivalent state loading to BioImage.IO PredictorAdaptor; no napari/training package installed",
+    "postprocessing": false,
+    "training_performed": false
+  },
+  "interface_version": "probe-result-v1",
+  "annotation_status": "not_ground_truth",
+  "test_ground_truth_allowed": false,
+  "timing_scope": "synchronized infer including image read, computation and output writes; excludes model load; no warmup",
+  "memory_scope": "torch CUDA peak allocated/reserved during infer, includes resident model; excludes driver/context and other processes"
+}

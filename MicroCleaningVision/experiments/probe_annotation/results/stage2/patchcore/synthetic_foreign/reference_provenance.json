@@ -1,0 +1,20 @@
+[
+  {
+    "raw_image_ref": "dataset/stage2_synthetic/normal.png",
+    "sha256": "c74083562d123356fc52837a45475b0074361258acda078aae18d6ef37ed2344",
+    "design_id": "synthetic-periodic-v1",
+    "evidence_kind": "synthetic",
+    "feature_grid": [
+      19,
+      19
+    ],
+    "geometry": {
+      "feature_extract_seconds": 0.039243100000021514,
+      "input_width": 256,
+      "input_height": 256,
+      "padded_width": 266,
+      "padded_height": 266,
+      "patch_size": 14
+    }
+  }
+]

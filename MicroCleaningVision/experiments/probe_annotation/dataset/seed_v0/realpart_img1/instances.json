@@ -1,0 +1,698 @@
+[
+  {
+    "id": 1,
+    "label": "structure",
+    "name": "central circular platform visible top",
+    "positive": [
+      [
+        270,
+        290
+      ],
+      [
+        250,
+        281
+      ],
+      [
+        289,
+        303
+      ]
+    ],
+    "negative": [
+      [
+        217,
+        290
+      ],
+      [
+        325,
+        291
+      ],
+      [
+        272,
+        346
+      ],
+      [
+        278,
+        240
+      ]
+    ],
+    "mask": "masks/0001_structure.png",
+    "mask_sha256": "3fac7720b1cbb82dfca315cb7176a3487421e687d535c8add7fb587ae09d0016",
+    "area_px": 4762,
+    "positive_hits": 3,
+    "positive_count": 3,
+    "negative_hits": 0,
+    "negative_count": 4
+  },
+  {
+    "id": 2,
+    "label": "structure",
+    "name": "central curved groove and narrow stem",
+    "positive": [
+      [
+        307,
+        20
+      ],
+      [
+        305,
+        61
+      ],
+      [
+        316,
+        81
+      ],
+      [
+        341,
+        98
+      ],
+      [
+        340,
+        114
+      ],
+      [
+        311,
+        122
+      ],
+      [
+        272,
+        121
+      ],
+      [
+        245,
+        129
+      ],
+      [
+        239,
+        144
+      ],
+      [
+        255,
+        160
+      ],
+      [
+        278,
+        177
+      ],
+      [
+        283,
+        197
+      ],
+      [
+        280,
+        227
+      ],
+      [
+        278,
+        246
+      ]
+    ],
+    "negative": [
+      [
+        289,
+        48
+      ],
+      [
+        327,
+        53
+      ],
+      [
+        374,
+        104
+      ],
+      [
+        308,
+        146
+      ],
+      [
+        220,
+        144
+      ],
+      [
+        261,
+        197
+      ],
+      [
+        299,
+        223
+      ],
+      [
+        270,
+        290
+      ]
+    ],
+    "mask": "masks/0002_structure.png",
+    "mask_sha256": "e1fb84440d2796fa1a2746cab943f09144fb0b978af4a8d6870850354365b4ee",
+    "area_px": 6708,
+    "positive_hits": 14,
+    "positive_count": 14,
+    "negative_hits": 0,
+    "negative_count": 8
+  },
+  {
+    "id": 3,
+    "label": "structure",
+    "name": "right groove upper diagonal and vertical segment",
+    "positive": [
+      [
+        452,
+        20
+      ],
+      [
+        494,
+        56
+      ],
+      [
+        545,
+        90
+      ],
+      [
+        582,
+        121
+      ],
+      [
+        584,
+        158
+      ],
+      [
+        581,
+        190
+      ],
+      [
+        578,
+        213
+      ],
+      [
+        571,
+        250
+      ],
+      [
+        551,
+        272
+      ],
+      [
+        522,
+        280
+      ]
+    ],
+    "negative": [
+      [
+        487,
+        15
+      ],
+      [
+        554,
+        57
+      ],
+      [
+        620,
+        166
+      ],
+      [
+        552,
+        224
+      ],
+      [
+        491,
+        269
+      ],
+      [
+        514,
+        321
+      ]
+    ],
+    "mask": "masks/0003_structure.png",
+    "mask_sha256": "9c3a796b12a15785b833aa621846f071c810a30ee65f82ff8d863fc4fda73ddc",
+    "area_px": 8344,
+    "positive_hits": 10,
+    "positive_count": 10,
+    "negative_hits": 0,
+    "negative_count": 6
+  },
+  {
+    "id": 4,
+    "label": "structure",
+    "name": "left truncated groove visible portions",
+    "positive": [
+      [
+        113,
+        15
+      ],
+      [
+        69,
+        30
+      ],
+      [
+        18,
+        58
+      ],
+      [
+        9,
+        114
+      ],
+      [
+        7,
+        168
+      ],
+      [
+        15,
+        201
+      ],
+      [
+        40,
+        222
+      ],
+      [
+        47,
+        247
+      ],
+      [
+        38,
+        269
+      ],
+      [
+        10,
+        278
+      ]
+    ],
+    "negative": [
+      [
+        63,
+        68
+      ],
+      [
+        40,
+        142
+      ],
+      [
+        53,
+        199
+      ],
+      [
+        77,
+        239
+      ],
+      [
+        64,
+        296
+      ]
+    ],
+    "mask": "masks/0004_structure.png",
+    "mask_sha256": "5f9ced454c7c6ffaf7777c80d50b757eb1f89f6742035fd514082e939d7160cf",
+    "area_px": 7654,
+    "positive_hits": 10,
+    "positive_count": 10,
+    "negative_hits": 0,
+    "negative_count": 5
+  },
+  {
+    "id": 10,
+    "label": "ignore",
+    "name": "uncertain platform root and dark rim",
+    "positive": [
+      [
+        233,
+        285
+      ],
+      [
+        242,
+        318
+      ],
+      [
+        273,
+        334
+      ],
+      [
+        306,
+        314
+      ],
+      [
+        312,
+        286
+      ],
+      [
+        293,
+        254
+      ]
+    ],
+    "negative": [
+      [
+        271,
+        290
+      ],
+      [
+        212,
+        281
+      ],
+      [
+        327,
+        326
+      ],
+      [
+        279,
+        351
+      ]
+    ],
+    "mask": "masks/0010_ignore.png",
+    "mask_sha256": "954b5f9cfcb94ddb7b146f1643df06fc055a47479208b0fadd5458bcdcd5bc38",
+    "area_px": 2855,
+    "positive_hits": 6,
+    "positive_count": 6,
+    "negative_hits": 0,
+    "negative_count": 4
+  },
+  {
+    "id": 5,
+    "label": "structure",
+    "name": "right groove lower serpentine segment (same continuous feature as ID3)",
+    "positive": [
+      [
+        506,
+        300
+      ],
+      [
+        514,
+        321
+      ],
+      [
+        551,
+        338
+      ],
+      [
+        587,
+        348
+      ],
+      [
+        611,
+        367
+      ],
+      [
+        625,
+        388
+      ],
+      [
+        602,
+        408
+      ],
+      [
+        590,
+        415
+      ],
+      [
+        558,
+        436
+      ],
+      [
+        543,
+        470
+      ]
+    ],
+    "negative": [
+      [
+        482,
+        314
+      ],
+      [
+        545,
+        366
+      ],
+      [
+        637,
+        403
+      ],
+      [
+        592,
+        449
+      ],
+      [
+        571,
+        250
+      ]
+    ],
+    "mask": "masks/0005_structure.png",
+    "mask_sha256": "c695e632ab1a7dc67b1a8f9042515291ed9a3a41459556a1d3dfebd181a1e6b5",
+    "area_px": 6502,
+    "positive_hits": 10,
+    "positive_count": 10,
+    "negative_hits": 0,
+    "negative_count": 5
+  },
+  {
+    "id": 11,
+    "label": "ignore",
+    "name": "central groove dark shadow edges",
+    "positive": [
+      [
+        298,
+        51
+      ],
+      [
+        298,
+        77
+      ],
+      [
+        235,
+        124
+      ],
+      [
+        232,
+        146
+      ],
+      [
+        274,
+        181
+      ],
+      [
+        273,
+        229
+      ],
+      [
+        350,
+        118
+      ]
+    ],
+    "negative": [
+      [
+        271,
+        290
+      ],
+      [
+        260,
+        144
+      ],
+      [
+        374,
+        135
+      ],
+      [
+        210,
+        181
+      ]
+    ],
+    "mask": "masks/0011_ignore.png",
+    "mask_sha256": "faa002c365bc7c8f6d5ddd6bd067bb4668a30468223d23924fb5122bfcd96743",
+    "area_px": 7606,
+    "positive_hits": 6,
+    "positive_count": 7,
+    "negative_hits": 0,
+    "negative_count": 4
+  },
+  {
+    "id": 12,
+    "label": "ignore",
+    "name": "thin crack above central channel",
+    "positive": [
+      [
+        214,
+        60
+      ],
+      [
+        229,
+        68
+      ],
+      [
+        256,
+        69
+      ],
+      [
+        278,
+        59
+      ]
+    ],
+    "negative": [
+      [
+        224,
+        43
+      ],
+      [
+        244,
+        86
+      ],
+      [
+        270,
+        87
+      ],
+      [
+        283,
+        43
+      ]
+    ],
+    "mask": "masks/0012_ignore.png",
+    "mask_sha256": "cb6c0f8c38dd11c77dc84948a31bd425c3d2805965f2e59b126e23e1714efaa2",
+    "area_px": 477,
+    "positive_hits": 2,
+    "positive_count": 4,
+    "negative_hits": 0,
+    "negative_count": 4
+  },
+  {
+    "id": 13,
+    "label": "ignore",
+    "name": "ambiguous pits left of circular platform",
+    "positive": [
+      [
+        213,
+        277
+      ],
+      [
+        215,
+        310
+      ],
+      [
+        209,
+        328
+      ]
+    ],
+    "negative": [
+      [
+        270,
+        290
+      ],
+      [
+        193,
+        286
+      ],
+      [
+        227,
+        316
+      ],
+      [
+        210,
+        354
+      ]
+    ],
+    "mask": "masks/0013_ignore.png",
+    "mask_sha256": "eb7d0361eef371dce37224de2aee5ebfb18a872ce699a9b96b1b69837f187922",
+    "area_px": 1324,
+    "positive_hits": 2,
+    "positive_count": 3,
+    "negative_hits": 0,
+    "negative_count": 4
+  },
+  {
+    "id": 14,
+    "label": "ignore",
+    "name": "right groove dark edge and shadow ambiguity",
+    "positive": [
+      [
+        516,
+        87
+      ],
+      [
+        557,
+        113
+      ],
+      [
+        568,
+        207
+      ],
+      [
+        490,
+        305
+      ],
+      [
+        582,
+        402
+      ],
+      [
+        535,
+        458
+      ]
+    ],
+    "negative": [
+      [
+        545,
+        90
+      ],
+      [
+        584,
+        158
+      ],
+      [
+        506,
+        300
+      ],
+      [
+        600,
+        375
+      ],
+      [
+        523,
+        438
+      ]
+    ],
+    "mask": "masks/0014_ignore.png",
+    "mask_sha256": "bc47d0f508837e2584328d67b0b50423215cc45e8e226b9c2e2c7bb78c9e83c1",
+    "area_px": 2231,
+    "positive_hits": 3,
+    "positive_count": 6,
+    "negative_hits": 0,
+    "negative_count": 5
+  },
+  {
+    "id": 15,
+    "label": "ignore",
+    "name": "left truncated groove dark outer edge",
+    "positive": [
+      [
+        23,
+        46
+      ],
+      [
+        1,
+        185
+      ],
+      [
+        56,
+        250
+      ],
+      [
+        29,
+        282
+      ]
+    ],
+    "negative": [
+      [
+        18,
+        58
+      ],
+      [
+        9,
+        114
+      ],
+      [
+        47,
+        247
+      ],
+      [
+        72,
+        278
+      ]
+    ],
+    "mask": "masks/0015_ignore.png",
+    "mask_sha256": "b995ba4e4576d030a35e9d3c10c000525b59bb70dde9c81efb154c672d062d5d",
+    "area_px": 5249,
+    "positive_hits": 4,
+    "positive_count": 4,
+    "negative_hits": 3,
+    "negative_count": 4
+  }
+]

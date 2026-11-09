@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "seed": 20261109,
+  "split_ratios": {
+    "train": 0.8,
+    "val": 0.1,
+    "test": 0.1
+  },
+  "metadata_notes": [
+    "The two handoff images are conservatively treated as one shared part group; identity has not been verified.",
+    "handoff_batch_unknown_001 is a conservative grouping placeholder, not a claim about the actual capture batch.",
+    "Device is unknown. Dimensions are read from the image files, never entered here.",
+    "Rows are draft placeholders only: not human verified and not allowed as test ground truth."
+  ],
+  "metadata_provenance": {
+    "part_id": "handoff_part_001 is a conservative shared placeholder group; individual part identity is not verified.",
+    "capture_batch": "handoff_batch_unknown_001 is a conservative shared placeholder group; actual capture batch is unknown and not verified.",
+    "device": "unknown; no device claim has been made."
+  },
+  "images": [
+    {
+      "filename": "realpart_img1.jpg",
+      "part_id": "handoff_part_001",
+      "capture_batch": "handoff_batch_unknown_001",
+      "device": "unknown",
+      "split_role": "placeholder_demo",
+      "annotation_status": "draft",
+      "human_verified": false,
+      "test_ground_truth_allowed": false
+    },
+    {
+      "filename": "realpart_img2.jpg",
+      "part_id": "handoff_part_001",
+      "capture_batch": "handoff_batch_unknown_001",
+      "device": "unknown",
+      "split_role": "placeholder_demo",
+      "annotation_status": "draft",
+      "human_verified": false,
+      "test_ground_truth_allowed": false
+    }
+  ]
+}

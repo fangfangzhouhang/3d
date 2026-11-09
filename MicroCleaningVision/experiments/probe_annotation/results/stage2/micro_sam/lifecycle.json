@@ -1,0 +1,8 @@
+{
+  "probe_name": "micro_sam",
+  "load_status": "ok",
+  "release_status": "ok",
+  "model_load_peak_allocated_mib": 357.58642578125,
+  "model_load_peak_reserved_mib": 402.0,
+  "model_load_ms": 9663.663899998937
+}

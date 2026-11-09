@@ -1,0 +1,3 @@
+﻿filename,part_id,capture_batch,device,width,height,split,split_role,annotation_status,human_verified,test_ground_truth_allowed
+realpart_img1.jpg,handoff_part_001,handoff_batch_unknown_001,unknown,640,480,train,placeholder_demo,draft,False,False
+realpart_img2.jpg,handoff_part_001,handoff_batch_unknown_001,unknown,640,480,train,placeholder_demo,draft,False,False

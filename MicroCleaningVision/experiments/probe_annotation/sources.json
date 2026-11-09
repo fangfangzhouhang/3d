@@ -1,0 +1,12 @@
+{
+  "sam2_repository": "https://github.com/facebookresearch/sam2.git",
+  "sam2_commit": "2b90b9f5ceec907a1c18123530e92e794ad901a4",
+  "config": "configs/sam2.1/sam2.1_hiera_t.yaml",
+  "checkpoint_url": "https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_tiny.pt",
+  "checkpoint_file": "sam2.1_hiera_tiny.pt",
+  "checkpoint_sha256": "7402e0d864fa82708a20fbd15bc84245c2f26dff0eb43a4b5b93452deb34be69",
+  "input_sha256": {
+    "realpart_img1.jpg": "d4ec9de39c4545a30888ace45d4638ee719e395350ea9b42ae7f8a60f2d30f93",
+    "realpart_img2.jpg": "591cfdadc06dce57dfe70a769ca79f25c605b6d865ca49bba18a0da126db8369"
+  }
+}

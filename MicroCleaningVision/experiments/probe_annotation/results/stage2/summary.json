@@ -1,0 +1,4247 @@
+{
+  "interface_version": "probe-batch-v1",
+  "task_id": "stage2-20261109T101923Z-71c07242",
+  "started_at": "2026-11-09T10:19:23.040178+00:00",
+  "ended_at": "2026-11-09T10:20:01.404908+00:00",
+  "status": "completed",
+  "config_sha256": "5e318d53c39d43eff8171e01697739f22c754bac42a98318e151b7be3cbabc2b",
+  "config_ref": "configs/stage2.json",
+  "output_root": "results/stage2",
+  "environment": {
+    "python": "3.12.4 (tags/v3.12.4:8e8a4ba, Jun  6 2024, 19:30:16) [MSC v.1940 64 bit (AMD64)]",
+    "executable": "D:\\大创\\3d\\MicroCleaningVision\\experiments\\probe_annotation\\.venv\\Scripts\\python.exe",
+    "platform": "Windows-11-10.0.26100-SP0",
+    "packages": {
+      "torch": "2.7.1+cu128",
+      "torchvision": "0.22.1+cu128",
+      "numpy": "2.2.6",
+      "pillow": "11.2.1",
+      "sam-2": "1.0"
+    },
+    "base_commit": "a5b304903e54e008e948375d84f3f4c04a0290e0",
+    "branch": "exp/probe-annotation",
+    "source_sha256": {
+      "probes/__init__.py": "55f04dbdeda8415b35e4f03fcfec447ffc275ee0e47e5bc00229c4572910124c",
+      "probes/base.py": "d34d95bc07a7982acb2860e6a630f4bfcc1ff4e930fac2a297b6e8be72188560",
+      "probes/comparison.py": "f4f9d355440cc06de385bd219075a33afcd3b77c1be93c4d478c93c6cb5766e4",
+      "probes/dino.py": "3ce3e82f63d6058ca4f7f22aee162a89732ccd4d7e64fb453570e53b9175fa54",
+      "probes/feature_utils.py": "d7273a56fcb7b68441e8f40c22d58c746a340844e8b668b914ec56e2483f261f",
+      "probes/make_synthetic.py": "805865ae40e5b3f80283691e11770addd32a6b45ce27715cd3248f8b1541016c",
+      "probes/micro_sam.py": "8d8328777617043eef2e3ed4e0973d4401fcb7e1897671d649a8964735f73aec",
+      "probes/patchcore.py": "f3369af6101cbd30badd687c373552363c6f4b8f7c2f3b42ab0049cc867a1958",
+      "probes/registry.py": "f7a0412cda408e00ec1e41f203d16894ce0065d9ddd790c2fda1f14ef76ae3f5",
+      "probes/runner.py": "a0b24adcd55fc330e332539f65e623688750b56207ce7ef2494bf262a6851d96",
+      "probes/tests/__init__.py": "a72104bf97a8ddd31683c74970fbc8ef3cfa2c59d784ecd33c8a5d6685831563",
+      "probes/tests/test_dino.py": "c3044d7f31dfde0a15f0b155c6de0093ba316e22616a969110935ede09e9353a",
+      "probes/tests/test_framework.py": "60464a46b79f40dcc030fd650d1564541caf552b9013361ff580b37b1f469555",
+      "probes/tests/test_micro_sam.py": "a29bea2be83c0e0c4085a72036985aba1e4f1003666704563cc071de0a5ba368",
+      "probes/tests/test_patchcore.py": "6477d38fb0e8cba9f019c1c27fd54248c1dd472c22bf5bc86bf2bb674548e94a",
+      "probes/tests/test_patchcore_review.py": "0a3a6d77182674c06520588a23c978313089a91cb346227d20b65468fbf59662",
+      "run_probes.py": "70eabdebfc0b75abbfb25d81176a6447c0543b77671001628d3a6e413717c19a",
+      "run_stage0.py": "306648bc610d6270c12298a2fd84e305d0d3fc71a0182bbfd3f92396c4c94e6e",
+      "stage2_sources.json": "e572f91b0812fcd52a129bdb732a0c37c667c05a9e45f3527d2a3ab4c28842f1",
+      "sources.json": "50091f653b28a02ae6c57e371172a1c15a7e67c1d3f7fdf518d4c54f6dc5b2fe",
+      "requirements.txt": "40d8d6f62950160ef4646503f8c5ad9e898478bc1c73bc5b0b00fc7e0f00f70e"
+    }
+  },
+  "results": [
+    {
+      "task_id": "stage2-20261109T101923Z-71c07242",
+      "observation_id": "realpart_img1:d4ec9de39c45",
+      "frame_id": "realpart_img1",
+      "raw_image_ref": "inputs/realpart_img1.jpg",
+      "input_sha256": "d4ec9de39c4545a30888ace45d4638ee719e395350ea9b42ae7f8a60f2d30f93",
+      "probe_name": "micro_sam",
+      "model_info": {
+        "model_name": "Micro-SAM vit_b_lm",
+        "model_version": "cb88e8d662bc0d988ff8d5f6f03d42f13dc07a51",
+        "weights_version": "BioImage.IO diplomatic-bug/1.2",
+        "weights_ref": "weights/micro_sam_vit_b_lm_1.2.pt",
+        "weights_sha256": "ffe862fa5b58d78375506041faf0eb3927ced5b5391e8be383e6d7ac07aed924",
+        "weights_bytes": 375023499,
+        "code_license": "MIT (Micro-SAM); Apache-2.0 (official SAM predictor)",
+        "weights_license": "CC-BY-4.0"
+      },
+      "started_at": "2026-11-09T10:19:38.911601+00:00",
+      "ended_at": "2026-11-09T10:19:45.595964+00:00",
+      "duration_ms": 5626.687100000709,
+      "model_load_ms": 9663.663899998937,
+      "peak_allocated_mib": 2535.1708984375,
+      "peak_reserved_mib": 3422.0,
+      "status": "ok",
+      "status_reason": "completed",
+      "reason_codes": [],
+      "output_files": [
+        {
+          "path": "agreement/0001_structure.png",
+          "sha256": "829c717ea1ba8fef14634596d7ae5c51c8067ec958543c0614cb6f21af5ad6d7",
+          "bytes": 499275
+        },
+        {
+          "path": "agreement/0002_structure.png",
+          "sha256": "1810e3bc046e061bff1e3597fd9e39e7956f77d792589e58600d70e3a3544263",
+          "bytes": 501018
+        },
+        {
+          "path": "agreement/0003_structure.png",
+          "sha256": "957b6edcc5629339ab011fdca765a457476ff83a2019cc52eaa205ecf59ea905",
+          "bytes": 501261
+        },
+        {
+          "path": "agreement/0004_structure.png",
+          "sha256": "f0b5da004de6e2d03083d24701f5b9e4069930aead657b1a5ff6cc6ccf133aa1",
+          "bytes": 500483
+        },
+        {
+          "path": "agreement/0005_structure.png",
+          "sha256": "d030a287f1c6d73466f7c2bc66cf5faa9719d8b843449974711477ae0123ab28",
+          "bytes": 500121
+        },
+        {
+          "path": "agreement/0010_ignore.png",
+          "sha256": "698585cf3f443af2d7dced9a7d00042c7e088b94766850a84416c329ff221f7c",
+          "bytes": 500338
+        },
+        {
+          "path": "agreement/0011_ignore.png",
+          "sha256": "42a3a1e4c2d308fc5805b3e069dc332c0a72ac5e4aa710ea1839c5053114a60d",
+          "bytes": 501553
+        },
+        {
+          "path": "agreement/0012_ignore.png",
+          "sha256": "985fe8ae98b66d2f0b6dcc5eee1fcf2df455f60b4935bd310f0e17eef5658db1",
+          "bytes": 499215
+        },
+        {
+          "path": "agreement/0013_ignore.png",
+          "sha256": "e8141f4dbdbd092fe5ca2a59d30c6f04857e966d0344cb001aeaaa9953c848d8",
+          "bytes": 499456
+        },
+        {
+          "path": "agreement/0014_ignore.png",
+          "sha256": "5d0e1b8b72c8f01211af23907a9c873c6639a89059ee361146f627fb2f395ffc",
+          "bytes": 502833
+        },
+        {
+          "path": "agreement/0015_ignore.png",
+          "sha256": "478742114c37145379c36cdcbd2968d8e9824582d65f84f197fcdf6d2b2e372e",
+          "bytes": 500606
+        },
+        {
+          "path": "candidates/0001_0.png",
+          "sha256": "def5a8933aba04e3a41ed839a9996de8d69729ffc523f055e138daaf8301dbcf",
+          "bytes": 853
+        },
+        {
+          "path": "candidates/0002_0.png",
+          "sha256": "6eab34dc1fc8acaced2a1de5cee1ae4d6020359686ecc796fb900d202282c422",
+          "bytes": 1608
+        },
+        {
+          "path": "candidates/0003_0.png",
+          "sha256": "aee63ac47524042e92d8e87f7d51373466acdeb3b39ced2c6e22826ff1f88041",
+          "bytes": 1631
+        },
+        {
+          "path": "candidates/0004_0.png",
+          "sha256": "9d1902cd15ba4c349ce34e45f1056f312820fbdd10399abc328a773477e9ee25",
+          "bytes": 1414
+        },
+        {
+          "path": "candidates/0005_0.png",
+          "sha256": "71eb738cf24bf220ddbd80acf394ce6b77b05044f431afebe2b363a30eb75dda",
+          "bytes": 1304
+        },
+        {
+          "path": "candidates/0010_0.png",
+          "sha256": "7b91ed7df20898fde13d5f4ec4483f0f8c780f19828925fae8e691828f9daf6b",
+          "bytes": 1424
+        },
+        {
+          "path": "candidates/0011_0.png",
+          "sha256": "b296a60fffc8eff5101a8c63f34e87eb3279a5122e4e4444c730f932bba407a7",
+          "bytes": 1704
+        },
+        {
+          "path": "candidates/0012_0.png",
+          "sha256": "577791ef36f695b1687e0c440c981a46e525d30e71b4ffdaae621650d9a94ace",
+          "bytes": 556
+        },
+        {
+          "path": "candidates/0013_0.png",
+          "sha256": "4cf24558a344b25c5dfb560b3ac1febaf7553c2d75400aacc5f7457fcf1dc7c2",
+          "bytes": 635
+        },
+        {
+          "path": "candidates/0014_0.png",
+          "sha256": "49ba9ae97d6100e46e6691b3693ba1d4514e41eb9ed9fca962d863b68c5bbdfa",
+          "bytes": 2668
+        },
+        {
+          "path": "candidates/0015_0.png",
+          "sha256": "950a8bd0f6b117b68ab871166a931ea0638e55429ec289a4b5a179815dd6ff12",
+          "bytes": 1405
+        },
+        {
+          "path": "gpu_memory_before_image.txt",
+          "sha256": "4cfbc9d3cc8e0db1e3a56ab5305de3d786fd2c4b6fbbb9aab716da62664cd41a",
+          "bytes": 12
+        },
+        {
+          "path": "instances.json",
+          "sha256": "17d3feb559b4ff3bf939efa24ad897e5df4007f906b6b9981cd69023831cf2fd",
+          "bytes": 14476
+        },
+        {
+          "path": "masks/0001_structure.png",
+          "sha256": "def5a8933aba04e3a41ed839a9996de8d69729ffc523f055e138daaf8301dbcf",
+          "bytes": 853
+        },
+        {
+          "path": "masks/0002_structure.png",
+          "sha256": "6eab34dc1fc8acaced2a1de5cee1ae4d6020359686ecc796fb900d202282c422",
+          "bytes": 1608
+        },
+        {
+          "path": "masks/0003_structure.png",
+          "sha256": "aee63ac47524042e92d8e87f7d51373466acdeb3b39ced2c6e22826ff1f88041",
+          "bytes": 1631
+        },
+        {
+          "path": "masks/0004_structure.png",
+          "sha256": "9d1902cd15ba4c349ce34e45f1056f312820fbdd10399abc328a773477e9ee25",
+          "bytes": 1414
+        },
+        {
+          "path": "masks/0005_structure.png",
+          "sha256": "71eb738cf24bf220ddbd80acf394ce6b77b05044f431afebe2b363a30eb75dda",
+          "bytes": 1304
+        },
+        {
+          "path": "masks/0010_ignore.png",
+          "sha256": "7b91ed7df20898fde13d5f4ec4483f0f8c780f19828925fae8e691828f9daf6b",
+          "bytes": 1424
+        },
+        {
+          "path": "masks/0011_ignore.png",
+          "sha256": "b296a60fffc8eff5101a8c63f34e87eb3279a5122e4e4444c730f932bba407a7",
+          "bytes": 1704
+        },
+        {
+          "path": "masks/0012_ignore.png",
+          "sha256": "577791ef36f695b1687e0c440c981a46e525d30e71b4ffdaae621650d9a94ace",
+          "bytes": 556
+        },
+        {
+          "path": "masks/0013_ignore.png",
+          "sha256": "4cf24558a344b25c5dfb560b3ac1febaf7553c2d75400aacc5f7457fcf1dc7c2",
+          "bytes": 635
+        },
+        {
+          "path": "masks/0014_ignore.png",
+          "sha256": "49ba9ae97d6100e46e6691b3693ba1d4514e41eb9ed9fca962d863b68c5bbdfa",
+          "bytes": 2668
+        },
+        {
+          "path": "masks/0015_ignore.png",
+          "sha256": "950a8bd0f6b117b68ab871166a931ea0638e55429ec289a4b5a179815dd6ff12",
+          "bytes": 1405
+        },
+        {
+          "path": "nvidia_smi_before_image.txt",
+          "sha256": "4275d55c7def6d723ffa069cb724718633b18d7b735678a252325fa7f6e31708",
+          "bytes": 1880
+        },
+        {
+          "path": "overlay.png",
+          "sha256": "45bceec81d84e9e82d16d3686f48e9fc92609cf80b954821cfdd5fda15f7d587",
+          "bytes": 521941
+        },
+        {
+          "path": "points.json",
+          "sha256": "f8ffbe157d8ce48a04390bbabb11ff21d355d511716bb96d6b79b26e373a1478",
+          "bytes": 2734
+        },
+        {
+          "path": "sam2_vs_micro_sam.png",
+          "sha256": "b88bfeb4608a29de201da6a7153261b4522bb1f700ce5b632c8a0ff04ed7c0cc",
+          "bytes": 625549
+        }
+      ],
+      "metrics": {
+        "instance_count": 11,
+        "instances": [
+          {
+            "id": 1,
+            "label": "structure",
+            "name": "central circular platform visible top",
+            "positive": [
+              [
+                270,
+                290
+              ],
+              [
+                250,
+                281
+              ],
+              [
+                289,
+                303
+              ]
+            ],
+            "negative": [
+              [
+                217,
+                290
+              ],
+              [
+                325,
+                291
+              ],
+              [
+                272,
+                346
+              ],
+              [
+                278,
+                240
+              ]
+            ],
+            "sam2_area_px": 4762,
+            "micro_sam_area_px": 5454,
+            "intersection_px": 4754,
+            "union_px": 5462,
+            "model_output_agreement_iou_not_accuracy": 0.8703771512266569,
+            "mask_ref": "masks/0001_structure.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img1/masks/0001_structure.png",
+            "sam2_mask_sha256": "3fac7720b1cbb82dfca315cb7176a3487421e687d535c8add7fb587ae09d0016",
+            "decode_seconds": 0.9490121999988332,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.89453125
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 2,
+            "label": "structure",
+            "name": "central curved groove and narrow stem",
+            "positive": [
+              [
+                307,
+                20
+              ],
+              [
+                305,
+                61
+              ],
+              [
+                316,
+                81
+              ],
+              [
+                341,
+                98
+              ],
+              [
+                340,
+                114
+              ],
+              [
+                311,
+                122
+              ],
+              [
+                272,
+                121
+              ],
+              [
+                245,
+                129
+              ],
+              [
+                239,
+                144
+              ],
+              [
+                255,
+                160
+              ],
+              [
+                278,
+                177
+              ],
+              [
+                283,
+                197
+              ],
+              [
+                280,
+                227
+              ],
+              [
+                278,
+                246
+              ]
+            ],
+            "negative": [
+              [
+                289,
+                48
+              ],
+              [
+                327,
+                53
+              ],
+              [
+                374,
+                104
+              ],
+              [
+                308,
+                146
+              ],
+              [
+                220,
+                144
+              ],
+              [
+                261,
+                197
+              ],
+              [
+                299,
+                223
+              ],
+              [
+                270,
+                290
+              ]
+            ],
+            "sam2_area_px": 6708,
+            "micro_sam_area_px": 6754,
+            "intersection_px": 5951,
+            "union_px": 7511,
+            "model_output_agreement_iou_not_accuracy": 0.7923046198908268,
+            "mask_ref": "masks/0002_structure.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img1/masks/0002_structure.png",
+            "sam2_mask_sha256": "e1fb84440d2796fa1a2746cab943f09144fb0b978af4a8d6870850354365b4ee",
+            "decode_seconds": 0.07621410000137985,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.85546875
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 3,
+            "label": "structure",
+            "name": "right groove upper diagonal and vertical segment",
+            "positive": [
+              [
+                452,
+                20
+              ],
+              [
+                494,
+                56
+              ],
+              [
+                545,
+                90
+              ],
+              [
+                582,
+                121
+              ],
+              [
+                584,
+                158
+              ],
+              [
+                581,
+                190
+              ],
+              [
+                578,
+                213
+              ],
+              [
+                571,
+                250
+              ],
+              [
+                551,
+                272
+              ],
+              [
+                522,
+                280
+              ]
+            ],
+            "negative": [
+              [
+                487,
+                15
+              ],
+              [
+                554,
+                57
+              ],
+              [
+                620,
+                166
+              ],
+              [
+                552,
+                224
+              ],
+              [
+                491,
+                269
+              ],
+              [
+                514,
+                321
+              ]
+            ],
+            "sam2_area_px": 8344,
+            "micro_sam_area_px": 7721,
+            "intersection_px": 7322,
+            "union_px": 8743,
+            "model_output_agreement_iou_not_accuracy": 0.8374699759807847,
+            "mask_ref": "masks/0003_structure.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img1/masks/0003_structure.png",
+            "sam2_mask_sha256": "9c3a796b12a15785b833aa621846f071c810a30ee65f82ff8d863fc4fda73ddc",
+            "decode_seconds": 0.07271399999808636,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.87890625
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 4,
+            "label": "structure",
+            "name": "left truncated groove visible portions",
+            "positive": [
+              [
+                113,
+                15
+              ],
+              [
+                69,
+                30
+              ],
+              [
+                18,
+                58
+              ],
+              [
+                9,
+                114
+              ],
+              [
+                7,
+                168
+              ],
+              [
+                15,
+                201
+              ],
+              [
+                40,
+                222
+              ],
+              [
+                47,
+                247
+              ],
+              [
+                38,
+                269
+              ],
+              [
+                10,
+                278
+              ]
+            ],
+            "negative": [
+              [
+                63,
+                68
+              ],
+              [
+                40,
+                142
+              ],
+              [
+                53,
+                199
+              ],
+              [
+                77,
+                239
+              ],
+              [
+                64,
+                296
+              ]
+            ],
+            "sam2_area_px": 7654,
+            "micro_sam_area_px": 7696,
+            "intersection_px": 7106,
+            "union_px": 8244,
+            "model_output_agreement_iou_not_accuracy": 0.8619602134885977,
+            "mask_ref": "masks/0004_structure.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img1/masks/0004_structure.png",
+            "sam2_mask_sha256": "5f9ced454c7c6ffaf7777c80d50b757eb1f89f6742035fd514082e939d7160cf",
+            "decode_seconds": 0.08259890000044834,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.8984375
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 10,
+            "label": "ignore",
+            "name": "uncertain platform root and dark rim",
+            "positive": [
+              [
+                233,
+                285
+              ],
+              [
+                242,
+                318
+              ],
+              [
+                273,
+                334
+              ],
+              [
+                306,
+                314
+              ],
+              [
+                312,
+                286
+              ],
+              [
+                293,
+                254
+              ]
+            ],
+            "negative": [
+              [
+                271,
+                290
+              ],
+              [
+                212,
+                281
+              ],
+              [
+                327,
+                326
+              ],
+              [
+                279,
+                351
+              ]
+            ],
+            "sam2_area_px": 2855,
+            "micro_sam_area_px": 4319,
+            "intersection_px": 2348,
+            "union_px": 4826,
+            "model_output_agreement_iou_not_accuracy": 0.4865312888520514,
+            "mask_ref": "masks/0010_ignore.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img1/masks/0010_ignore.png",
+            "sam2_mask_sha256": "954b5f9cfcb94ddb7b146f1643df06fc055a47479208b0fadd5458bcdcd5bc38",
+            "decode_seconds": 0.27209140000195475,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.45703125
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 5,
+            "label": "structure",
+            "name": "right groove lower serpentine segment (same continuous feature as ID3)",
+            "positive": [
+              [
+                506,
+                300
+              ],
+              [
+                514,
+                321
+              ],
+              [
+                551,
+                338
+              ],
+              [
+                587,
+                348
+              ],
+              [
+                611,
+                367
+              ],
+              [
+                625,
+                388
+              ],
+              [
+                602,
+                408
+              ],
+              [
+                590,
+                415
+              ],
+              [
+                558,
+                436
+              ],
+              [
+                543,
+                470
+              ]
+            ],
+            "negative": [
+              [
+                482,
+                314
+              ],
+              [
+                545,
+                366
+              ],
+              [
+                637,
+                403
+              ],
+              [
+                592,
+                449
+              ],
+              [
+                571,
+                250
+              ]
+            ],
+            "sam2_area_px": 6502,
+            "micro_sam_area_px": 6459,
+            "intersection_px": 5867,
+            "union_px": 7094,
+            "model_output_agreement_iou_not_accuracy": 0.8270369326191147,
+            "mask_ref": "masks/0005_structure.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img1/masks/0005_structure.png",
+            "sam2_mask_sha256": "c695e632ab1a7dc67b1a8f9042515291ed9a3a41459556a1d3dfebd181a1e6b5",
+            "decode_seconds": 0.07701369999995222,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.859375
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 11,
+            "label": "ignore",
+            "name": "central groove dark shadow edges",
+            "positive": [
+              [
+                298,
+                51
+              ],
+              [
+                298,
+                77
+              ],
+              [
+                235,
+                124
+              ],
+              [
+                232,
+                146
+              ],
+              [
+                274,
+                181
+              ],
+              [
+                273,
+                229
+              ],
+              [
+                350,
+                118
+              ]
+            ],
+            "negative": [
+              [
+                271,
+                290
+              ],
+              [
+                260,
+                144
+              ],
+              [
+                374,
+                135
+              ],
+              [
+                210,
+                181
+              ]
+            ],
+            "sam2_area_px": 7606,
+            "micro_sam_area_px": 8389,
+            "intersection_px": 6397,
+            "union_px": 9598,
+            "model_output_agreement_iou_not_accuracy": 0.6664930193790373,
+            "mask_ref": "masks/0011_ignore.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img1/masks/0011_ignore.png",
+            "sam2_mask_sha256": "faa002c365bc7c8f6d5ddd6bd067bb4668a30468223d23924fb5122bfcd96743",
+            "decode_seconds": 0.07589300000108778,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.78125
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 12,
+            "label": "ignore",
+            "name": "thin crack above central channel",
+            "positive": [
+              [
+                214,
+                60
+              ],
+              [
+                229,
+                68
+              ],
+              [
+                256,
+                69
+              ],
+              [
+                278,
+                59
+              ]
+            ],
+            "negative": [
+              [
+                224,
+                43
+              ],
+              [
+                244,
+                86
+              ],
+              [
+                270,
+                87
+              ],
+              [
+                283,
+                43
+              ]
+            ],
+            "sam2_area_px": 477,
+            "micro_sam_area_px": 670,
+            "intersection_px": 439,
+            "union_px": 708,
+            "model_output_agreement_iou_not_accuracy": 0.6200564971751412,
+            "mask_ref": "masks/0012_ignore.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img1/masks/0012_ignore.png",
+            "sam2_mask_sha256": "cb6c0f8c38dd11c77dc84948a31bd425c3d2805965f2e59b126e23e1714efaa2",
+            "decode_seconds": 0.07440159999896423,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.65625
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 13,
+            "label": "ignore",
+            "name": "ambiguous pits left of circular platform",
+            "positive": [
+              [
+                213,
+                277
+              ],
+              [
+                215,
+                310
+              ],
+              [
+                209,
+                328
+              ]
+            ],
+            "negative": [
+              [
+                270,
+                290
+              ],
+              [
+                193,
+                286
+              ],
+              [
+                227,
+                316
+              ],
+              [
+                210,
+                354
+              ]
+            ],
+            "sam2_area_px": 1324,
+            "micro_sam_area_px": 860,
+            "intersection_px": 697,
+            "union_px": 1487,
+            "model_output_agreement_iou_not_accuracy": 0.468728984532616,
+            "mask_ref": "masks/0013_ignore.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img1/masks/0013_ignore.png",
+            "sam2_mask_sha256": "eb7d0361eef371dce37224de2aee5ebfb18a872ce699a9b96b1b69837f187922",
+            "decode_seconds": 0.07487669999682112,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.53125
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 14,
+            "label": "ignore",
+            "name": "right groove dark edge and shadow ambiguity",
+            "positive": [
+              [
+                516,
+                87
+              ],
+              [
+                557,
+                113
+              ],
+              [
+                568,
+                207
+              ],
+              [
+                490,
+                305
+              ],
+              [
+                582,
+                402
+              ],
+              [
+                535,
+                458
+              ]
+            ],
+            "negative": [
+              [
+                545,
+                90
+              ],
+              [
+                584,
+                158
+              ],
+              [
+                506,
+                300
+              ],
+              [
+                600,
+                375
+              ],
+              [
+                523,
+                438
+              ]
+            ],
+            "sam2_area_px": 2231,
+            "micro_sam_area_px": 6868,
+            "intersection_px": 1724,
+            "union_px": 7375,
+            "model_output_agreement_iou_not_accuracy": 0.23376271186440678,
+            "mask_ref": "masks/0014_ignore.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img1/masks/0014_ignore.png",
+            "sam2_mask_sha256": "bc47d0f508837e2584328d67b0b50423215cc45e8e226b9c2e2c7bb78c9e83c1",
+            "decode_seconds": 0.06517920000260347,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.373046875
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 15,
+            "label": "ignore",
+            "name": "left truncated groove dark outer edge",
+            "positive": [
+              [
+                23,
+                46
+              ],
+              [
+                1,
+                185
+              ],
+              [
+                56,
+                250
+              ],
+              [
+                29,
+                282
+              ]
+            ],
+            "negative": [
+              [
+                18,
+                58
+              ],
+              [
+                9,
+                114
+              ],
+              [
+                47,
+                247
+              ],
+              [
+                72,
+                278
+              ]
+            ],
+            "sam2_area_px": 5249,
+            "micro_sam_area_px": 5402,
+            "intersection_px": 3298,
+            "union_px": 7353,
+            "model_output_agreement_iou_not_accuracy": 0.44852441180470554,
+            "mask_ref": "masks/0015_ignore.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img1/masks/0015_ignore.png",
+            "sam2_mask_sha256": "b995ba4e4576d030a35e9d3c10c000525b59bb70dde9c81efb154c672d062d5d",
+            "decode_seconds": 0.0751897000009194,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.83984375
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          }
+        ],
+        "encode_seconds": 1.3399468999996316,
+        "inference_seconds": 3.2351314000006823,
+        "parameter_count": 93735472,
+        "points_sha256": "f8ffbe157d8ce48a04390bbabb11ff21d355d511716bb96d6b79b26e373a1478",
+        "precision": "bfloat16 autocast; weights float32",
+        "empty_instance_ids": [],
+        "agreement_scope": "raw full-resolution corresponding masks by instance ID; both are model drafts; IoU is model-output agreement, NOT accuracy",
+        "agreement_colors": "magenta Micro-SAM only; cyan SAM2 only; white both",
+        "model_role": "microscopy LM pretrained point segmentation; classes supplied by unchanged stage1 prompt author",
+        "adapter": "official SAM SamPredictor, equivalent state loading to BioImage.IO PredictorAdaptor; no napari/training package installed",
+        "postprocessing": false,
+        "training_performed": false
+      },
+      "interface_version": "probe-result-v1",
+      "annotation_status": "not_ground_truth",
+      "test_ground_truth_allowed": false,
+      "timing_scope": "synchronized infer including image read, computation and output writes; excludes model load; no warmup",
+      "memory_scope": "torch CUDA peak allocated/reserved during infer, includes resident model; excludes driver/context and other processes"
+    },
+    {
+      "task_id": "stage2-20261109T101923Z-71c07242",
+      "observation_id": "realpart_img2:591cfdadc06d",
+      "frame_id": "realpart_img2",
+      "raw_image_ref": "inputs/realpart_img2.jpg",
+      "input_sha256": "591cfdadc06dce57dfe70a769ca79f25c605b6d865ca49bba18a0da126db8369",
+      "probe_name": "micro_sam",
+      "model_info": {
+        "model_name": "Micro-SAM vit_b_lm",
+        "model_version": "cb88e8d662bc0d988ff8d5f6f03d42f13dc07a51",
+        "weights_version": "BioImage.IO diplomatic-bug/1.2",
+        "weights_ref": "weights/micro_sam_vit_b_lm_1.2.pt",
+        "weights_sha256": "ffe862fa5b58d78375506041faf0eb3927ced5b5391e8be383e6d7ac07aed924",
+        "weights_bytes": 375023499,
+        "code_license": "MIT (Micro-SAM); Apache-2.0 (official SAM predictor)",
+        "weights_license": "CC-BY-4.0"
+      },
+      "started_at": "2026-11-09T10:19:45.624606+00:00",
+      "ended_at": "2026-11-09T10:19:49.749165+00:00",
+      "duration_ms": 3068.788999997196,
+      "model_load_ms": 9663.663899998937,
+      "peak_allocated_mib": 2535.9013671875,
+      "peak_reserved_mib": 3434.0,
+      "status": "ok",
+      "status_reason": "completed",
+      "reason_codes": [],
+      "output_files": [
+        {
+          "path": "agreement/0001_structure.png",
+          "sha256": "368dec989f58dee70f7b63916b733eda5e9f485bafa93177e25bc450f1deaf8e",
+          "bytes": 470778
+        },
+        {
+          "path": "agreement/0002_structure.png",
+          "sha256": "29ecdafcda6066e6cc7cef992dd23755837851327490cda50024d80225312467",
+          "bytes": 470541
+        },
+        {
+          "path": "agreement/0003_structure.png",
+          "sha256": "e9386f4d960281eb0ec213268c5004b8ed9e0b6725326cd391f3d15c5517fb9f",
+          "bytes": 473231
+        },
+        {
+          "path": "agreement/0010_ignore.png",
+          "sha256": "ab6039ec1e5fc122ec8a57d1a7161e72cce632e6a73b8b0cad094370adb35485",
+          "bytes": 472291
+        },
+        {
+          "path": "agreement/0011_ignore.png",
+          "sha256": "f481ec4b138c95ae5d4c3f28d74ad6f4884a42c4958cc7ad6f0151b1d2eb9456",
+          "bytes": 472176
+        },
+        {
+          "path": "agreement/0012_ignore.png",
+          "sha256": "402f71d1688dc2afa166e45aebff52d5b3461ea35ddc2e22deb9b2f1dcb98ed2",
+          "bytes": 479788
+        },
+        {
+          "path": "agreement/0013_ignore.png",
+          "sha256": "0111783e64334c207a9677e6570b63d0ec5fb5863ff0b17be31003c84c6eb560",
+          "bytes": 471614
+        },
+        {
+          "path": "agreement/0014_ignore.png",
+          "sha256": "a793afc950738209aee78e9a91a4d8a9e188b264a9e44252ff8932820c316490",
+          "bytes": 472702
+        },
+        {
+          "path": "agreement/0020_residue.png",
+          "sha256": "039074494c271218853f4092edba61ed2d3b479528f52a00867e6897c4b1cff7",
+          "bytes": 470487
+        },
+        {
+          "path": "agreement/0021_residue.png",
+          "sha256": "ed4f76c5e49888dbed9de5310cb946a476c12e8db64002453c4d20ce075d3b2f",
+          "bytes": 470341
+        },
+        {
+          "path": "candidates/0001_0.png",
+          "sha256": "8d17e8931cb78e36c72829ed3818eb9879f1b0d8b81d0b5e09153f92d13bc0ef",
+          "bytes": 1013
+        },
+        {
+          "path": "candidates/0002_0.png",
+          "sha256": "9b304215616eaf113b2dd9f0b5da88bf381ea96ea84719ca68e11ec82ce3dacd",
+          "bytes": 537
+        },
+        {
+          "path": "candidates/0003_0.png",
+          "sha256": "bec7f4c1c788cf786f0039b9cc0321dfd974c48d5fd15e1a838ac1e9fe3e45c9",
+          "bytes": 2181
+        },
+        {
+          "path": "candidates/0010_0.png",
+          "sha256": "233df77df1b8961b8effdbb8a9f676cf63b56e96858fe712bb427471ec1e1cf9",
+          "bytes": 1348
+        },
+        {
+          "path": "candidates/0011_0.png",
+          "sha256": "86885e9b8bfe8b082f60500de3e181305ad08c7f3d5a4024fe04593b697994ec",
+          "bytes": 1945
+        },
+        {
+          "path": "candidates/0012_0.png",
+          "sha256": "bd4876bb80ff2e3d0821629ac362cf6dc1654307346a653b021e966ccad39b7a",
+          "bytes": 4933
+        },
+        {
+          "path": "candidates/0013_0.png",
+          "sha256": "87eee5b9e95cafef041cd29423b996f9c3af25eff5b4035b8975423fce22c787",
+          "bytes": 688
+        },
+        {
+          "path": "candidates/0014_0.png",
+          "sha256": "d919920cad70484c322c6d685ff64f0c41f854ae18f96b54c9bfcd5ed96e18d2",
+          "bytes": 713
+        },
+        {
+          "path": "candidates/0020_0.png",
+          "sha256": "8cf56e7fdfd3869e964647bdbe2cc21d5a38399f7cd7c1094cc84f6d20ae0534",
+          "bytes": 504
+        },
+        {
+          "path": "candidates/0021_0.png",
+          "sha256": "a594cf257dbf81472286c8822a9b77987e2726fe37863070070ac6af9e2db983",
+          "bytes": 471
+        },
+        {
+          "path": "gpu_memory_before_image.txt",
+          "sha256": "5c41f1d0a0f81b1da6c0ecc7487236f693d3abfcccdbefbea3cf2bce28717c3f",
+          "bytes": 12
+        },
+        {
+          "path": "instances.json",
+          "sha256": "890a4c05efe429de9f825c5a8916022cb6cd02e498f3a52b97f429954347bac5",
+          "bytes": 12355
+        },
+        {
+          "path": "masks/0001_structure.png",
+          "sha256": "8d17e8931cb78e36c72829ed3818eb9879f1b0d8b81d0b5e09153f92d13bc0ef",
+          "bytes": 1013
+        },
+        {
+          "path": "masks/0002_structure.png",
+          "sha256": "9b304215616eaf113b2dd9f0b5da88bf381ea96ea84719ca68e11ec82ce3dacd",
+          "bytes": 537
+        },
+        {
+          "path": "masks/0003_structure.png",
+          "sha256": "bec7f4c1c788cf786f0039b9cc0321dfd974c48d5fd15e1a838ac1e9fe3e45c9",
+          "bytes": 2181
+        },
+        {
+          "path": "masks/0010_ignore.png",
+          "sha256": "233df77df1b8961b8effdbb8a9f676cf63b56e96858fe712bb427471ec1e1cf9",
+          "bytes": 1348
+        },
+        {
+          "path": "masks/0011_ignore.png",
+          "sha256": "86885e9b8bfe8b082f60500de3e181305ad08c7f3d5a4024fe04593b697994ec",
+          "bytes": 1945
+        },
+        {
+          "path": "masks/0012_ignore.png",
+          "sha256": "bd4876bb80ff2e3d0821629ac362cf6dc1654307346a653b021e966ccad39b7a",
+          "bytes": 4933
+        },
+        {
+          "path": "masks/0013_ignore.png",
+          "sha256": "87eee5b9e95cafef041cd29423b996f9c3af25eff5b4035b8975423fce22c787",
+          "bytes": 688
+        },
+        {
+          "path": "masks/0014_ignore.png",
+          "sha256": "d919920cad70484c322c6d685ff64f0c41f854ae18f96b54c9bfcd5ed96e18d2",
+          "bytes": 713
+        },
+        {
+          "path": "masks/0020_residue.png",
+          "sha256": "8cf56e7fdfd3869e964647bdbe2cc21d5a38399f7cd7c1094cc84f6d20ae0534",
+          "bytes": 504
+        },
+        {
+          "path": "masks/0021_residue.png",
+          "sha256": "a594cf257dbf81472286c8822a9b77987e2726fe37863070070ac6af9e2db983",
+          "bytes": 471
+        },
+        {
+          "path": "nvidia_smi_before_image.txt",
+          "sha256": "a745415936a8b0bdc84aeca73ebd07e6d809128f9eb7058fa4f9c83812529924",
+          "bytes": 1880
+        },
+        {
+          "path": "overlay.png",
+          "sha256": "7a03c3fe83000e5b48df6e2a2fe81db8887d2e65b70772b9f7ff09a3ab7ad476",
+          "bytes": 470383
+        },
+        {
+          "path": "points.json",
+          "sha256": "fa0aa62457a25c13818e41ed9faaa378c453038d970c432ddced67a313b06503",
+          "bytes": 2426
+        },
+        {
+          "path": "sam2_vs_micro_sam.png",
+          "sha256": "a4246e6b4e9ba655b0881a562be9b7c6ab3055b009ce10c9a885f323f28dba9b",
+          "bytes": 601230
+        }
+      ],
+      "metrics": {
+        "instance_count": 10,
+        "instances": [
+          {
+            "id": 1,
+            "label": "structure",
+            "name": "left circular platform visible top",
+            "positive": [
+              [
+                160,
+                256
+              ],
+              [
+                137,
+                235
+              ],
+              [
+                190,
+                274
+              ]
+            ],
+            "negative": [
+              [
+                163,
+                179
+              ],
+              [
+                242,
+                255
+              ],
+              [
+                160,
+                335
+              ],
+              [
+                83,
+                258
+              ]
+            ],
+            "sam2_area_px": 10389,
+            "micro_sam_area_px": 11536,
+            "intersection_px": 10318,
+            "union_px": 11607,
+            "model_output_agreement_iou_not_accuracy": 0.8889463254932368,
+            "mask_ref": "masks/0001_structure.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0001_structure.png",
+            "sam2_mask_sha256": "838c8b9c7846e4c712db78076dde55399f92e20d5d861ae5731d9fb9c936249a",
+            "decode_seconds": 0.0949092999981076,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.953125
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 2,
+            "label": "structure",
+            "name": "horizontal narrow connection to circular platform",
+            "positive": [
+              [
+                10,
+                261
+              ],
+              [
+                51,
+                260
+              ],
+              [
+                90,
+                259
+              ],
+              [
+                106,
+                257
+              ]
+            ],
+            "negative": [
+              [
+                50,
+                236
+              ],
+              [
+                51,
+                286
+              ],
+              [
+                160,
+                255
+              ]
+            ],
+            "sam2_area_px": 2364,
+            "micro_sam_area_px": 2934,
+            "intersection_px": 2340,
+            "union_px": 2958,
+            "model_output_agreement_iou_not_accuracy": 0.7910750507099391,
+            "mask_ref": "masks/0002_structure.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0002_structure.png",
+            "sam2_mask_sha256": "f94710be8860dc8475da0a22c2b17859e0529e227726e5fdc8e52a8f74596671",
+            "decode_seconds": 0.06914749999850756,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.8515625
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 3,
+            "label": "structure",
+            "name": "vertical straight groove and right horizontal branch",
+            "positive": [
+              [
+                474,
+                30
+              ],
+              [
+                474,
+                90
+              ],
+              [
+                475,
+                160
+              ],
+              [
+                475,
+                210
+              ],
+              [
+                478,
+                243
+              ],
+              [
+                479,
+                290
+              ],
+              [
+                479,
+                350
+              ],
+              [
+                480,
+                420
+              ],
+              [
+                480,
+                471
+              ],
+              [
+                540,
+                243
+              ],
+              [
+                620,
+                244
+              ]
+            ],
+            "negative": [
+              [
+                446,
+                95
+              ],
+              [
+                451,
+                326
+              ],
+              [
+                441,
+                200
+              ],
+              [
+                525,
+                190
+              ],
+              [
+                540,
+                290
+              ],
+              [
+                438,
+                260
+              ],
+              [
+                520,
+                452
+              ]
+            ],
+            "sam2_area_px": 19884,
+            "micro_sam_area_px": 20013,
+            "intersection_px": 17824,
+            "union_px": 22073,
+            "model_output_agreement_iou_not_accuracy": 0.8075023784714357,
+            "mask_ref": "masks/0003_structure.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0003_structure.png",
+            "sam2_mask_sha256": "ca9e81828f5d1f4166fbcda4139ea0f7152120e0743dfbf7f40caef67866fb63",
+            "decode_seconds": 0.07762580000053276,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.796875
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 10,
+            "label": "ignore",
+            "name": "circular platform dark rim and root ambiguity",
+            "positive": [
+              [
+                109,
+                245
+              ],
+              [
+                130,
+                202
+              ],
+              [
+                197,
+                208
+              ],
+              [
+                222,
+                254
+              ],
+              [
+                199,
+                302
+              ],
+              [
+                158,
+                316
+              ]
+            ],
+            "negative": [
+              [
+                160,
+                255
+              ],
+              [
+                163,
+                180
+              ],
+              [
+                240,
+                256
+              ],
+              [
+                157,
+                339
+              ]
+            ],
+            "sam2_area_px": 4607,
+            "micro_sam_area_px": 3160,
+            "intersection_px": 2578,
+            "union_px": 5189,
+            "model_output_agreement_iou_not_accuracy": 0.4968201965696666,
+            "mask_ref": "masks/0010_ignore.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0010_ignore.png",
+            "sam2_mask_sha256": "6fd379a0ddfab75944905a0fe040749a68fded43a73c506aa785e466f6449187",
+            "decode_seconds": 0.05351909999808413,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.5078125
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 11,
+            "label": "ignore",
+            "name": "straight groove left boundary dark shadow excluding obvious clumps",
+            "positive": [
+              [
+                455,
+                42
+              ],
+              [
+                456,
+                159
+              ],
+              [
+                457,
+                205
+              ],
+              [
+                459,
+                284
+              ],
+              [
+                460,
+                375
+              ],
+              [
+                461,
+                449
+              ]
+            ],
+            "negative": [
+              [
+                446,
+                95
+              ],
+              [
+                451,
+                326
+              ],
+              [
+                475,
+                90
+              ],
+              [
+                479,
+                350
+              ],
+              [
+                435,
+                190
+              ]
+            ],
+            "sam2_area_px": 2471,
+            "micro_sam_area_px": 5545,
+            "intersection_px": 2196,
+            "union_px": 5820,
+            "model_output_agreement_iou_not_accuracy": 0.37731958762886597,
+            "mask_ref": "masks/0011_ignore.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0011_ignore.png",
+            "sam2_mask_sha256": "28cd1af134a7ef682bffa5c4b5f20aef0685c1a2c0f582733b23c26e8eb2cf13",
+            "decode_seconds": 0.07691720000002533,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.5078125
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 12,
+            "label": "ignore",
+            "name": "straight groove right boundary and branch shadow",
+            "positive": [
+              [
+                493,
+                45
+              ],
+              [
+                494,
+                173
+              ],
+              [
+                497,
+                224
+              ],
+              [
+                548,
+                228
+              ],
+              [
+                620,
+                258
+              ],
+              [
+                499,
+                304
+              ],
+              [
+                502,
+                390
+              ]
+            ],
+            "negative": [
+              [
+                475,
+                90
+              ],
+              [
+                479,
+                350
+              ],
+              [
+                540,
+                243
+              ],
+              [
+                521,
+                190
+              ],
+              [
+                520,
+                300
+              ]
+            ],
+            "sam2_area_px": 7136,
+            "micro_sam_area_px": 21152,
+            "intersection_px": 4070,
+            "union_px": 24218,
+            "model_output_agreement_iou_not_accuracy": 0.1680568172433727,
+            "mask_ref": "masks/0012_ignore.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0012_ignore.png",
+            "sam2_mask_sha256": "c5e974344b65467aa75819bb61d9413fd69897a6deb08bd53990c6899d54b3c1",
+            "decode_seconds": 0.07485830000223359,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.59375
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 13,
+            "label": "ignore",
+            "name": "horizontal connection edge shadow",
+            "positive": [
+              [
+                50,
+                248
+              ],
+              [
+                50,
+                273
+              ],
+              [
+                99,
+                277
+              ]
+            ],
+            "negative": [
+              [
+                50,
+                260
+              ],
+              [
+                50,
+                232
+              ],
+              [
+                50,
+                289
+              ],
+              [
+                160,
+                255
+              ]
+            ],
+            "sam2_area_px": 2576,
+            "micro_sam_area_px": 1719,
+            "intersection_px": 1333,
+            "union_px": 2962,
+            "model_output_agreement_iou_not_accuracy": 0.450033760972316,
+            "mask_ref": "masks/0013_ignore.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0013_ignore.png",
+            "sam2_mask_sha256": "9a06c521568b11fd7a7955bd8f10f53edf122ac14549c9500e6d2cd111ac9f1d",
+            "decode_seconds": 0.07785839999996824,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.51171875
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 14,
+            "label": "ignore",
+            "name": "ambiguous pits above platform; identity unknown",
+            "positive": [
+              [
+                110,
+                169
+              ],
+              [
+                94,
+                184
+              ],
+              [
+                134,
+                180
+              ]
+            ],
+            "negative": [
+              [
+                160,
+                255
+              ],
+              [
+                110,
+                140
+              ],
+              [
+                74,
+                164
+              ],
+              [
+                158,
+                176
+              ]
+            ],
+            "sam2_area_px": 8905,
+            "micro_sam_area_px": 2638,
+            "intersection_px": 2178,
+            "union_px": 9365,
+            "model_output_agreement_iou_not_accuracy": 0.23256807261078483,
+            "mask_ref": "masks/0014_ignore.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0014_ignore.png",
+            "sam2_mask_sha256": "02455abd955d224bc65b3881db6f343f42110b79cf40421998ce451f0ed1dc96",
+            "decode_seconds": 0.06625550000171643,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.65625
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 20,
+            "label": "residue",
+            "name": "only visually obvious dark-green clump near upper straight-groove edge",
+            "positive": [
+              [
+                446,
+                94
+              ],
+              [
+                447,
+                106
+              ],
+              [
+                441,
+                89
+              ]
+            ],
+            "negative": [
+              [
+                429,
+                94
+              ],
+              [
+                474,
+                94
+              ],
+              [
+                456,
+                49
+              ],
+              [
+                456,
+                157
+              ],
+              [
+                450,
+                73
+              ],
+              [
+                448,
+                124
+              ],
+              [
+                461,
+                101
+              ]
+            ],
+            "sam2_area_px": 556,
+            "micro_sam_area_px": 358,
+            "intersection_px": 358,
+            "union_px": 556,
+            "model_output_agreement_iou_not_accuracy": 0.6438848920863309,
+            "mask_ref": "masks/0020_residue.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0020_residue.png",
+            "sam2_mask_sha256": "4fbf2ab506d56590984fb65986e48a5a3ccd62875d54a77beaf40aa9b12f9bdf",
+            "decode_seconds": 0.0711023000003479,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.75390625
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          },
+          {
+            "id": 21,
+            "label": "residue",
+            "name": "only visually obvious dark-green clump near lower straight-groove edge",
+            "positive": [
+              [
+                449,
+                326
+              ],
+              [
+                444,
+                331
+              ],
+              [
+                454,
+                323
+              ]
+            ],
+            "negative": [
+              [
+                430,
+                326
+              ],
+              [
+                477,
+                326
+              ],
+              [
+                459,
+                301
+              ],
+              [
+                459,
+                357
+              ],
+              [
+                448,
+                310
+              ],
+              [
+                446,
+                344
+              ]
+            ],
+            "sam2_area_px": 326,
+            "micro_sam_area_px": 221,
+            "intersection_px": 221,
+            "union_px": 326,
+            "model_output_agreement_iou_not_accuracy": 0.6779141104294478,
+            "mask_ref": "masks/0021_residue.png",
+            "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0021_residue.png",
+            "sam2_mask_sha256": "2d56e21d2c49c42d454021468f7be4d18b7b1a4a41335e3e9d3a6805afb735bb",
+            "decode_seconds": 0.07995279999886407,
+            "candidate_index": 0,
+            "model_internal_quality_scores_not_measured_accuracy": [
+              0.734375
+            ],
+            "annotation_status": "draft",
+            "human_verified": false
+          }
+        ],
+        "encode_seconds": 0.27081270000053337,
+        "inference_seconds": 1.012958899998921,
+        "parameter_count": 93735472,
+        "points_sha256": "fa0aa62457a25c13818e41ed9faaa378c453038d970c432ddced67a313b06503",
+        "precision": "bfloat16 autocast; weights float32",
+        "empty_instance_ids": [],
+        "agreement_scope": "raw full-resolution corresponding masks by instance ID; both are model drafts; IoU is model-output agreement, NOT accuracy",
+        "agreement_colors": "magenta Micro-SAM only; cyan SAM2 only; white both",
+        "model_role": "microscopy LM pretrained point segmentation; classes supplied by unchanged stage1 prompt author",
+        "adapter": "official SAM SamPredictor, equivalent state loading to BioImage.IO PredictorAdaptor; no napari/training package installed",
+        "postprocessing": false,
+        "training_performed": false
+      },
+      "interface_version": "probe-result-v1",
+      "annotation_status": "not_ground_truth",
+      "test_ground_truth_allowed": false,
+      "timing_scope": "synchronized infer including image read, computation and output writes; excludes model load; no warmup",
+      "memory_scope": "torch CUDA peak allocated/reserved during infer, includes resident model; excludes driver/context and other processes"
+    },
+    {
+      "task_id": "stage2-20261109T101923Z-71c07242",
+      "observation_id": "realpart_img1:d4ec9de39c45",
+      "frame_id": "realpart_img1",
+      "raw_image_ref": "inputs/realpart_img1.jpg",
+      "input_sha256": "d4ec9de39c4545a30888ace45d4638ee719e395350ea9b42ae7f8a60f2d30f93",
+      "probe_name": "dino",
+      "model_info": {
+        "model_name": "DINOv2 ViT-S/14",
+        "model_version": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+        "weights_version": "dinov2_vits14_pretrain / LVD-142M",
+        "weights_ref": "weights\\dinov2_vits14_pretrain.pth",
+        "weights_sha256": "b938bf1bc15cd2ec0feacfe3a1bb553fe8ea9ca46a7e1d8d00217f29aef60cd9",
+        "weights_bytes": 88283115,
+        "code_license": "Apache-2.0",
+        "weights_license": "Apache-2.0"
+      },
+      "started_at": "2026-11-09T10:19:51.894185+00:00",
+      "ended_at": "2026-11-09T10:19:54.778769+00:00",
+      "duration_ms": 2213.4074000023247,
+      "model_load_ms": 1578.012399997533,
+      "peak_allocated_mib": 145.93310546875,
+      "peak_reserved_mib": 164.0,
+      "status": "ok",
+      "status_reason": "Feature extraction completed; full three-class separability unavailable because draft classes are missing.",
+      "reason_codes": [
+        "draft-not-ground-truth",
+        "missing-draft-residue",
+        "missing-draft-substrate"
+      ],
+      "output_files": [
+        {
+          "path": "cluster_centers.npy",
+          "sha256": "80cb40dfbecd84409e267d315e4ba0d61a17d803f7bbcfcea36b3c54e88ea76e",
+          "bytes": 12416
+        },
+        {
+          "path": "cluster_ids.png",
+          "sha256": "2686dc94747f0b76fed53554ae2efb06a95d6922532defbea13fa559534d8620",
+          "bytes": 2293
+        },
+        {
+          "path": "cluster_patch_ids.png",
+          "sha256": "1c1ffe420fbd33fdeb8eb1202836055113901415133575b7d230c1087362edd2",
+          "bytes": 572
+        },
+        {
+          "path": "clusters.png",
+          "sha256": "10edbc8737afd35e763e944fabf8e5ae469f80711a92f9a51004d4fa8a5f396c",
+          "bytes": 3644
+        },
+        {
+          "path": "draft_feature_statistics.json",
+          "sha256": "0adae3efb23e68e88b551f832c20a065a620c053c94cb709d60a1b9b5813eb17",
+          "bytes": 17895
+        },
+        {
+          "path": "draft_patch_pixel_counts.npz",
+          "sha256": "5c9982b99fa8b5e9dfe7825d43d9f29c5e1425fdf7d183b83161237d0859219f",
+          "bytes": 39408
+        },
+        {
+          "path": "features.npy",
+          "sha256": "50dfd95fc5603728bf7b9b7a2374dd17e3c150ddf6fd42c0341c7a91b45e92f9",
+          "bytes": 2473088
+        },
+        {
+          "path": "gpu_memory_before_image.txt",
+          "sha256": "bb34b73604091739f12ee8980c3c92d0f7600499cf9c69ef0da6696ffab75e17",
+          "bytes": 12
+        },
+        {
+          "path": "nvidia_smi_before_image.txt",
+          "sha256": "e4375d64ae834d1d7be85ad05c45c209fe847ad243cc14db6c66c4e3e032b84f",
+          "bytes": 1880
+        },
+        {
+          "path": "original_pca_clusters.png",
+          "sha256": "ddc9b98474c366dd20ce5c3a10a157e1eaee98e771a53080b5652e63081d0937",
+          "bytes": 919689
+        },
+        {
+          "path": "overlay.png",
+          "sha256": "d7f83fca70f357412303d56f4721c3b9d3d639d05a89315177ceabd5cf14ad44",
+          "bytes": 475498
+        },
+        {
+          "path": "pca_overlay.png",
+          "sha256": "7473b8a031e2055c451159906b439017748639c45e0bb0b3bc67ff67959abfe5",
+          "bytes": 520463
+        },
+        {
+          "path": "pca_patch_rgb.png",
+          "sha256": "0043cbef1f0158c798e2bf7b3c98143e0270215fced43375cdd48edd2bcf332b",
+          "bytes": 4654
+        },
+        {
+          "path": "pca_projection.npz",
+          "sha256": "5d57bb3bf73d91ababda0f91b6aa933dc0f5b80ab3d59bdbd6a113b2f7855205",
+          "bytes": 13664
+        },
+        {
+          "path": "pca_rgb.png",
+          "sha256": "401abeec3aebadeaf4c25c3b0314574e9446bb3d043d3ec63da23b4000a1e6da",
+          "bytes": 289092
+        }
+      ],
+      "metrics": {
+        "model_parameters": 22056576,
+        "feature_extract_seconds": 0.2066330999987258,
+        "feature_shape": [
+          35,
+          46,
+          384
+        ],
+        "feature_dtype": "float32",
+        "input_width": 640,
+        "input_height": 480,
+        "preprocessing": {
+          "resize": false,
+          "padding": "bottom/right edge replication to multiple of 14",
+          "padded_width": 644,
+          "padded_height": 490,
+          "patch_size": 14,
+          "normalization_mean": [
+            0.485,
+            0.456,
+            0.406
+          ],
+          "normalization_std": [
+            0.229,
+            0.224,
+            0.225
+          ],
+          "precision": "float32"
+        },
+        "pca": {
+          "scope": "per image; colours not comparable across images",
+          "display_quantiles": [
+            0.01,
+            0.99
+          ],
+          "explained_variance_ratio": [
+            0.15032055377174883,
+            0.11719660862307742,
+            0.11553692030385013
+          ],
+          "upsampling": "bilinear display only; raw patch features remain available"
+        },
+        "clustering": {
+          "k": 4,
+          "seed": 0,
+          "max_iterations": 50,
+          "iterations": 17,
+          "converged": true,
+          "initialization": "seeded first patch then deterministic farthest point",
+          "input_normalization": "L2 normalize each patch; Euclidean Lloyd clustering",
+          "cluster_patch_counts": [
+            668,
+            213,
+            342,
+            387
+          ],
+          "semantic_assignment": null,
+          "scope": "per image; arbitrary IDs have no class semantics",
+          "palette_rgb": [
+            [
+              31,
+              119,
+              180
+            ],
+            [
+              255,
+              127,
+              14
+            ],
+            [
+              44,
+              160,
+              44
+            ],
+            [
+              214,
+              39,
+              40
+            ]
+          ]
+        },
+        "draft_feature_statistics": {
+          "annotation_status": "draft",
+          "human_verified": false,
+          "test_ground_truth_allowed": false,
+          "semantics": "Labels were assigned to SAM2 drafts; neither material identity nor class truth is verified.",
+          "aggregation": "Unit-normalize descriptors; weight each patch by surviving class pixels; normalize weighted centre.",
+          "within_definition": "Pixel-weighted mean (1 - cosine(patch, normalized class centre)).",
+          "between_definition": "1 - cosine(normalized class centres); ratio divides by mean of both within dispersions.",
+          "ignore_pixels": 19396,
+          "conflicting_nonignore_pixels": 0,
+          "unknown_pixels": 267660,
+          "ignore_precedence": true,
+          "unlabelled_is_substrate": false,
+          "classes": {
+            "structure": {
+              "status": "available",
+              "raw_draft_pixels": 33255,
+              "valid_draft_pixels": 20144,
+              "contributing_patches": 247,
+              "effective_patch_count": 140.61700319781988,
+              "patch_equivalent_area": 102.77551020408163,
+              "majority_class_patches": 99,
+              "minimum_patch_class_fraction": 0.00510204081632653,
+              "maximum_patch_class_fraction": 1.0,
+              "pixel_weighted_patch_class_fraction": 0.7308896354411503,
+              "center": [
+                -0.015142521070468222,
+                0.10718698324909852,
+                -0.07123157996652894,
+                0.01848452360356959,
+                0.029202440748099214,
+                -0.029235846730249863,
+                -0.007383732944941515,
+                -0.006010824068682883,
+                -0.003718666283446254,
+                -0.004271721960464647,
+                -0.0256708574847855,
+                0.009204776845716417,
+                0.04571725149846043,
+                0.05222045721359047,
+                -0.03096100908981988,
+                -0.012156102973783355,
+                0.018110294245520114,
+                0.028574769268944245,
+                0.15755492909090524,
+                0.008258840725395072,
+                -0.04246128189957251,
+                -0.04701758607056725,
+                0.009588723614485746,
+                0.06539248261058876,
+                -0.08276513748389658,
+                -0.036973110531112664,
+                -0.05204392621092005,
+                0.10786001738178644,
+                0.038433439744885285,
+                -0.010962468595337524,
+                -0.01758822133626425,
+                -0.012167879743497135,
+                0.018636276577856065,
+                0.08500575529808008,
+                0.06390993811494404,
+                -0.058475335152316926,
+                0.009544629452294779,
+                0.04496600841614329,
+                -0.025127463427274416,
+                -0.02090931554725626,
+                0.06066825187517344,
+                -0.038089688297099,
+                -0.008414401179556982,
+                0.005940717388666843,
+                -0.02062032280904434,
+                -0.03340587432640961,
+                0.032722746006997684,
+                0.022991479656553487,
+                -0.032312868876313,
+                -0.016161645759334833,
+                0.024850291548675813,
+                -0.050938183598122126,
+                -0.04442479553998745,
+                0.008516729986478087,
+                -0.026929850782116276,
+                -0.005961705056915315,
+                0.06060632389811088,
+                0.02598478762979376,
+                -0.024137883641135977,
+                -0.04609457206931636,
+                0.014864106323803642,
+                -0.0035670160354057874,
+                0.03808702768439256,
+                0.08437609545121011,
+                0.08581784767772384,
+                0.044553821069789896,
+                0.019008266441716038,
+                -0.035561829786671745,
+                0.14599879960726966,
+                -0.022708156341621228,
+                -0.043904227811978114,
+                -0.04756216963630313,
+                -0.013472076744512977,
+                0.005035540423399693,
+                -0.07543877671042834,
+                0.032900625019634984,
+                0.006536872259612585,
+                -0.05114021625717743,
+                -0.0949195347645449,
+                -0.14060085363448943,
+                -0.028478017937817852,
+                0.038927376387344066,
+                0.047721311185997976,
+                0.02973915718872126,
+                -0.00788332514538876,
+                0.052341475989084715,
+                0.0017749693358159553,
+                0.018389518423913398,
+                -0.026428177819882572,
+                0.02342780589487602,
+                -0.024332286555167747,
+                -0.08804539840842791,
+                0.018092788789169215,
+                0.05057532929469388,
+                -0.08120775376786536,
+                -0.08355690699561745,
+                0.09270533362411452,
+                0.07822486042328301,
+                -0.0035897967959185634,
+                0.06617553513479706,
+                0.08593591824842628,
+                0.01827024795047805,
+                0.03431658716480886,
+                0.12632672490656788,
+                0.03535142602397799,
+                -0.04898143301224485,
+                0.06022517411927705,
+                0.017251136671279695,
+                -0.0032077753547119312,
+                -0.00521146717330012,
+                0.09524510663105064,
+                0.05971589709002527,
+                -0.08604631775982753,
+                -0.08214304292732623,
+                0.04821897420649891,
+                -0.022001839173076795,
+                -0.005244380543463066,
+                -0.06947548128253145,
+                -0.05164471468940297,
+                -0.016551183718116622,
+                0.016254475482237067,
+                0.028140098044526034,
+                -0.00273062653242834,
+                0.0562783090748752,
+                0.035966422946454975,
+                -0.018529978416193558,
+                0.06213075172457327,
+                0.07243935069512913,
+                -0.022259272645464966,
+                -0.07404382342060611,
+                -0.028118028354757973,
+                -0.10418972377074619,
+                -0.0881670230763543,
+                0.035277707173461,
+                -0.04933395434748594,
+                0.07195699955425718,
+                -0.04809818124411073,
+                -0.06061891634687273,
+                0.14346696732596698,
+                0.040127646230425244,
+                -0.017358965615330714,
+                -0.03353567241157466,
+                0.02440123090509136,
+                -0.02683434007101086,
+                -0.007811642156427441,
+                -0.02589948418263931,
+                0.013788732334814424,
+                -0.0127115108474673,
+                0.06375317176444169,
+                -0.006338925892499397,
+                0.01758151530008859,
+                -0.010286193966553572,
+                0.011432866441808305,
+                0.04253044513554314,
+                -0.07656621485638787,
+                -0.02239871062210268,
+                0.04837177796136964,
+                -0.08865619761226799,
+                -0.004422971345855118,
+                0.10496804748439446,
+                0.005269044401479923,
+                -0.023345824887556044,
+                0.0030218247434207483,
+                0.044843994616129534,
+                -0.010497305012194872,
+                -0.025519367871783695,
+                0.03197746373379545,
+                0.004633298160776928,
+                0.002422903951810861,
+                0.08050616955704855,
+                -0.01145673551744098,
+                0.02822220718956507,
+                -0.031702739581390194,
+                0.006291629185690533,
+                0.03259539041338118,
+                0.019515996200749702,
+                0.016689680861251506,
+                -0.020867086552097274,
+                -0.05875064950487727,
+                0.08107101374190448,
+                -0.0003020980486925561,
+                0.05432841512944533,
+                -0.002441850915033271,
+                0.019532922817551843,
+                0.0231335566015911,
+                -0.004583060210850231,
+                0.00969642981758304,
+                0.010336073156950978,
+                -0.06027696876068262,
+                -0.04108874636165457,
+                -0.06529166498135389,
+                0.026167119790679916,
+                -0.058360901541590966,
+                -0.08894720417367359,
+                -0.004086858166009876,
+                0.009246035059576645,
+                -0.02544230179854466,
+                -0.10571773240014416,
+                0.002764758966479901,
+                0.03196320263850656,
+                -0.07688947066810156,
+                0.03607043122989145,
+                0.06052662232721728,
+                0.022156389377089344,
+                0.06598389923192692,
+                -0.0015319358295770385,
+                0.045915247185640023,
+                0.0405355077100882,
+                0.041653770574025396,
+                0.00475165520894931,
+                0.02372431970670834,
+                0.06563718009412374,
+                -0.014843075067661402,
+                0.0438540709337108,
+                -0.03425306306804509,
+                -0.023376285166561647,
+                0.033971461603143994,
+                0.0192120452691182,
+                0.0565671698017898,
+                0.21904220895531082,
+                0.02664520833355874,
+                0.06463181061819347,
+                -0.002159373779768635,
+                -0.10094364146865127,
+                -0.022120084931614915,
+                -0.051534400657971144,
+                0.009313173433678601,
+                -0.011006287644806146,
+                0.005316093739776494,
+                -0.06706519265713366,
+                0.1029737460873801,
+                0.018955291057263804,
+                0.03733024241314305,
+                0.017386108672542897,
+                -0.02584003260889716,
+                0.090939904710091,
+                -0.02343403354735688,
+                0.04279391701868356,
+                0.023452188676335913,
+                0.021941998483215853,
+                0.03680815825230496,
+                0.07326485217787788,
+                -0.03373518757592464,
+                -0.06824007337513373,
+                -0.00017359713925824312,
+                -0.039503260662487646,
+                0.0012827896545720202,
+                -0.028787981552488386,
+                -0.026967802961646876,
+                0.10070543006757746,
+                0.01519961243179552,
+                0.00950971094439988,
+                -0.02115561461440634,
+                0.05967206953849273,
+                0.09807163079443845,
+                0.005248812997427126,
+                0.0008792415787429391,
+                -0.06809803054167601,
+                0.05852047005599743,
+                -0.005002576905763765,
+                0.02577210120492925,
+                0.08404100840870614,
+                0.07097825135545817,
+                0.029309897150299847,
+                -0.016890020091216963,
+                -0.024051623479254144,
+                0.019346561022607275,
+                -0.02049703938646358,
+                0.06284949959541145,
+                -0.08414822918670456,
+                0.01967915010820598,
+                -0.050404408409035296,
+                -0.030722120076325445,
+                -0.03052865407527315,
+                -0.028300192984962988,
+                -0.00563931022120244,
+                0.07174898722934858,
+                -0.01840010244147978,
+                -0.15075432557806848,
+                -0.0005646279376573807,
+                -0.08022518094274296,
+                -0.014364064769393312,
+                0.08716992178582537,
+                0.07238854626736446,
+                0.0006125155774405395,
+                -0.07948879418457458,
+                0.028299192444245513,
+                0.013689899696560917,
+                0.03561763106669419,
+                0.029311036720145758,
+                -0.0002892644658060015,
+                0.09320372147805327,
+                0.005687312809551669,
+                0.015517961677110387,
+                -0.008172002160330167,
+                0.011203119505742423,
+                -0.0200662452624389,
+                -0.09096341164097167,
+                0.044021234018101436,
+                -0.03124777195176361,
+                -0.02753438532969452,
+                -0.03288560732725281,
+                -0.007581800152318245,
+                -0.07383340305893878,
+                0.06677567985742494,
+                0.027490508070025604,
+                -0.007157392287692909,
+                -0.038322393393146616,
+                -0.01985904852400761,
+                0.06177820322140706,
+                0.05365540000137471,
+                -0.014211723018785353,
+                0.0035892477890764295,
+                -0.0980433585595133,
+                -0.06681979132707164,
+                -0.06514859107747843,
+                -0.02020037088242013,
+                -0.018160618676903325,
+                -0.12097345309846617,
+                0.006295739714025688,
+                -0.041693874587410154,
+                -0.02924705429808501,
+                -0.028440865185912892,
+                -0.016663155859944826,
+                0.04048896191943453,
+                -0.03810717943834973,
+                0.1313537833552423,
+                -0.08122119374945032,
+                0.08092722147499411,
+                0.005660328587144003,
+                -0.027015213936467542,
+                0.01649433185975024,
+                -0.04574789475993166,
+                0.024543583780844622,
+                0.08118216852838542,
+                0.010723811526633325,
+                0.037122448950814055,
+                0.024783993049878904,
+                -0.0930223562774529,
+                0.02896289698439402,
+                0.048880724447838926,
+                0.019918746768623815,
+                -0.014637160221752595,
+                0.057031123760064494,
+                0.05143639901479271,
+                -0.014406889287848548,
+                0.02725408053848332,
+                -0.08362772290972856,
+                -0.03694920800931472,
+                0.005316097816811341,
+                0.006113518152141754,
+                -0.01068563740667977,
+                -0.015688813989328407,
+                -0.03419781108354433,
+                -0.05021203277350998,
+                -0.010460975352720347,
+                -0.08350668732645723,
+                0.011735098243421215,
+                -0.018423486342737775,
+                -0.07598938968548735,
+                -0.03650668582851233,
+                0.0719013541229177,
+                0.051319162636973926,
+                -0.02466797363580171,
+                -0.019063530049423183,
+                0.008206948656571239,
+                0.010003365690906008,
+                0.022366442281533217,
+                0.009373635859905426,
+                -0.03203597367045467,
+                0.011224201176336376,
+                -0.02960194245264811,
+                -0.007190152189362074,
+                0.07210034367906407,
+                -0.06648178181045912,
+                0.004730068487950018,
+                0.0009365388135347018,
+                0.026507234996598485,
+                0.018921753628948004,
+                -0.08532862699755264,
+                -0.02825888765165608,
+                0.11849268778488918,
+                -0.0018770270666152815,
+                0.059475944721654524
+              ],
+              "within_cosine_dispersion": 0.2552419323786251
+            },
+            "residue": {
+              "status": "unavailable",
+              "reason": "no draft pixels after ignore/conflict exclusion",
+              "raw_draft_pixels": 0,
+              "valid_draft_pixels": 0,
+              "contributing_patches": 0,
+              "center": null,
+              "within_cosine_dispersion": null
+            },
+            "substrate": {
+              "status": "unavailable",
+              "reason": "no draft pixels after ignore/conflict exclusion",
+              "raw_draft_pixels": 0,
+              "valid_draft_pixels": 0,
+              "contributing_patches": 0,
+              "center": null,
+              "within_cosine_dispersion": null
+            }
+          },
+          "comparisons": [
+            {
+              "classes": [
+                "structure",
+                "residue"
+              ],
+              "center_cosine_distance": null,
+              "mean_within_cosine_dispersion": null,
+              "between_to_within_ratio": null,
+              "shared_contributing_patches": 0,
+              "status": "unavailable",
+              "reason": "one or both draft classes have no valid pixels"
+            },
+            {
+              "classes": [
+                "structure",
+                "substrate"
+              ],
+              "center_cosine_distance": null,
+              "mean_within_cosine_dispersion": null,
+              "between_to_within_ratio": null,
+              "shared_contributing_patches": 0,
+              "status": "unavailable",
+              "reason": "one or both draft classes have no valid pixels"
+            },
+            {
+              "classes": [
+                "residue",
+                "substrate"
+              ],
+              "center_cosine_distance": null,
+              "mean_within_cosine_dispersion": null,
+              "between_to_within_ratio": null,
+              "shared_contributing_patches": 0,
+              "status": "unavailable",
+              "reason": "one or both draft classes have no valid pixels"
+            }
+          ],
+          "missing_classes": [
+            "residue",
+            "substrate"
+          ],
+          "three_class_separability_status": "not_assessable",
+          "limitations": [
+            "Unlabelled pixels are unknown and never treated as substrate.",
+            "A 14-pixel patch may mix narrow residue, structure, shadows and unknown pixels.",
+            "DINO descriptors use global attention, so a patch descriptor is not purely local material response.",
+            "Drafts from another model are not independent human ground truth; no accuracy or class classifier is produced.",
+            "Per-image centres describe these two images only; no generalization or statistical significance is inferred."
+          ],
+          "provenance": {
+            "seed_dir": "dataset/seed_v0/realpart_img1",
+            "instances_sha256": "dab567ff27d65047e2e161aada0ba4bbe76c25d28f4c7b3b3b4bbd92ddb4d371",
+            "points_sha256": "f8ffbe157d8ce48a04390bbabb11ff21d355d511716bb96d6b79b26e373a1478",
+            "mask_files": [
+              {
+                "id": 1,
+                "label": "structure",
+                "ref": "masks/0001_structure.png",
+                "sha256": "3fac7720b1cbb82dfca315cb7176a3487421e687d535c8add7fb587ae09d0016"
+              },
+              {
+                "id": 2,
+                "label": "structure",
+                "ref": "masks/0002_structure.png",
+                "sha256": "e1fb84440d2796fa1a2746cab943f09144fb0b978af4a8d6870850354365b4ee"
+              },
+              {
+                "id": 3,
+                "label": "structure",
+                "ref": "masks/0003_structure.png",
+                "sha256": "9c3a796b12a15785b833aa621846f071c810a30ee65f82ff8d863fc4fda73ddc"
+              },
+              {
+                "id": 4,
+                "label": "structure",
+                "ref": "masks/0004_structure.png",
+                "sha256": "5f9ced454c7c6ffaf7777c80d50b757eb1f89f6742035fd514082e939d7160cf"
+              },
+              {
+                "id": 10,
+                "label": "ignore",
+                "ref": "masks/0010_ignore.png",
+                "sha256": "954b5f9cfcb94ddb7b146f1643df06fc055a47479208b0fadd5458bcdcd5bc38"
+              },
+              {
+                "id": 5,
+                "label": "structure",
+                "ref": "masks/0005_structure.png",
+                "sha256": "c695e632ab1a7dc67b1a8f9042515291ed9a3a41459556a1d3dfebd181a1e6b5"
+              },
+              {
+                "id": 11,
+                "label": "ignore",
+                "ref": "masks/0011_ignore.png",
+                "sha256": "faa002c365bc7c8f6d5ddd6bd067bb4668a30468223d23924fb5122bfcd96743"
+              },
+              {
+                "id": 12,
+                "label": "ignore",
+                "ref": "masks/0012_ignore.png",
+                "sha256": "cb6c0f8c38dd11c77dc84948a31bd425c3d2805965f2e59b126e23e1714efaa2"
+              },
+              {
+                "id": 13,
+                "label": "ignore",
+                "ref": "masks/0013_ignore.png",
+                "sha256": "eb7d0361eef371dce37224de2aee5ebfb18a872ce699a9b96b1b69837f187922"
+              },
+              {
+                "id": 14,
+                "label": "ignore",
+                "ref": "masks/0014_ignore.png",
+                "sha256": "bc47d0f508837e2584328d67b0b50423215cc45e8e226b9c2e2c7bb78c9e83c1"
+              },
+              {
+                "id": 15,
+                "label": "ignore",
+                "ref": "masks/0015_ignore.png",
+                "sha256": "b995ba4e4576d030a35e9d3c10c000525b59bb70dde9c81efb154c672d062d5d"
+              }
+            ]
+          }
+        },
+        "training": false,
+        "classifier": false,
+        "labelled_accuracy": null,
+        "qualitative_scope": "Inspect feature grouping and draft relative distances; missing classes stay unavailable."
+      },
+      "interface_version": "probe-result-v1",
+      "annotation_status": "not_ground_truth",
+      "test_ground_truth_allowed": false,
+      "timing_scope": "synchronized infer including image read, computation and output writes; excludes model load; no warmup",
+      "memory_scope": "torch CUDA peak allocated/reserved during infer, includes resident model; excludes driver/context and other processes"
+    },
+    {
+      "task_id": "stage2-20261109T101923Z-71c07242",
+      "observation_id": "realpart_img2:591cfdadc06d",
+      "frame_id": "realpart_img2",
+      "raw_image_ref": "inputs/realpart_img2.jpg",
+      "input_sha256": "591cfdadc06dce57dfe70a769ca79f25c605b6d865ca49bba18a0da126db8369",
+      "probe_name": "dino",
+      "model_info": {
+        "model_name": "DINOv2 ViT-S/14",
+        "model_version": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+        "weights_version": "dinov2_vits14_pretrain / LVD-142M",
+        "weights_ref": "weights\\dinov2_vits14_pretrain.pth",
+        "weights_sha256": "b938bf1bc15cd2ec0feacfe3a1bb553fe8ea9ca46a7e1d8d00217f29aef60cd9",
+        "weights_bytes": 88283115,
+        "code_license": "Apache-2.0",
+        "weights_license": "Apache-2.0"
+      },
+      "started_at": "2026-11-09T10:19:54.812556+00:00",
+      "ended_at": "2026-11-09T10:19:57.470562+00:00",
+      "duration_ms": 1957.8141999991203,
+      "model_load_ms": 1578.012399997533,
+      "peak_allocated_mib": 145.93310546875,
+      "peak_reserved_mib": 164.0,
+      "status": "ok",
+      "status_reason": "Feature extraction completed; full three-class separability unavailable because draft classes are missing.",
+      "reason_codes": [
+        "draft-not-ground-truth",
+        "missing-draft-substrate"
+      ],
+      "output_files": [
+        {
+          "path": "cluster_centers.npy",
+          "sha256": "20632677b01bcf4aaa8192a5b40090c82712f0ea1abf94d9264491f12bef52fc",
+          "bytes": 12416
+        },
+        {
+          "path": "cluster_ids.png",
+          "sha256": "6ec5ae90c28f103707eef713451e113dfb736945efbbd0eaa41308b971aa6459",
+          "bytes": 2108
+        },
+        {
+          "path": "cluster_patch_ids.png",
+          "sha256": "aa530e7821b9f5e78892f0585b1f987aecca260123b6dc19763cc4124d265c51",
+          "bytes": 499
+        },
+        {
+          "path": "clusters.png",
+          "sha256": "db667eebecfc6151418dd57780683faa42929d08bf631d088b813a746bdf0a38",
+          "bytes": 3320
+        },
+        {
+          "path": "draft_feature_statistics.json",
+          "sha256": "36226f250909cf1649f7ca3ea88a71018535f8be970c24715c29a8a745d9b408",
+          "bytes": 29929
+        },
+        {
+          "path": "draft_patch_pixel_counts.npz",
+          "sha256": "bf66a7a48d6c2daaa686ecad8e1c901bd4b57f58f8568c0ce08f1e5b46e7b458",
+          "bytes": 39408
+        },
+        {
+          "path": "features.npy",
+          "sha256": "67a9324f2be80a3a0cb22db15740171e7c62d680ec318fe167364fef920e661a",
+          "bytes": 2473088
+        },
+        {
+          "path": "gpu_memory_before_image.txt",
+          "sha256": "bb34b73604091739f12ee8980c3c92d0f7600499cf9c69ef0da6696ffab75e17",
+          "bytes": 12
+        },
+        {
+          "path": "nvidia_smi_before_image.txt",
+          "sha256": "7815f980d38d8bb85a193811f74d2c4a497fd381745ea8173b6be61c23c5100d",
+          "bytes": 1880
+        },
+        {
+          "path": "original_pca_clusters.png",
+          "sha256": "74ed1fc417e156d45c0207a2d5bc0d6dc1909818103bfc37215bdc9bef002b43",
+          "bytes": 848555
+        },
+        {
+          "path": "overlay.png",
+          "sha256": "5387f18b390b6e7c068d95c25f594825476248a7847a71bf9bcbe683d49a9fe4",
+          "bytes": 444175
+        },
+        {
+          "path": "pca_overlay.png",
+          "sha256": "dbac53f789d908458918ed545e8db3540ad8bbfe10570bc721a04add7717b082",
+          "bytes": 502699
+        },
+        {
+          "path": "pca_patch_rgb.png",
+          "sha256": "e64432262cd22395ccf2b2fcb35c712d359ce2b5d9e216674781878e5bfd8590",
+          "bytes": 4567
+        },
+        {
+          "path": "pca_projection.npz",
+          "sha256": "c31a951bc0bf98241c9b6d4399860d8cbab8a652ee78a8a40ee2afb1916f4063",
+          "bytes": 13664
+        },
+        {
+          "path": "pca_rgb.png",
+          "sha256": "ce6441618295da27e3faee913468eeb0707807d5aa212b74249b7a2941a8a809",
+          "bytes": 279178
+        }
+      ],
+      "metrics": {
+        "model_parameters": 22056576,
+        "feature_extract_seconds": 0.08735950000118464,
+        "feature_shape": [
+          35,
+          46,
+          384
+        ],
+        "feature_dtype": "float32",
+        "input_width": 640,
+        "input_height": 480,
+        "preprocessing": {
+          "resize": false,
+          "padding": "bottom/right edge replication to multiple of 14",
+          "padded_width": 644,
+          "padded_height": 490,
+          "patch_size": 14,
+          "normalization_mean": [
+            0.485,
+            0.456,
+            0.406
+          ],
+          "normalization_std": [
+            0.229,
+            0.224,
+            0.225
+          ],
+          "precision": "float32"
+        },
+        "pca": {
+          "scope": "per image; colours not comparable across images",
+          "display_quantiles": [
+            0.01,
+            0.99
+          ],
+          "explained_variance_ratio": [
+            0.14702711224286907,
+            0.12611648348161622,
+            0.09798094851632451
+          ],
+          "upsampling": "bilinear display only; raw patch features remain available"
+        },
+        "clustering": {
+          "k": 4,
+          "seed": 0,
+          "max_iterations": 50,
+          "iterations": 17,
+          "converged": true,
+          "initialization": "seeded first patch then deterministic farthest point",
+          "input_normalization": "L2 normalize each patch; Euclidean Lloyd clustering",
+          "cluster_patch_counts": [
+            330,
+            729,
+            326,
+            225
+          ],
+          "semantic_assignment": null,
+          "scope": "per image; arbitrary IDs have no class semantics",
+          "palette_rgb": [
+            [
+              31,
+              119,
+              180
+            ],
+            [
+              255,
+              127,
+              14
+            ],
+            [
+              44,
+              160,
+              44
+            ],
+            [
+              214,
+              39,
+              40
+            ]
+          ]
+        },
+        "draft_feature_statistics": {
+          "annotation_status": "draft",
+          "human_verified": false,
+          "test_ground_truth_allowed": false,
+          "semantics": "Labels were assigned to SAM2 drafts; neither material identity nor class truth is verified.",
+          "aggregation": "Unit-normalize descriptors; weight each patch by surviving class pixels; normalize weighted centre.",
+          "within_definition": "Pixel-weighted mean (1 - cosine(patch, normalized class centre)).",
+          "between_definition": "1 - cosine(normalized class centres); ratio divides by mean of both within dispersions.",
+          "ignore_pixels": 23686,
+          "conflicting_nonignore_pixels": 0,
+          "unknown_pixels": 256912,
+          "ignore_precedence": true,
+          "unlabelled_is_substrate": false,
+          "classes": {
+            "structure": {
+              "status": "available",
+              "raw_draft_pixels": 32625,
+              "valid_draft_pixels": 25751,
+              "contributing_patches": 221,
+              "effective_patch_count": 159.9826874449174,
+              "patch_equivalent_area": 131.3826530612245,
+              "majority_class_patches": 133,
+              "minimum_patch_class_fraction": 0.00510204081632653,
+              "maximum_patch_class_fraction": 1.0,
+              "pixel_weighted_patch_class_fraction": 0.821230441615503,
+              "center": [
+                -0.04610300055384031,
+                0.09299625792059102,
+                -0.03670896827665555,
+                -0.07072551973493253,
+                -0.019753016593189822,
+                0.0733744445434443,
+                -0.12060078539141786,
+                -0.007530980346720672,
+                -0.00025617467141247614,
+                -0.053563900498804225,
+                -0.012876245128497532,
+                0.004250500588550431,
+                -0.0013538379237761876,
+                0.0875426319316664,
+                -0.07344597574859103,
+                -0.0038894781176385626,
+                -0.011527676018150437,
+                0.06232678027287869,
+                0.10167206147236303,
+                0.03232802255836806,
+                -0.015204875244222576,
+                -0.09654581897733346,
+                -0.007360312933883867,
+                0.11781854232115929,
+                -0.0606282569466162,
+                -0.014562113041929177,
+                -0.019496276581752674,
+                0.05324780493318051,
+                0.007284221651341905,
+                0.0060952004305540024,
+                0.0531027741539195,
+                -0.0011414763471361904,
+                -0.005443687471396336,
+                0.05151879143424087,
+                -0.0030240252960503002,
+                0.00993627026844849,
+                0.006815913787785574,
+                0.03199618023034499,
+                -0.10455409656173903,
+                0.029996682351750084,
+                0.09699506463161182,
+                -0.021248876585814144,
+                -0.005654166585562853,
+                -0.04356019052742595,
+                -0.015483796385746965,
+                0.026887146239447355,
+                -0.014650485111986168,
+                0.0631434574714493,
+                -0.047677697255404175,
+                0.025712659851531622,
+                0.007475948979383771,
+                -0.0068702463300641045,
+                -0.05924732441817467,
+                0.0423436515283198,
+                -0.029120491142568754,
+                0.021646264927078104,
+                0.056657798983801945,
+                0.045751101781413166,
+                -0.003961154000493788,
+                -0.08093801724545274,
+                -0.0023575866768263043,
+                0.03944297099006392,
+                -0.02562624277929465,
+                0.029296832522723845,
+                0.06453503096301738,
+                0.12177709791004088,
+                0.07031854393784553,
+                0.015767953636091344,
+                0.23106149020715974,
+                -0.11199061666497029,
+                -0.010658187835169693,
+                -0.017798004230933456,
+                -0.01437434816470886,
+                -0.02051185784871222,
+                -0.1046657542098051,
+                0.056624265340099636,
+                0.04243784453788464,
+                0.006607853350264998,
+                -0.05901613578911672,
+                -0.1213573798002366,
+                0.021211250842363496,
+                0.01961366079815439,
+                0.08772063688904741,
+                -0.0032858764805059164,
+                -0.04924130882116209,
+                0.05676288532530611,
+                0.002169414611277261,
+                0.00727497550686317,
+                -0.023518699220795747,
+                0.0148763893462135,
+                -0.03725789261835157,
+                -0.08972914849941785,
+                0.028783797306297272,
+                0.025517314001747966,
+                0.015645562670645877,
+                -0.08478495100066046,
+                0.07293059313426734,
+                0.09272526379887674,
+                -0.02860117459148588,
+                0.01378777133774997,
+                0.05121038835241186,
+                -0.0002506404052572299,
+                0.044022241410232345,
+                0.12763742264502834,
+                0.0022992115956635014,
+                -0.04246442331441147,
+                0.056823562297044085,
+                -0.0007652523175646288,
+                0.03726709992488307,
+                0.003643601070685966,
+                0.04427370463112755,
+                0.03276158720035519,
+                -0.05015021575907497,
+                -0.05724552061040685,
+                0.053680387274423584,
+                -0.025468475169862555,
+                -0.01901348247387042,
+                -0.001578042817119715,
+                -0.016303143060996658,
+                -0.01150088835912779,
+                0.0007844074257216952,
+                0.028799984467800924,
+                -0.020142989417115887,
+                -0.009338703144149526,
+                0.000815157733083766,
+                -0.02359250157730559,
+                0.0537881996873386,
+                0.07188508803473337,
+                -0.06814699846900683,
+                0.011465763419159803,
+                -0.03432896211560678,
+                -0.05221958697231726,
+                -0.009061825194168774,
+                -0.02854809618210588,
+                -0.02299734778278992,
+                0.013951444632032933,
+                -0.029735958008985836,
+                -0.06270208734091853,
+                0.07366360530560165,
+                -0.013095206358337325,
+                -0.022216106648394605,
+                0.025854649511731855,
+                0.011903242470655844,
+                -0.05606171052519871,
+                0.012144405846184751,
+                -0.032007257964120274,
+                -0.028130379360575945,
+                0.03131558674563047,
+                -0.014819358515777972,
+                0.0034872898308642986,
+                0.0057336404007188825,
+                0.027827439499620053,
+                -0.010197089382792672,
+                0.04337457152539179,
+                0.06457554532331597,
+                -0.035861189297117055,
+                -0.03482414300063771,
+                -0.07099536650433008,
+                0.04219422500345939,
+                0.03651484728717041,
+                -0.013988941372166589,
+                -0.045384979337152145,
+                0.01995378250655024,
+                -0.012603602535661463,
+                -0.01728592011458103,
+                0.032348025404683275,
+                -6.327757279134979e-05,
+                -0.029700577436618247,
+                -0.011497641160018734,
+                0.07273794353642764,
+                -0.06968702670824838,
+                0.08953868025090998,
+                0.03987480980902737,
+                -0.0038542689066565386,
+                0.04695970531465183,
+                0.008385445222420065,
+                -0.012231507556245393,
+                -0.03582160436750708,
+                -0.041608709174583744,
+                0.06129373623825659,
+                0.0722623150668012,
+                0.013980769534636001,
+                -0.05350190625534863,
+                0.05940369126554025,
+                0.036670292395698634,
+                0.07686216597929496,
+                0.10150074835043549,
+                -0.0686093944272559,
+                0.008157695377503334,
+                -0.013932128264088605,
+                0.0034826165708668057,
+                -0.019230922072607567,
+                -0.011532603455180576,
+                -0.03958912642001232,
+                -0.006294981966660068,
+                -0.02496651247822737,
+                -0.024389974434391632,
+                -0.05922431429760583,
+                -0.013261790245985339,
+                0.014826877702141054,
+                0.009097905329419167,
+                0.014515436298057821,
+                0.06492254353209216,
+                0.03923380865286139,
+                0.04782603875916827,
+                -0.05470837483231303,
+                0.06167188086267438,
+                0.07927789484435183,
+                -0.20356370128669274,
+                -0.026847871194784077,
+                0.09341246622231543,
+                0.023404694030944407,
+                -0.010793976687679742,
+                0.05713344800382826,
+                0.032221057939665475,
+                -0.010261775985570595,
+                -0.03339273518295726,
+                -0.012204966334760033,
+                0.0022759981413298276,
+                0.2429968019058307,
+                0.04338437534405783,
+                0.04346353727245859,
+                -0.048121474891440204,
+                -0.05257799516129816,
+                0.021505404683460825,
+                0.004792701546510591,
+                0.07650769693393233,
+                -0.011917557063943728,
+                -0.0027424320284550924,
+                -0.026144366149682227,
+                0.010276603190479398,
+                0.05468707236309084,
+                0.06381269919945998,
+                -0.033750192806446526,
+                -0.039880899523969685,
+                0.0296542710189225,
+                0.02249806753359782,
+                0.030694846410972934,
+                -0.026332415722262387,
+                0.01949428211613509,
+                0.030880793840378597,
+                0.11103066709181081,
+                -0.09002666273963639,
+                -0.07438551887665436,
+                -0.01952756610720186,
+                -0.005814254737824687,
+                -0.00357083761625127,
+                0.01262507355259832,
+                -0.011245056523267388,
+                0.06374697337907483,
+                -0.007491950527231315,
+                -0.023990428305490002,
+                -0.03121655912850634,
+                0.04821770948885944,
+                0.09906418139267538,
+                0.00494958003761504,
+                0.027737349061787438,
+                -0.035704341769894614,
+                0.056701626822975755,
+                0.04357872239514334,
+                -0.009722414957509739,
+                0.07546827982397455,
+                0.05354013832194185,
+                -0.01691334447445049,
+                0.12414832125438746,
+                -0.013147840134110453,
+                -0.01051226413937509,
+                -0.045858338682575765,
+                0.06249613388990072,
+                -0.13413640191417142,
+                0.014348912637623449,
+                -0.024051158191339437,
+                -0.005917079484547699,
+                -0.059359649477680965,
+                0.025372919165088163,
+                0.020750970673265146,
+                0.026248498630156835,
+                -0.03295709649336041,
+                -0.1373920357380036,
+                0.02605717864124858,
+                -0.02795839676021919,
+                -0.10259371465027715,
+                0.013593423682490412,
+                0.04332628684112672,
+                -0.015470437166744282,
+                0.018307829406920682,
+                0.02082873991347833,
+                -0.0008529058462332208,
+                0.03188185457930189,
+                -0.012199520094333055,
+                0.007750722318246668,
+                0.015177748216287893,
+                0.02585458194468406,
+                0.04523539027802847,
+                -0.07282498453678944,
+                -0.036728806809998356,
+                -0.00406705340959534,
+                -0.08093153972939351,
+                -0.044097434714671986,
+                -0.037991046563967915,
+                -0.044556342433268135,
+                -0.06123879664654152,
+                0.012799893234768031,
+                0.017183643787555953,
+                0.002022567868938017,
+                0.010522609199679102,
+                -0.012134009092799077,
+                -0.043845372126487564,
+                0.041344734651989797,
+                0.03079937023662969,
+                -0.001369775771829903,
+                0.03256505235584756,
+                0.028775129816120498,
+                -0.11468611816604858,
+                -0.11063398850860798,
+                -0.029588802594754927,
+                0.013755498564021695,
+                -0.04062870596174386,
+                -0.11273816695302898,
+                0.040442204126045364,
+                -0.0012487387441509421,
+                0.02017485401858191,
+                -0.09193253283566286,
+                -0.045780294867202566,
+                -0.012097247451102647,
+                -0.004184216724409152,
+                0.07992941200961351,
+                -0.07108647148818197,
+                0.03732978658656167,
+                0.021659105017290497,
+                0.015056962731841261,
+                0.06380409052741988,
+                -0.054547958437935716,
+                0.05640115350624045,
+                -0.03212509503339476,
+                -0.014241346484941157,
+                0.030502551646001127,
+                -0.011756762777646668,
+                -0.07458486346985914,
+                0.09263224791302883,
+                0.11400861990011436,
+                -0.01656194287038329,
+                0.043522960191446684,
+                0.028441589222667478,
+                0.05351345908754283,
+                0.0025973170952303492,
+                0.049711340647140764,
+                -0.021191351188735937,
+                -0.04806611174053608,
+                0.002907407853247627,
+                -0.004975864637077619,
+                0.0533278768829018,
+                -0.035302262011155744,
+                -0.02895853372685985,
+                -0.014815443852478634,
+                0.009618498945200404,
+                -0.04068480011060183,
+                -0.0001993217600262303,
+                -0.02335490001155886,
+                0.01277267537449685,
+                0.015891713538554397,
+                0.05517904915536142,
+                0.06339621227610573,
+                -0.006377959533825028,
+                -0.06117791538243985,
+                -0.008427817024032573,
+                -0.010371202506197151,
+                -0.02833184737995828,
+                -0.029392289123802477,
+                -0.022289148952328582,
+                -0.017809760578709626,
+                -0.023208224952202545,
+                0.001968497519608235,
+                0.04692813157016221,
+                -0.05089008916400638,
+                0.010452434680534785,
+                -0.021401833121924854,
+                0.02347190615378445,
+                0.035513284461749874,
+                -0.0236357446778294,
+                -0.03286857514889144,
+                0.026284127201004277,
+                0.005759587887641154,
+                0.0455844443855148
+              ],
+              "within_cosine_dispersion": 0.2619425482336379
+            },
+            "residue": {
+              "status": "available",
+              "raw_draft_pixels": 882,
+              "valid_draft_pixels": 851,
+              "contributing_patches": 12,
+              "effective_patch_count": 7.59224003270886,
+              "patch_equivalent_area": 4.341836734693878,
+              "majority_class_patches": 4,
+              "minimum_patch_class_fraction": 0.04081632653061224,
+              "maximum_patch_class_fraction": 0.8163265306122449,
+              "pixel_weighted_patch_class_fraction": 0.5718782224993405,
+              "center": [
+                -0.05823245722795385,
+                0.005871314236393658,
+                0.014564088844646616,
+                -0.08231531641813343,
+                -0.03033819782180789,
+                0.1546625942634849,
+                -0.13314678193997811,
+                -0.036700134082013,
+                -0.027596877517636207,
+                -0.04097440294035413,
+                -0.04951931884333283,
+                -0.044473571998950384,
+                0.004160210471277441,
+                0.05450316819633987,
+                -0.07661598825928753,
+                0.03888584778068724,
+                -0.014603810620385092,
+                0.0050203141844423595,
+                -0.01355039714721092,
+                0.008192825612286193,
+                -0.02535474437946632,
+                -0.042583289946781996,
+                -0.0028689499737513504,
+                0.0013199000274712732,
+                -0.05186525342713604,
+                0.0093402023217876,
+                -0.00977241320671359,
+                0.043275128781795374,
+                0.07489804626856804,
+                -0.05301133289607702,
+                0.06872760953968564,
+                -0.03139232449991153,
+                -0.07988688129076699,
+                0.0452179379558697,
+                0.015442083107298922,
+                -0.0018022856036873005,
+                0.05022882666921765,
+                0.029236874429807037,
+                -0.12357849597905056,
+                -0.020931618410134578,
+                0.021035829205691157,
+                -0.026853577776919782,
+                0.06344323629359144,
+                -0.05042483454628003,
+                0.002265192637647711,
+                0.02143535629336264,
+                -0.04325787261742819,
+                -0.02857261434242984,
+                -0.05272681389941032,
+                0.10515581858610999,
+                0.06826369955994362,
+                0.013773480451555799,
+                -0.044017563079152985,
+                0.055995783449477574,
+                -0.015900071541495968,
+                0.004761842340445389,
+                0.052959650157751816,
+                0.08000502005587318,
+                -0.03729844715355194,
+                -0.08824782124696166,
+                0.024565948231291147,
+                0.012844021746742176,
+                0.024303893565032476,
+                0.02997232826822121,
+                0.0976244790053753,
+                0.05025338187127649,
+                0.07082686809999897,
+                -0.04182830739912903,
+                0.0474853214456385,
+                0.038965810077598785,
+                0.03785777931672432,
+                -0.027866377298296344,
+                0.027614150972741773,
+                0.04755246069323039,
+                -0.09719157113314962,
+                0.07651480201717024,
+                0.015596057877371759,
+                0.00399190230116701,
+                -0.013142774375526545,
+                -0.11290040118735432,
+                0.016080528751002375,
+                -0.008487093038918066,
+                0.025788395483164958,
+                -0.001979642658261071,
+                0.06739913327549435,
+                0.04411879707411445,
+                0.040418118667960065,
+                -0.011517014701594643,
+                -0.015835704724207835,
+                0.04029689005942571,
+                -0.00428037945881793,
+                -0.044764261504589155,
+                0.037613181335159965,
+                0.026699885896970515,
+                0.036708007823202625,
+                -0.06350260028492337,
+                0.0516604840215601,
+                0.032759802922155364,
+                -0.0535751098255478,
+                0.013622167647128243,
+                0.005344015805762194,
+                -0.004311823621612193,
+                0.0714963669917802,
+                0.10150283067384687,
+                0.0790626077189191,
+                -0.07102907048083355,
+                0.05822824963967151,
+                -0.026220894172650385,
+                0.060169816656618774,
+                -0.0037312492813759987,
+                0.06011836450937329,
+                0.03287995340605799,
+                -0.018943101063172936,
+                0.022476629240043483,
+                -0.017440100289749405,
+                -0.037959082812057204,
+                -0.04332522538861503,
+                -0.044850585441663815,
+                0.05346773196666982,
+                0.028456483623545803,
+                -0.031357558086456294,
+                0.11225587695871432,
+                -0.010583493858636567,
+                0.010643314521093355,
+                -0.003357778343779515,
+                0.012980802508526517,
+                0.059324714107667764,
+                0.07925247615980602,
+                -0.04677817387562882,
+                -0.0166932829997899,
+                0.1293266090910391,
+                -0.04847620360715195,
+                -0.053690373782820336,
+                -0.040749266893689726,
+                -0.022130924198654905,
+                -0.019650235491093022,
+                -0.023812043623474808,
+                -0.0771973568580036,
+                0.04178409153378785,
+                -0.030487690497249212,
+                -0.005857619576250366,
+                0.1020692145262553,
+                0.06303105652759086,
+                -0.04022841749648326,
+                0.011055690350056041,
+                -0.027751680441997488,
+                -0.02902743370753705,
+                0.03769572073319261,
+                -0.018146668975049393,
+                0.010675223363960717,
+                -0.06110637245535555,
+                -0.007067452070436969,
+                -0.0438442388278826,
+                0.0836094813099391,
+                0.030232824849188957,
+                -0.06570419965038325,
+                0.009553446543096911,
+                -0.04302797356433221,
+                0.004020402476924512,
+                0.09314591536266023,
+                0.013199386936522825,
+                -0.024155933759562976,
+                -0.030704492880074857,
+                0.015633042072413013,
+                -0.042627341381877557,
+                0.035672790818965454,
+                -0.026268117817854545,
+                -0.019751326448458853,
+                0.005175537018769736,
+                0.10932782098487187,
+                -0.04530984742319532,
+                0.06650512173682942,
+                0.010095388871058968,
+                0.006876976719166063,
+                0.03014299298470882,
+                0.002313372611336674,
+                0.013785017557047358,
+                0.01966118129158871,
+                0.017180782639121147,
+                0.006710905238071422,
+                0.03263839411620386,
+                -0.03447300901815407,
+                -0.01056296836786477,
+                -0.012582001880704357,
+                -0.013430436968601866,
+                0.06206043128878674,
+                0.02680367099884216,
+                -0.04587118911110317,
+                0.019198393425322167,
+                0.033274902680096176,
+                -0.03744014234683641,
+                -0.026306438644760177,
+                0.006213592554933064,
+                -0.0492543703455406,
+                -0.0003771593665990074,
+                -0.10186538905664967,
+                -0.026059610755178198,
+                -0.036302642629845214,
+                0.002280142995342308,
+                -0.0027167341330890694,
+                0.022716602746824674,
+                0.06555178192065968,
+                0.010461642240287174,
+                0.025853025209400297,
+                0.01645678431840763,
+                -0.025094089971169735,
+                0.0640989836894769,
+                0.07265548206243216,
+                0.04123579451718658,
+                -0.009969480725762397,
+                0.045670584593476476,
+                0.0300285642831378,
+                0.057069606377498805,
+                -0.018823402351926873,
+                0.10352459346322158,
+                0.03150678672356542,
+                0.05023397519251239,
+                0.0015767563057474648,
+                -0.025836728504827773,
+                0.23463582391763446,
+                0.06836236240084118,
+                0.10220144274187855,
+                -0.0010181785300841957,
+                -0.04807743042155666,
+                -0.023663530425061557,
+                -0.005561823014536921,
+                0.023946382984480662,
+                0.029171452821596576,
+                0.08201062942974766,
+                -0.016787455882753904,
+                -0.049639598465312816,
+                -0.010891031490984393,
+                -0.027388005194272133,
+                -0.056198190808639206,
+                -0.010128050714698238,
+                0.05102998117622324,
+                -0.00845997576646626,
+                0.05016543346637296,
+                -0.025815793928133244,
+                0.08599916413345454,
+                -0.033496911311258946,
+                0.06577364947982417,
+                -0.1610951540859833,
+                -0.05440306455634421,
+                0.00896337562653475,
+                -0.03184149181878181,
+                0.030805570424035204,
+                -0.06878221119043798,
+                0.004044554005647536,
+                0.051562969603342806,
+                0.03401139932515173,
+                -0.030697979940848125,
+                -0.030916486628102518,
+                -0.03282494370338322,
+                0.06408002457935182,
+                -0.007289103252641197,
+                -0.019678022687537496,
+                -0.003143849376614306,
+                0.10045552251951913,
+                0.06065340366018247,
+                0.03082484844102617,
+                -0.015824967985905648,
+                0.032172288727902995,
+                -0.0737342374637568,
+                0.11720106629429766,
+                0.03026174553903096,
+                0.03542369443002567,
+                -0.02910489676617615,
+                0.06429050740484683,
+                -0.10406622282511256,
+                0.03149107340155766,
+                -0.00854463948449762,
+                0.0673294056991853,
+                -0.0633121039647308,
+                -0.05244600065692874,
+                0.05204243089079982,
+                0.003942963675629604,
+                0.013417327441632284,
+                -0.12174193530140999,
+                -0.0037034043121258373,
+                0.013049577506803314,
+                -0.07480450761299332,
+                0.0570964969961129,
+                0.02543959647669377,
+                0.024444318811283554,
+                -0.035863690904358786,
+                -0.10891360352160445,
+                -0.012517229475622841,
+                0.05615912370148034,
+                0.007438100398675862,
+                -0.03396646549868695,
+                -0.010620377865245724,
+                0.10030357349864137,
+                0.13055907134574832,
+                -0.08177076035836174,
+                -0.0795054842791216,
+                0.026442550782443307,
+                -0.06249086993570478,
+                -0.019204374535762448,
+                -0.061913995748119385,
+                -0.04551477576906903,
+                -0.04322909202334332,
+                0.022266032065399746,
+                0.027271762188736576,
+                -0.015262270061784638,
+                0.02110871895810946,
+                -0.0001378483389520759,
+                -0.0940316620101976,
+                0.1015210592140036,
+                0.006738437225959375,
+                0.024621455601574627,
+                0.010614833772450002,
+                -0.018752514122662434,
+                -0.027440922903421244,
+                -0.04705363349063318,
+                -0.024542437528335896,
+                0.029934769951159672,
+                -0.033615294813796784,
+                -0.10958251159472016,
+                0.026226566166434925,
+                -0.021841579628854094,
+                0.05153935533442597,
+                -0.008619538365641288,
+                0.0795343603190129,
+                -0.06563286903697561,
+                -0.01722462391332288,
+                0.07906951267065378,
+                -0.07877509821503452,
+                0.041714198101199924,
+                -0.03624231127738627,
+                -0.0016889751122142781,
+                0.046663008015893064,
+                0.038165019295824824,
+                -0.02562893453470397,
+                -0.05066766861839556,
+                0.029841446417594633,
+                0.020643755946504617,
+                0.0016430519168983701,
+                -0.07828302260943766,
+                0.09558360477493313,
+                0.03314039362058221,
+                -0.04039312160409379,
+                0.04013652354235798,
+                0.017611846830544835,
+                -0.00480937497185199,
+                -0.019507988105867215,
+                0.04334497342847879,
+                -0.05964636097456896,
+                -0.004625491306291968,
+                0.036210702976546945,
+                -0.03846836013764214,
+                0.04292477620851345,
+                -0.012577714009402146,
+                0.0003495998406295995,
+                0.01756642129140339,
+                0.0026553555752717884,
+                -0.07060247312860264,
+                0.004634995803652704,
+                -0.0386485324392494,
+                -0.004499105431170587,
+                -0.06512252292130147,
+                -0.0018008380845583804,
+                0.032150657274005276,
+                -0.01554572087015851,
+                -0.04428685326700286,
+                0.0061921989547515715,
+                0.04141614826615751,
+                -0.026372664741655765,
+                0.01641385523654459,
+                -0.036879127193449074,
+                -0.02199521517046114,
+                -0.03601631404647427,
+                -0.01630931473574507,
+                0.03105809988839041,
+                -0.08555649702975737,
+                -0.015567060028519694,
+                0.024950921417220193,
+                0.07928015582536853,
+                -0.03435469519340684,
+                -0.04805021397991204,
+                -0.10612133489082468,
+                0.08782461240016343,
+                0.0021671418162454614,
+                -0.05708680888849304
+              ],
+              "within_cosine_dispersion": 0.15019382018848584
+            },
+            "substrate": {
+              "status": "unavailable",
+              "reason": "no draft pixels after ignore/conflict exclusion",
+              "raw_draft_pixels": 0,
+              "valid_draft_pixels": 0,
+              "contributing_patches": 0,
+              "center": null,
+              "within_cosine_dispersion": null
+            }
+          },
+          "comparisons": [
+            {
+              "classes": [
+                "structure",
+                "residue"
+              ],
+              "center_cosine_distance": 0.39101139473420266,
+              "mean_within_cosine_dispersion": 0.20606818421106188,
+              "between_to_within_ratio": 1.8974855154433534,
+              "shared_contributing_patches": 4,
+              "status": "available",
+              "reason": "relative descriptor geometry, not recognition accuracy"
+            },
+            {
+              "classes": [
+                "structure",
+                "substrate"
+              ],
+              "center_cosine_distance": null,
+              "mean_within_cosine_dispersion": null,
+              "between_to_within_ratio": null,
+              "shared_contributing_patches": 0,
+              "status": "unavailable",
+              "reason": "one or both draft classes have no valid pixels"
+            },
+            {
+              "classes": [
+                "residue",
+                "substrate"
+              ],
+              "center_cosine_distance": null,
+              "mean_within_cosine_dispersion": null,
+              "between_to_within_ratio": null,
+              "shared_contributing_patches": 0,
+              "status": "unavailable",
+              "reason": "one or both draft classes have no valid pixels"
+            }
+          ],
+          "missing_classes": [
+            "substrate"
+          ],
+          "three_class_separability_status": "not_assessable",
+          "limitations": [
+            "Unlabelled pixels are unknown and never treated as substrate.",
+            "A 14-pixel patch may mix narrow residue, structure, shadows and unknown pixels.",
+            "DINO descriptors use global attention, so a patch descriptor is not purely local material response.",
+            "Drafts from another model are not independent human ground truth; no accuracy or class classifier is produced.",
+            "Per-image centres describe these two images only; no generalization or statistical significance is inferred."
+          ],
+          "provenance": {
+            "seed_dir": "dataset/seed_v0/realpart_img2",
+            "instances_sha256": "c65dd897e9f0f5cf801c5a73cbc841fe31d1954d10ce5f6689dded0d99dcc49c",
+            "points_sha256": "fa0aa62457a25c13818e41ed9faaa378c453038d970c432ddced67a313b06503",
+            "mask_files": [
+              {
+                "id": 1,
+                "label": "structure",
+                "ref": "masks/0001_structure.png",
+                "sha256": "838c8b9c7846e4c712db78076dde55399f92e20d5d861ae5731d9fb9c936249a"
+              },
+              {
+                "id": 2,
+                "label": "structure",
+                "ref": "masks/0002_structure.png",
+                "sha256": "f94710be8860dc8475da0a22c2b17859e0529e227726e5fdc8e52a8f74596671"
+              },
+              {
+                "id": 3,
+                "label": "structure",
+                "ref": "masks/0003_structure.png",
+                "sha256": "ca9e81828f5d1f4166fbcda4139ea0f7152120e0743dfbf7f40caef67866fb63"
+              },
+              {
+                "id": 10,
+                "label": "ignore",
+                "ref": "masks/0010_ignore.png",
+                "sha256": "6fd379a0ddfab75944905a0fe040749a68fded43a73c506aa785e466f6449187"
+              },
+              {
+                "id": 11,
+                "label": "ignore",
+                "ref": "masks/0011_ignore.png",
+                "sha256": "28cd1af134a7ef682bffa5c4b5f20aef0685c1a2c0f582733b23c26e8eb2cf13"
+              },
+              {
+                "id": 12,
+                "label": "ignore",
+                "ref": "masks/0012_ignore.png",
+                "sha256": "c5e974344b65467aa75819bb61d9413fd69897a6deb08bd53990c6899d54b3c1"
+              },
+              {
+                "id": 13,
+                "label": "ignore",
+                "ref": "masks/0013_ignore.png",
+                "sha256": "9a06c521568b11fd7a7955bd8f10f53edf122ac14549c9500e6d2cd111ac9f1d"
+              },
+              {
+                "id": 14,
+                "label": "ignore",
+                "ref": "masks/0014_ignore.png",
+                "sha256": "02455abd955d224bc65b3881db6f343f42110b79cf40421998ce451f0ed1dc96"
+              },
+              {
+                "id": 20,
+                "label": "residue",
+                "ref": "masks/0020_residue.png",
+                "sha256": "4fbf2ab506d56590984fb65986e48a5a3ccd62875d54a77beaf40aa9b12f9bdf"
+              },
+              {
+                "id": 21,
+                "label": "residue",
+                "ref": "masks/0021_residue.png",
+                "sha256": "2d56e21d2c49c42d454021468f7be4d18b7b1a4a41335e3e9d3a6805afb735bb"
+              }
+            ]
+          }
+        },
+        "training": false,
+        "classifier": false,
+        "labelled_accuracy": null,
+        "qualitative_scope": "Inspect feature grouping and draft relative distances; missing classes stay unavailable."
+      },
+      "interface_version": "probe-result-v1",
+      "annotation_status": "not_ground_truth",
+      "test_ground_truth_allowed": false,
+      "timing_scope": "synchronized infer including image read, computation and output writes; excludes model load; no warmup",
+      "memory_scope": "torch CUDA peak allocated/reserved during infer, includes resident model; excludes driver/context and other processes"
+    },
+    {
+      "task_id": "stage2-20261109T101923Z-71c07242",
+      "observation_id": "realpart_img1:d4ec9de39c45",
+      "frame_id": "realpart_img1",
+      "raw_image_ref": "inputs/realpart_img1.jpg",
+      "input_sha256": "d4ec9de39c4545a30888ace45d4638ee719e395350ea9b42ae7f8a60f2d30f93",
+      "probe_name": "patchcore",
+      "model_info": {
+        "model_name": "DINOv2 ViT-S/14 + PatchCore-style memory bank",
+        "model_version": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+        "weights_version": "dinov2_vits14_pretrain / LVD-142M",
+        "weights_ref": "weights/dinov2_vits14_pretrain.pth",
+        "weights_sha256": "b938bf1bc15cd2ec0feacfe3a1bb553fe8ea9ca46a7e1d8d00217f29aef60cd9",
+        "weights_bytes": 88283115,
+        "code_license": "Apache-2.0 (DINOv2 backbone)",
+        "weights_license": "Apache-2.0"
+      },
+      "started_at": "2026-11-09T10:19:57.994075+00:00",
+      "ended_at": "2026-11-09T10:19:58.300006+00:00",
+      "duration_ms": null,
+      "model_load_ms": 165.62859999976354,
+      "peak_allocated_mib": null,
+      "peak_reserved_mib": null,
+      "status": "blocked",
+      "status_reason": "No gold-standard clean reference photographs of the same design; real inference is blocked.",
+      "reason_codes": [
+        "missing-clean-reference"
+      ],
+      "output_files": [
+        {
+          "path": "failure.txt",
+          "sha256": "3b26f3d77bea3d89d818bafeccba2fdd2a69c46703e6d555da9c08fcbdc472d4",
+          "bytes": 839
+        },
+        {
+          "path": "gpu_memory_before_image.txt",
+          "sha256": "6630202e2da2c98567f27ee66cee0d370d2b590a3723fbd0fc5a98a2c462f3a3",
+          "bytes": 12
+        },
+        {
+          "path": "nvidia_smi_before_image.txt",
+          "sha256": "a45c31bc0c291ff1091a56d56ce303893affba57ba5c00896cde5c81055024f3",
+          "bytes": 1880
+        }
+      ],
+      "metrics": {
+        "blocked_check_duration_ms": 1.703799996903399
+      },
+      "interface_version": "probe-result-v1",
+      "annotation_status": "not_ground_truth",
+      "test_ground_truth_allowed": false,
+      "timing_scope": "synchronized infer including image read, computation and output writes; excludes model load; no warmup",
+      "memory_scope": "torch CUDA peak allocated/reserved during infer, includes resident model; excludes driver/context and other processes"
+    },
+    {
+      "task_id": "stage2-20261109T101923Z-71c07242",
+      "observation_id": "realpart_img2:591cfdadc06d",
+      "frame_id": "realpart_img2",
+      "raw_image_ref": "inputs/realpart_img2.jpg",
+      "input_sha256": "591cfdadc06dce57dfe70a769ca79f25c605b6d865ca49bba18a0da126db8369",
+      "probe_name": "patchcore",
+      "model_info": {
+        "model_name": "DINOv2 ViT-S/14 + PatchCore-style memory bank",
+        "model_version": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+        "weights_version": "dinov2_vits14_pretrain / LVD-142M",
+        "weights_ref": "weights/dinov2_vits14_pretrain.pth",
+        "weights_sha256": "b938bf1bc15cd2ec0feacfe3a1bb553fe8ea9ca46a7e1d8d00217f29aef60cd9",
+        "weights_bytes": 88283115,
+        "code_license": "Apache-2.0 (DINOv2 backbone)",
+        "weights_license": "Apache-2.0"
+      },
+      "started_at": "2026-11-09T10:19:58.311008+00:00",
+      "ended_at": "2026-11-09T10:19:58.585716+00:00",
+      "duration_ms": null,
+      "model_load_ms": 165.62859999976354,
+      "peak_allocated_mib": null,
+      "peak_reserved_mib": null,
+      "status": "blocked",
+      "status_reason": "No gold-standard clean reference photographs of the same design; real inference is blocked.",
+      "reason_codes": [
+        "missing-clean-reference"
+      ],
+      "output_files": [
+        {
+          "path": "failure.txt",
+          "sha256": "3b26f3d77bea3d89d818bafeccba2fdd2a69c46703e6d555da9c08fcbdc472d4",
+          "bytes": 839
+        },
+        {
+          "path": "gpu_memory_before_image.txt",
+          "sha256": "6630202e2da2c98567f27ee66cee0d370d2b590a3723fbd0fc5a98a2c462f3a3",
+          "bytes": 12
+        },
+        {
+          "path": "nvidia_smi_before_image.txt",
+          "sha256": "cbc63d882ae02948445a61c288ae810434d22799ceeb8aaf4cdd090e9fa17594",
+          "bytes": 1880
+        }
+      ],
+      "metrics": {
+        "blocked_check_duration_ms": 1.2658999985433184
+      },
+      "interface_version": "probe-result-v1",
+      "annotation_status": "not_ground_truth",
+      "test_ground_truth_allowed": false,
+      "timing_scope": "synchronized infer including image read, computation and output writes; excludes model load; no warmup",
+      "memory_scope": "torch CUDA peak allocated/reserved during infer, includes resident model; excludes driver/context and other processes"
+    },
+    {
+      "task_id": "stage2-20261109T101923Z-71c07242",
+      "observation_id": "synthetic_normal:08b62f7395cd",
+      "frame_id": "synthetic_normal",
+      "raw_image_ref": "dataset/stage2_synthetic/query_normal.png",
+      "input_sha256": "08b62f7395cdfdbc0ace1b4f86e6fa00d5c34984f88637ed1a57c4aafbf688a1",
+      "probe_name": "patchcore",
+      "model_info": {
+        "model_name": "DINOv2 ViT-S/14 + PatchCore-style memory bank",
+        "model_version": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+        "weights_version": "dinov2_vits14_pretrain / LVD-142M",
+        "weights_ref": "weights\\dinov2_vits14_pretrain.pth",
+        "weights_sha256": "b938bf1bc15cd2ec0feacfe3a1bb553fe8ea9ca46a7e1d8d00217f29aef60cd9",
+        "weights_bytes": 88283115,
+        "code_license": "Apache-2.0",
+        "weights_license": "Apache-2.0"
+      },
+      "started_at": "2026-11-09T10:19:58.596717+00:00",
+      "ended_at": "2026-11-09T10:20:00.727151+00:00",
+      "duration_ms": 1708.0156999982137,
+      "model_load_ms": 165.62859999976354,
+      "peak_allocated_mib": 123.498046875,
+      "peak_reserved_mib": 148.0,
+      "status": "ok",
+      "status_reason": "completed",
+      "reason_codes": [],
+      "output_files": [
+        {
+          "path": "gpu_memory_before_image.txt",
+          "sha256": "6630202e2da2c98567f27ee66cee0d370d2b590a3723fbd0fc5a98a2c462f3a3",
+          "bytes": 12
+        },
+        {
+          "path": "heatmap.npy",
+          "sha256": "49842a3a1249dcab5db8151f34adf5007deb7bec93ec5e9a4db98fb1fadd4662",
+          "bytes": 313728
+        },
+        {
+          "path": "heatmap.png",
+          "sha256": "2774aca3a7eb76122f9d770e2e22a37dae622c750f76b1e4dcd070fba84914e2",
+          "bytes": 22316
+        },
+        {
+          "path": "memory_bank.npy",
+          "sha256": "581597aab986bbabad159d9191af3d9e132f189ca198f2c509132e4f919b3420",
+          "bytes": 196736
+        },
+        {
+          "path": "memory_bank_indices.npy",
+          "sha256": "5117845e02df64746967695ad4e34e4b10291f582a0cd7ef8c39cd7549192c0a",
+          "bytes": 1152
+        },
+        {
+          "path": "nvidia_smi_before_image.txt",
+          "sha256": "cbc63d882ae02948445a61c288ae810434d22799ceeb8aaf4cdd090e9fa17594",
+          "bytes": 1880
+        },
+        {
+          "path": "overlay.png",
+          "sha256": "41796a9edd5dfdc2f3042de1198c2ed40a2f004a1961c6f41f76dbb964c2c096",
+          "bytes": 93460
+        },
+        {
+          "path": "patch_distances.npy",
+          "sha256": "c768c3c9c36fc17593500ce0653954a7bcdb7ad86b0df1fb129448da1e0e91b9",
+          "bytes": 1728
+        },
+        {
+          "path": "reference_provenance.json",
+          "sha256": "b1ed88948e91882771f0651ffdc77d3ebf5b1d9be3d879f833ac1cbdd5fb9766",
+          "bytes": 508
+        }
+      ],
+      "metrics": {
+        "patch_score_max": 28.816293716430664,
+        "patch_score_mean": 20.359210968017578,
+        "heatmap_score_max": 28.816293716430664,
+        "heatmap_score_mean": 20.35921287536621,
+        "feature_grid": [
+          20,
+          20
+        ],
+        "memory_bank_size": 128,
+        "memory_bank_cap": 128,
+        "memory_bank_identity": "ccc89ef6ca3bbdf8e6564f443a55936517c2414399bc2d890a110e780294495c",
+        "method": "frozen DINOv2 patch features; 3x3 local mean; unique farthest-first coreset; exact nearest Euclidean distance",
+        "canonical_patchcore": false,
+        "deviation": "DINOv2 replaces canonical PatchCore WideResNet backbone; no canonical performance claim",
+        "reference_provenance": [
+          {
+            "raw_image_ref": "dataset/stage2_synthetic/normal.png",
+            "sha256": "c74083562d123356fc52837a45475b0074361258acda078aae18d6ef37ed2344",
+            "design_id": "synthetic-periodic-v1",
+            "evidence_kind": "synthetic",
+            "feature_grid": [
+              19,
+              19
+            ],
+            "geometry": {
+              "feature_extract_seconds": 0.039243100000021514,
+              "input_width": 256,
+              "input_height": 256,
+              "padded_width": 266,
+              "padded_height": 266,
+              "patch_size": 14
+            }
+          }
+        ],
+        "reference_setup_seconds": 1.5628128999996989,
+        "cached_bank_build_seconds": 1.5628128999996989,
+        "first_infer_includes_reference_setup": true,
+        "inference_seconds": 0.04836980000254698,
+        "query_feature_extract_seconds": 0.02657779999935883,
+        "inference_timing_scope": "query read + frozen feature extraction + aggregation + nearest-bank distances + bilinear upsampling; excludes reference setup and output writes",
+        "visualization": {
+          "display_p99": 26.65348243713379,
+          "display_scale": 26.65348243713379,
+          "normalization": "per-image p99, clipped; only within-image visual contrast",
+          "cross_image_colors_comparable": false,
+          "raw_values": "Euclidean feature distances; not probabilities or material classes",
+          "upsampling": "bilinear patch-grid upsampling then crop to original dimensions"
+        },
+        "synthetic_only": true,
+        "training": false,
+        "network_parameters_updated": false,
+        "threshold_or_classifier_fitted": false
+      },
+      "interface_version": "probe-result-v1",
+      "annotation_status": "not_ground_truth",
+      "test_ground_truth_allowed": false,
+      "timing_scope": "synchronized infer including image read, computation and output writes; excludes model load; no warmup",
+      "memory_scope": "torch CUDA peak allocated/reserved during infer, includes resident model; excludes driver/context and other processes"
+    },
+    {
+      "task_id": "stage2-20261109T101923Z-71c07242",
+      "observation_id": "synthetic_foreign:f12d9e94c709",
+      "frame_id": "synthetic_foreign",
+      "raw_image_ref": "dataset/stage2_synthetic/query_with_spots.png",
+      "input_sha256": "f12d9e94c709b479831c957286c21ecc004e2c1766ec2613231f252d3b30f3ea",
+      "probe_name": "patchcore",
+      "model_info": {
+        "model_name": "DINOv2 ViT-S/14 + PatchCore-style memory bank",
+        "model_version": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+        "weights_version": "dinov2_vits14_pretrain / LVD-142M",
+        "weights_ref": "weights\\dinov2_vits14_pretrain.pth",
+        "weights_sha256": "b938bf1bc15cd2ec0feacfe3a1bb553fe8ea9ca46a7e1d8d00217f29aef60cd9",
+        "weights_bytes": 88283115,
+        "code_license": "Apache-2.0",
+        "weights_license": "Apache-2.0"
+      },
+      "started_at": "2026-11-09T10:20:00.761161+00:00",
+      "ended_at": "2026-11-09T10:20:01.366263+00:00",
+      "duration_ms": 94.22229999836418,
+      "model_load_ms": 165.62859999976354,
+      "peak_allocated_mib": 123.498046875,
+      "peak_reserved_mib": 148.0,
+      "status": "ok",
+      "status_reason": "completed",
+      "reason_codes": [],
+      "output_files": [
+        {
+          "path": "gpu_memory_before_image.txt",
+          "sha256": "bb34b73604091739f12ee8980c3c92d0f7600499cf9c69ef0da6696ffab75e17",
+          "bytes": 12
+        },
+        {
+          "path": "heatmap.npy",
+          "sha256": "b9d1c7491d03dacb9e69237440817f738a8a7b0c92c97028533f3769985401bf",
+          "bytes": 313728
+        },
+        {
+          "path": "heatmap.png",
+          "sha256": "558be0a811c3167745fafdc89b8978e3b0dcd6ae54b328e2536099b2bcf3f5ee",
+          "bytes": 26298
+        },
+        {
+          "path": "memory_bank.npy",
+          "sha256": "581597aab986bbabad159d9191af3d9e132f189ca198f2c509132e4f919b3420",
+          "bytes": 196736
+        },
+        {
+          "path": "memory_bank_indices.npy",
+          "sha256": "5117845e02df64746967695ad4e34e4b10291f582a0cd7ef8c39cd7549192c0a",
+          "bytes": 1152
+        },
+        {
+          "path": "nvidia_smi_before_image.txt",
+          "sha256": "7a9ae5b2ee5417bce876d7cfab83da3f2a9166221a9f655ebe6e39df038dbcd2",
+          "bytes": 1880
+        },
+        {
+          "path": "overlay.png",
+          "sha256": "3ea90b7bec348ed398bbfca430a765a5982333de8cb71ac9947cee96c6ea4e8c",
+          "bytes": 96330
+        },
+        {
+          "path": "patch_distances.npy",
+          "sha256": "1bfeb34dd45d562d47b5a335d5d5f438cc6c647ae55a9561a742fb446125c3b6",
+          "bytes": 1728
+        },
+        {
+          "path": "reference_provenance.json",
+          "sha256": "b1ed88948e91882771f0651ffdc77d3ebf5b1d9be3d879f833ac1cbdd5fb9766",
+          "bytes": 508
+        }
+      ],
+      "metrics": {
+        "patch_score_max": 51.305294036865234,
+        "patch_score_mean": 27.78497314453125,
+        "heatmap_score_max": 51.09132766723633,
+        "heatmap_score_mean": 27.784975051879883,
+        "feature_grid": [
+          20,
+          20
+        ],
+        "memory_bank_size": 128,
+        "memory_bank_cap": 128,
+        "memory_bank_identity": "ccc89ef6ca3bbdf8e6564f443a55936517c2414399bc2d890a110e780294495c",
+        "method": "frozen DINOv2 patch features; 3x3 local mean; unique farthest-first coreset; exact nearest Euclidean distance",
+        "canonical_patchcore": false,
+        "deviation": "DINOv2 replaces canonical PatchCore WideResNet backbone; no canonical performance claim",
+        "reference_provenance": [
+          {
+            "raw_image_ref": "dataset/stage2_synthetic/normal.png",
+            "sha256": "c74083562d123356fc52837a45475b0074361258acda078aae18d6ef37ed2344",
+            "design_id": "synthetic-periodic-v1",
+            "evidence_kind": "synthetic",
+            "feature_grid": [
+              19,
+              19
+            ],
+            "geometry": {
+              "feature_extract_seconds": 0.039243100000021514,
+              "input_width": 256,
+              "input_height": 256,
+              "padded_width": 266,
+              "padded_height": 266,
+              "patch_size": 14
+            }
+          }
+        ],
+        "reference_setup_seconds": 0.0,
+        "cached_bank_build_seconds": 1.5628128999996989,
+        "first_infer_includes_reference_setup": false,
+        "inference_seconds": 0.026229299997794442,
+        "query_feature_extract_seconds": 0.014186600001266925,
+        "inference_timing_scope": "query read + frozen feature extraction + aggregation + nearest-bank distances + bilinear upsampling; excludes reference setup and output writes",
+        "visualization": {
+          "display_p99": 48.450889587402344,
+          "display_scale": 48.450889587402344,
+          "normalization": "per-image p99, clipped; only within-image visual contrast",
+          "cross_image_colors_comparable": false,
+          "raw_values": "Euclidean feature distances; not probabilities or material classes",
+          "upsampling": "bilinear patch-grid upsampling then crop to original dimensions"
+        },
+        "synthetic_only": true,
+        "training": false,
+        "network_parameters_updated": false,
+        "threshold_or_classifier_fitted": false,
+        "synthetic_mask_ref": "dataset/stage2_synthetic/synthetic_mask.png",
+        "synthetic_mask_sha256": "94a48d43183fc8c4ec690a6ff58ed20861a70b658bd8d9c0703a690013b2ccc5",
+        "synthetic_patch_mean_inside": 45.589630126953125,
+        "synthetic_patch_mean_outside": 26.5985107421875,
+        "synthetic_patch_relative": 1.713991830927676,
+        "selfcheck_inside_gt_outside": true
+      },
+      "interface_version": "probe-result-v1",
+      "annotation_status": "not_ground_truth",
+      "test_ground_truth_allowed": false,
+      "timing_scope": "synchronized infer including image read, computation and output writes; excludes model load; no warmup",
+      "memory_scope": "torch CUDA peak allocated/reserved during infer, includes resident model; excludes driver/context and other processes"
+    }
+  ],
+  "lifecycle": [
+    {
+      "probe_name": "micro_sam",
+      "load_status": "ok",
+      "release_status": "ok",
+      "model_load_peak_allocated_mib": 357.58642578125,
+      "model_load_peak_reserved_mib": 402.0,
+      "model_load_ms": 9663.663899998937
+    },
+    {
+      "probe_name": "dino",
+      "load_status": "ok",
+      "release_status": "ok",
+      "model_load_peak_allocated_mib": 116.13916015625,
+      "model_load_peak_reserved_mib": 142.0,
+      "model_load_ms": 1578.012399997533
+    },
+    {
+      "probe_name": "patchcore",
+      "load_status": "ok",
+      "release_status": "ok",
+      "model_load_peak_allocated_mib": 32.0,
+      "model_load_peak_reserved_mib": 32.0,
+      "model_load_ms": 165.62859999976354
+    }
+  ],
+  "annotation_status": "not_ground_truth",
+  "test_ground_truth_allowed": false,
+  "status_counts": {
+    "ok": 6,
+    "blocked": 2,
+    "failed": 0
+  }
+}

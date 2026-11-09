@@ -1,0 +1,156 @@
+{
+  "status": "complete",
+  "predictor": "SAM2ImagePredictor",
+  "amg_used": false,
+  "source": {
+    "sam2_repository": "https://github.com/facebookresearch/sam2.git",
+    "sam2_commit": "2b90b9f5ceec907a1c18123530e92e794ad901a4",
+    "config": "configs/sam2.1/sam2.1_hiera_t.yaml",
+    "checkpoint_url": "https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_tiny.pt",
+    "checkpoint_file": "sam2.1_hiera_tiny.pt",
+    "checkpoint_sha256": "7402e0d864fa82708a20fbd15bc84245c2f26dff0eb43a4b5b93452deb34be69",
+    "input_sha256": {
+      "realpart_img1.jpg": "d4ec9de39c4545a30888ace45d4638ee719e395350ea9b42ae7f8a60f2d30f93",
+      "realpart_img2.jpg": "591cfdadc06dce57dfe70a769ca79f25c605b6d865ca49bba18a0da126db8369"
+    }
+  },
+  "image_sha256": "591cfdadc06dce57dfe70a769ca79f25c605b6d865ca49bba18a0da126db8369",
+  "width": 640,
+  "height": 480,
+  "config_sha256": "fa0aa62457a25c13818e41ed9faaa378c453038d970c432ddced67a313b06503",
+  "python": "3.12.4 (tags/v3.12.4:8e8a4ba, Jun  6 2024, 19:30:16) [MSC v.1940 64 bit (AMD64)]",
+  "executable": "D:\\大创\\3d\\MicroCleaningVision\\experiments\\probe_annotation\\.venv\\Scripts\\python.exe",
+  "base_commit": "a5b304903e54e008e948375d84f3f4c04a0290e0",
+  "branch": "exp/probe-annotation",
+  "packages": {
+    "torch": "2.7.1+cu128",
+    "torchvision": "0.22.1+cu128",
+    "numpy": "2.2.6",
+    "pillow": "11.2.1",
+    "sam-2": "1.0"
+  },
+  "code_sha256": {
+    "__init__.py": "03ada583273c016d6c8afb489c75877a37c0209d574f16be4c02ec57b437757b",
+    "export.py": "1d7179731606da6c42966f5c3b7873b6639186a62a46327f1b6b597e2d3a751f",
+    "manifest.py": "dfd547ab5442b84bb2981ee5d9a126310e623fab97e39d167719756d4cbbb638",
+    "predict.py": "15ff2b69fa8b26c8c0ee9af95c9ccec8985e1e3927f506c4a7398f7b3d33de0a",
+    "session.py": "b45dce3b3a3c2244ce96bdaca1e3ece34234f49230cb24b1b1cf34e116f54b50",
+    "test_annotation.py": "7a34db085259f04526d6f1a23ffd3fd2057e5e0291646c98f638fcefaf0d4f16",
+    "test_manifest.py": "010219b41d8ab37294976f8b8ed748214aa377612b4f6702de096b02a94ea3ff",
+    "verify.py": "d04b0b07d20a4ce5a4fb6104bd23ab79473d26eddad2958941c971c6f7afdbdb"
+  },
+  "model_load_seconds": 2.872294699998747,
+  "encode_seconds": 1.0918410000012955,
+  "prediction_records": [
+    {
+      "id": 1,
+      "decode_seconds": 0.5739141000012751,
+      "candidate_count": 1,
+      "selected": 0,
+      "model_internal_quality_scores_not_measured_accuracy": [
+        0.93359375
+      ]
+    },
+    {
+      "id": 2,
+      "decode_seconds": 0.058661499999288935,
+      "candidate_count": 1,
+      "selected": 0,
+      "model_internal_quality_scores_not_measured_accuracy": [
+        0.91015625
+      ]
+    },
+    {
+      "id": 3,
+      "decode_seconds": 0.06015599999955157,
+      "candidate_count": 1,
+      "selected": 0,
+      "model_internal_quality_scores_not_measured_accuracy": [
+        0.78125
+      ]
+    },
+    {
+      "id": 10,
+      "decode_seconds": 0.05849809999926947,
+      "candidate_count": 1,
+      "selected": 0,
+      "model_internal_quality_scores_not_measured_accuracy": [
+        0.71875
+      ]
+    },
+    {
+      "id": 11,
+      "decode_seconds": 0.060045799997169524,
+      "candidate_count": 1,
+      "selected": 0,
+      "model_internal_quality_scores_not_measured_accuracy": [
+        0.1787109375
+      ]
+    },
+    {
+      "id": 12,
+      "decode_seconds": 0.06716079999750946,
+      "candidate_count": 1,
+      "selected": 0,
+      "model_internal_quality_scores_not_measured_accuracy": [
+        0.341796875
+      ]
+    },
+    {
+      "id": 13,
+      "decode_seconds": 0.06068769999910728,
+      "candidate_count": 1,
+      "selected": 0,
+      "model_internal_quality_scores_not_measured_accuracy": [
+        0.302734375
+      ]
+    },
+    {
+      "id": 14,
+      "decode_seconds": 0.05305740000039805,
+      "candidate_count": 1,
+      "selected": 0,
+      "model_internal_quality_scores_not_measured_accuracy": [
+        0.39453125
+      ]
+    },
+    {
+      "id": 20,
+      "decode_seconds": 0.0576227999990806,
+      "candidate_count": 1,
+      "selected": 0,
+      "model_internal_quality_scores_not_measured_accuracy": [
+        0.75390625
+      ]
+    },
+    {
+      "id": 21,
+      "decode_seconds": 0.05735829999684938,
+      "candidate_count": 1,
+      "selected": 0,
+      "model_internal_quality_scores_not_measured_accuracy": [
+        0.83203125
+      ]
+    }
+  ],
+  "precision": "bfloat16 autocast",
+  "seed": 0,
+  "postprocessing": false,
+  "annotation_status": "draft",
+  "human_verified": false,
+  "test_ground_truth_allowed": false,
+  "counts": {
+    "structure": 3,
+    "residue": 2,
+    "substrate": 0,
+    "ignore": 5
+  },
+  "positive_points": 49,
+  "negative_points": 49,
+  "prompt_misses": [
+    10,
+    12,
+    14
+  ],
+  "elapsed_selection_to_export_seconds": 346.812
+}

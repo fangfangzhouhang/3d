@@ -1,0 +1,60 @@
+{
+  "schema": "probe-sources-v1",
+  "verified_at": "2026-11-09",
+  "repositories": [
+    {
+      "name": "sam",
+      "url": "https://github.com/facebookresearch/segment-anything.git",
+      "path": "vendor/segment-anything",
+      "commit": "dca509fe793f601edb92606367a655c15ac00fdf",
+      "code_license": "Apache-2.0"
+    },
+    {
+      "name": "dinov2",
+      "url": "https://github.com/facebookresearch/dinov2.git",
+      "path": "vendor/dinov2",
+      "commit": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+      "code_license": "Apache-2.0 for the selected DINOv2 backbone; unrelated CELL/XRay entrypoints not imported"
+    }
+  ],
+  "checkpoints": [
+    {
+      "name": "micro_sam_vit_b_lm",
+      "url": "https://uk1s3.embassy.ebi.ac.uk/public-datasets/bioimage.io/diplomatic-bug/1.2/files/vit_b.pt",
+      "path": "weights/micro_sam_vit_b_lm_1.2.pt",
+      "sha256": "ffe862fa5b58d78375506041faf0eb3927ced5b5391e8be383e6d7ac07aed924",
+      "bytes": 375023499,
+      "weights_license": "CC-BY-4.0",
+      "hash_basis": "local measurement agrees with official model rdf.yaml"
+    },
+    {
+      "name": "dinov2_vits14",
+      "url": "https://dl.fbaipublicfiles.com/dinov2/dinov2_vits14/dinov2_vits14_pretrain.pth",
+      "path": "weights/dinov2_vits14_pretrain.pth",
+      "sha256": "b938bf1bc15cd2ec0feacfe3a1bb553fe8ea9ca46a7e1d8d00217f29aef60cd9",
+      "bytes": 88283115,
+      "weights_license": "Apache-2.0",
+      "hash_basis": "local downloaded-file measurement; not claimed to be an upstream published checksum"
+    }
+  ],
+  "micro_sam": {
+    "source_commit": "cb88e8d662bc0d988ff8d5f6f03d42f13dc07a51",
+    "code_license": "MIT",
+    "registry_url": "https://github.com/computational-cell-analytics/micro-sam/blob/cb88e8d662bc0d988ff8d5f6f03d42f13dc07a51/micro_sam/util.py",
+    "model_card_url": "https://uk1s3.embassy.ebi.ac.uk/public-datasets/bioimage.io/diplomatic-bug/1.2/files/rdf.yaml",
+    "model_card_ref": "logs/stage2/microsam_rdf.yaml",
+    "architecture_ref": "logs/stage2/microsam_predictor_adaptor.py",
+    "architecture_sha256": "a5870bb3df17bf3f58dc95fd2d30c9078217c30f41ed4b2639c14728097552e1",
+    "runtime": "official SAM SamPredictor, same model and state loading as official BioImage.IO PredictorAdaptor; no micro_sam GUI/training dependency installed"
+  },
+  "patchcore": {
+    "official_code_url": "https://github.com/amazon-science/patchcore-inspection",
+    "official_code_license": "Apache-2.0",
+    "paper": "https://arxiv.org/abs/2106.08265",
+    "implementation": "local PatchCore-style DINOv2 variant; local mean aggregation, deterministic farthest-first coreset, exact Euclidean nearest neighbour; no upstream benchmark claims",
+    "additional_checkpoint": null,
+    "official_code_commit": "fcaa92f124fb1ad74a7acf56726decd4b27cbcad",
+    "official_license_url": "https://raw.githubusercontent.com/amazon-science/patchcore-inspection/fcaa92f124fb1ad74a7acf56726decd4b27cbcad/LICENSE"
+  },
+  "agpl_policy": "AGPL candidates are excluded before download/install/inference. None of the selected code or checkpoints is AGPL. Do not infer a weight license from its code license."
+}

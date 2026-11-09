@@ -1,0 +1,10 @@
+.venv*/
+.cache/
+vendor/
+weights/
+__pycache__/
+*.pyc
+*.pt
+*.pth
+*.onnx
+

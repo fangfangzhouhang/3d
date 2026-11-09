@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "D:\大创\3d\MicroCleaningVision\experiments\probe_annotation\probes\runner.py", line 294, in run_config
+    result = probe.infer(image, image_dir)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\大创\3d\MicroCleaningVision\experiments\probe_annotation\probes\patchcore.py", line 228, in infer
+    references, synthetic = self._references(image)
+                            ^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\大创\3d\MicroCleaningVision\experiments\probe_annotation\probes\patchcore.py", line 215, in _references
+    raise ProbeBlocked("No gold-standard clean reference photographs of the same design; real inference is blocked.", "missing-clean-reference")
+probes.base.ProbeBlocked: No gold-standard clean reference photographs of the same design; real inference is blocked.

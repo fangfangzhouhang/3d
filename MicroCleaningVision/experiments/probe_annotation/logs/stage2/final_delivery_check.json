@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "runtime_summary_sha256": "5044068d006eda7f23d4d3095ff00a40fbd389d5d6e9ec86257130cfc9ea484e",
+  "runtime_summary_unchanged": true,
+  "postrun_code_changes": [
+    {
+      "path": "probes/comparison.py",
+      "run_sha256": "f4f9d355440cc06de385bd219075a33afcd3b77c1be93c4d478c93c6cb5766e4",
+      "delivery_sha256": "dc1b88a614a108201b970dedf9db94140ea9c76d4fdb9033488194268d1a92d8"
+    }
+  ],
+  "runtime_source_snapshot": "logs/stage2/comparison_run_source.py",
+  "additional_tests": "probes/tests/test_comparison.py",
+  "distinct_test_cases_passed": 43,
+  "test_log_counts": {
+    "logs/stage2/all_tests.log": 34,
+    "logs/stage2/comparison_tests.log": 24
+  },
+  "repeated_framework_cases": 15,
+  "markdown_local_links_checked": 107,
+  "missing_links": [],
+  "document_sha256": {
+    "README.md": "8a5ca7998d4644d38c0e848a0016c7482d3e7dd0158cf3fa349663868963f905",
+    "MODELS.md": "61af611e7f36ffa64ed1d9a8e66700bba8152756e6cce6b32703a85909fcf06c",
+    "stage2_report.md": "bec6b12d85d134e599fa7fd803ba61d3d20e30f6fb94c9c7f4900c35d98813d6",
+    "failures.md": "dd292d92fa0de1f5d2b3c62db8404eb904cf081c362fb67ac1f09c85bce70722",
+    "baseline_handoff.md": "992d7efb5061d5fc4c7666dd6d094c89ffbfebabb067f3a3a756e1ffb218de3b",
+    "results/stage2/comparison.md": "cf53a3b77aaaeb52ae914937aa5cf4641799679a522de0004dbdb70829fb9bfb"
+  },
+  "branch": "exp/probe-annotation",
+  "head": "a5b304903e54e008e948375d84f3f4c04a0290e0",
+  "git_status": "?? MicroCleaningVision/experiments/",
+  "final_artifact_verification": "logs/stage2/artifact_verification_final.json"
+}

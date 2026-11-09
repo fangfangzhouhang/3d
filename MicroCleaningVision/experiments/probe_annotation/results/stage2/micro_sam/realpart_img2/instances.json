@@ -1,0 +1,634 @@
+[
+  {
+    "id": 1,
+    "label": "structure",
+    "name": "left circular platform visible top",
+    "positive": [
+      [
+        160,
+        256
+      ],
+      [
+        137,
+        235
+      ],
+      [
+        190,
+        274
+      ]
+    ],
+    "negative": [
+      [
+        163,
+        179
+      ],
+      [
+        242,
+        255
+      ],
+      [
+        160,
+        335
+      ],
+      [
+        83,
+        258
+      ]
+    ],
+    "sam2_area_px": 10389,
+    "micro_sam_area_px": 11536,
+    "intersection_px": 10318,
+    "union_px": 11607,
+    "model_output_agreement_iou_not_accuracy": 0.8889463254932368,
+    "mask_ref": "masks/0001_structure.png",
+    "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0001_structure.png",
+    "sam2_mask_sha256": "838c8b9c7846e4c712db78076dde55399f92e20d5d861ae5731d9fb9c936249a",
+    "decode_seconds": 0.0949092999981076,
+    "candidate_index": 0,
+    "model_internal_quality_scores_not_measured_accuracy": [
+      0.953125
+    ],
+    "annotation_status": "draft",
+    "human_verified": false
+  },
+  {
+    "id": 2,
+    "label": "structure",
+    "name": "horizontal narrow connection to circular platform",
+    "positive": [
+      [
+        10,
+        261
+      ],
+      [
+        51,
+        260
+      ],
+      [
+        90,
+        259
+      ],
+      [
+        106,
+        257
+      ]
+    ],
+    "negative": [
+      [
+        50,
+        236
+      ],
+      [
+        51,
+        286
+      ],
+      [
+        160,
+        255
+      ]
+    ],
+    "sam2_area_px": 2364,
+    "micro_sam_area_px": 2934,
+    "intersection_px": 2340,
+    "union_px": 2958,
+    "model_output_agreement_iou_not_accuracy": 0.7910750507099391,
+    "mask_ref": "masks/0002_structure.png",
+    "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0002_structure.png",
+    "sam2_mask_sha256": "f94710be8860dc8475da0a22c2b17859e0529e227726e5fdc8e52a8f74596671",
+    "decode_seconds": 0.06914749999850756,
+    "candidate_index": 0,
+    "model_internal_quality_scores_not_measured_accuracy": [
+      0.8515625
+    ],
+    "annotation_status": "draft",
+    "human_verified": false
+  },
+  {
+    "id": 3,
+    "label": "structure",
+    "name": "vertical straight groove and right horizontal branch",
+    "positive": [
+      [
+        474,
+        30
+      ],
+      [
+        474,
+        90
+      ],
+      [
+        475,
+        160
+      ],
+      [
+        475,
+        210
+      ],
+      [
+        478,
+        243
+      ],
+      [
+        479,
+        290
+      ],
+      [
+        479,
+        350
+      ],
+      [
+        480,
+        420
+      ],
+      [
+        480,
+        471
+      ],
+      [
+        540,
+        243
+      ],
+      [
+        620,
+        244
+      ]
+    ],
+    "negative": [
+      [
+        446,
+        95
+      ],
+      [
+        451,
+        326
+      ],
+      [
+        441,
+        200
+      ],
+      [
+        525,
+        190
+      ],
+      [
+        540,
+        290
+      ],
+      [
+        438,
+        260
+      ],
+      [
+        520,
+        452
+      ]
+    ],
+    "sam2_area_px": 19884,
+    "micro_sam_area_px": 20013,
+    "intersection_px": 17824,
+    "union_px": 22073,
+    "model_output_agreement_iou_not_accuracy": 0.8075023784714357,
+    "mask_ref": "masks/0003_structure.png",
+    "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0003_structure.png",
+    "sam2_mask_sha256": "ca9e81828f5d1f4166fbcda4139ea0f7152120e0743dfbf7f40caef67866fb63",
+    "decode_seconds": 0.07762580000053276,
+    "candidate_index": 0,
+    "model_internal_quality_scores_not_measured_accuracy": [
+      0.796875
+    ],
+    "annotation_status": "draft",
+    "human_verified": false
+  },
+  {
+    "id": 10,
+    "label": "ignore",
+    "name": "circular platform dark rim and root ambiguity",
+    "positive": [
+      [
+        109,
+        245
+      ],
+      [
+        130,
+        202
+      ],
+      [
+        197,
+        208
+      ],
+      [
+        222,
+        254
+      ],
+      [
+        199,
+        302
+      ],
+      [
+        158,
+        316
+      ]
+    ],
+    "negative": [
+      [
+        160,
+        255
+      ],
+      [
+        163,
+        180
+      ],
+      [
+        240,
+        256
+      ],
+      [
+        157,
+        339
+      ]
+    ],
+    "sam2_area_px": 4607,
+    "micro_sam_area_px": 3160,
+    "intersection_px": 2578,
+    "union_px": 5189,
+    "model_output_agreement_iou_not_accuracy": 0.4968201965696666,
+    "mask_ref": "masks/0010_ignore.png",
+    "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0010_ignore.png",
+    "sam2_mask_sha256": "6fd379a0ddfab75944905a0fe040749a68fded43a73c506aa785e466f6449187",
+    "decode_seconds": 0.05351909999808413,
+    "candidate_index": 0,
+    "model_internal_quality_scores_not_measured_accuracy": [
+      0.5078125
+    ],
+    "annotation_status": "draft",
+    "human_verified": false
+  },
+  {
+    "id": 11,
+    "label": "ignore",
+    "name": "straight groove left boundary dark shadow excluding obvious clumps",
+    "positive": [
+      [
+        455,
+        42
+      ],
+      [
+        456,
+        159
+      ],
+      [
+        457,
+        205
+      ],
+      [
+        459,
+        284
+      ],
+      [
+        460,
+        375
+      ],
+      [
+        461,
+        449
+      ]
+    ],
+    "negative": [
+      [
+        446,
+        95
+      ],
+      [
+        451,
+        326
+      ],
+      [
+        475,
+        90
+      ],
+      [
+        479,
+        350
+      ],
+      [
+        435,
+        190
+      ]
+    ],
+    "sam2_area_px": 2471,
+    "micro_sam_area_px": 5545,
+    "intersection_px": 2196,
+    "union_px": 5820,
+    "model_output_agreement_iou_not_accuracy": 0.37731958762886597,
+    "mask_ref": "masks/0011_ignore.png",
+    "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0011_ignore.png",
+    "sam2_mask_sha256": "28cd1af134a7ef682bffa5c4b5f20aef0685c1a2c0f582733b23c26e8eb2cf13",
+    "decode_seconds": 0.07691720000002533,
+    "candidate_index": 0,
+    "model_internal_quality_scores_not_measured_accuracy": [
+      0.5078125
+    ],
+    "annotation_status": "draft",
+    "human_verified": false
+  },
+  {
+    "id": 12,
+    "label": "ignore",
+    "name": "straight groove right boundary and branch shadow",
+    "positive": [
+      [
+        493,
+        45
+      ],
+      [
+        494,
+        173
+      ],
+      [
+        497,
+        224
+      ],
+      [
+        548,
+        228
+      ],
+      [
+        620,
+        258
+      ],
+      [
+        499,
+        304
+      ],
+      [
+        502,
+        390
+      ]
+    ],
+    "negative": [
+      [
+        475,
+        90
+      ],
+      [
+        479,
+        350
+      ],
+      [
+        540,
+        243
+      ],
+      [
+        521,
+        190
+      ],
+      [
+        520,
+        300
+      ]
+    ],
+    "sam2_area_px": 7136,
+    "micro_sam_area_px": 21152,
+    "intersection_px": 4070,
+    "union_px": 24218,
+    "model_output_agreement_iou_not_accuracy": 0.1680568172433727,
+    "mask_ref": "masks/0012_ignore.png",
+    "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0012_ignore.png",
+    "sam2_mask_sha256": "c5e974344b65467aa75819bb61d9413fd69897a6deb08bd53990c6899d54b3c1",
+    "decode_seconds": 0.07485830000223359,
+    "candidate_index": 0,
+    "model_internal_quality_scores_not_measured_accuracy": [
+      0.59375
+    ],
+    "annotation_status": "draft",
+    "human_verified": false
+  },
+  {
+    "id": 13,
+    "label": "ignore",
+    "name": "horizontal connection edge shadow",
+    "positive": [
+      [
+        50,
+        248
+      ],
+      [
+        50,
+        273
+      ],
+      [
+        99,
+        277
+      ]
+    ],
+    "negative": [
+      [
+        50,
+        260
+      ],
+      [
+        50,
+        232
+      ],
+      [
+        50,
+        289
+      ],
+      [
+        160,
+        255
+      ]
+    ],
+    "sam2_area_px": 2576,
+    "micro_sam_area_px": 1719,
+    "intersection_px": 1333,
+    "union_px": 2962,
+    "model_output_agreement_iou_not_accuracy": 0.450033760972316,
+    "mask_ref": "masks/0013_ignore.png",
+    "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0013_ignore.png",
+    "sam2_mask_sha256": "9a06c521568b11fd7a7955bd8f10f53edf122ac14549c9500e6d2cd111ac9f1d",
+    "decode_seconds": 0.07785839999996824,
+    "candidate_index": 0,
+    "model_internal_quality_scores_not_measured_accuracy": [
+      0.51171875
+    ],
+    "annotation_status": "draft",
+    "human_verified": false
+  },
+  {
+    "id": 14,
+    "label": "ignore",
+    "name": "ambiguous pits above platform; identity unknown",
+    "positive": [
+      [
+        110,
+        169
+      ],
+      [
+        94,
+        184
+      ],
+      [
+        134,
+        180
+      ]
+    ],
+    "negative": [
+      [
+        160,
+        255
+      ],
+      [
+        110,
+        140
+      ],
+      [
+        74,
+        164
+      ],
+      [
+        158,
+        176
+      ]
+    ],
+    "sam2_area_px": 8905,
+    "micro_sam_area_px": 2638,
+    "intersection_px": 2178,
+    "union_px": 9365,
+    "model_output_agreement_iou_not_accuracy": 0.23256807261078483,
+    "mask_ref": "masks/0014_ignore.png",
+    "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0014_ignore.png",
+    "sam2_mask_sha256": "02455abd955d224bc65b3881db6f343f42110b79cf40421998ce451f0ed1dc96",
+    "decode_seconds": 0.06625550000171643,
+    "candidate_index": 0,
+    "model_internal_quality_scores_not_measured_accuracy": [
+      0.65625
+    ],
+    "annotation_status": "draft",
+    "human_verified": false
+  },
+  {
+    "id": 20,
+    "label": "residue",
+    "name": "only visually obvious dark-green clump near upper straight-groove edge",
+    "positive": [
+      [
+        446,
+        94
+      ],
+      [
+        447,
+        106
+      ],
+      [
+        441,
+        89
+      ]
+    ],
+    "negative": [
+      [
+        429,
+        94
+      ],
+      [
+        474,
+        94
+      ],
+      [
+        456,
+        49
+      ],
+      [
+        456,
+        157
+      ],
+      [
+        450,
+        73
+      ],
+      [
+        448,
+        124
+      ],
+      [
+        461,
+        101
+      ]
+    ],
+    "sam2_area_px": 556,
+    "micro_sam_area_px": 358,
+    "intersection_px": 358,
+    "union_px": 556,
+    "model_output_agreement_iou_not_accuracy": 0.6438848920863309,
+    "mask_ref": "masks/0020_residue.png",
+    "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0020_residue.png",
+    "sam2_mask_sha256": "4fbf2ab506d56590984fb65986e48a5a3ccd62875d54a77beaf40aa9b12f9bdf",
+    "decode_seconds": 0.0711023000003479,
+    "candidate_index": 0,
+    "model_internal_quality_scores_not_measured_accuracy": [
+      0.75390625
+    ],
+    "annotation_status": "draft",
+    "human_verified": false
+  },
+  {
+    "id": 21,
+    "label": "residue",
+    "name": "only visually obvious dark-green clump near lower straight-groove edge",
+    "positive": [
+      [
+        449,
+        326
+      ],
+      [
+        444,
+        331
+      ],
+      [
+        454,
+        323
+      ]
+    ],
+    "negative": [
+      [
+        430,
+        326
+      ],
+      [
+        477,
+        326
+      ],
+      [
+        459,
+        301
+      ],
+      [
+        459,
+        357
+      ],
+      [
+        448,
+        310
+      ],
+      [
+        446,
+        344
+      ]
+    ],
+    "sam2_area_px": 326,
+    "micro_sam_area_px": 221,
+    "intersection_px": 221,
+    "union_px": 326,
+    "model_output_agreement_iou_not_accuracy": 0.6779141104294478,
+    "mask_ref": "masks/0021_residue.png",
+    "sam2_mask_ref": "dataset/seed_v0/realpart_img2/masks/0021_residue.png",
+    "sam2_mask_sha256": "2d56e21d2c49c42d454021468f7be4d18b7b1a4a41335e3e9d3a6805afb735bb",
+    "decode_seconds": 0.07995279999886407,
+    "candidate_index": 0,
+    "model_internal_quality_scores_not_measured_accuracy": [
+      0.734375
+    ],
+    "annotation_status": "draft",
+    "human_verified": false
+  }
+]

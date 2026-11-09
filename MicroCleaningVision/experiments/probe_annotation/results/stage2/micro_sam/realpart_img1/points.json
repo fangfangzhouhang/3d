@@ -1,0 +1,18 @@
+{
+  "schema": "sam2-points-v1",
+  "image_sha256": "d4ec9de39c4545a30888ace45d4638ee719e395350ea9b42ae7f8a60f2d30f93",
+  "author": "codex_visual_point_draft",
+  "annotations": [
+    {"id": 1, "label": "structure", "name": "central circular platform visible top", "positive": [[270,290],[250,281],[289,303]], "negative": [[217,290],[325,291],[272,346],[278,240]]},
+    {"id": 2, "label": "structure", "name": "central curved groove and narrow stem", "positive": [[307,20],[305,61],[316,81],[341,98],[340,114],[311,122],[272,121],[245,129],[239,144],[255,160],[278,177],[283,197],[280,227],[278,246]], "negative": [[289,48],[327,53],[374,104],[308,146],[220,144],[261,197],[299,223],[270,290]]},
+    {"id": 3, "label": "structure", "name": "right groove upper diagonal and vertical segment", "positive": [[452,20],[494,56],[545,90],[582,121],[584,158],[581,190],[578,213],[571,250],[551,272],[522,280]], "negative": [[487,15],[554,57],[620,166],[552,224],[491,269],[514,321]]},
+    {"id": 4, "label": "structure", "name": "left truncated groove visible portions", "positive": [[113,15],[69,30],[18,58],[9,114],[7,168],[15,201],[40,222],[47,247],[38,269],[10,278]], "negative": [[63,68],[40,142],[53,199],[77,239],[64,296]]},
+    {"id": 10, "label": "ignore", "name": "uncertain platform root and dark rim", "positive": [[233,285],[242,318],[273,334],[306,314],[312,286],[293,254]], "negative": [[271,290],[212,281],[327,326],[279,351]]},
+    {"id": 5, "label": "structure", "name": "right groove lower serpentine segment (same continuous feature as ID3)", "positive": [[506,300],[514,321],[551,338],[587,348],[611,367],[625,388],[602,408],[590,415],[558,436],[543,470]], "negative": [[482,314],[545,366],[637,403],[592,449],[571,250]]},
+    {"id": 11, "label": "ignore", "name": "central groove dark shadow edges", "positive": [[298,51],[298,77],[235,124],[232,146],[274,181],[273,229],[350,118]], "negative": [[271,290],[260,144],[374,135],[210,181]]},
+    {"id": 12, "label": "ignore", "name": "thin crack above central channel", "positive": [[214,60],[229,68],[256,69],[278,59]], "negative": [[224,43],[244,86],[270,87],[283,43]]},
+    {"id": 13, "label": "ignore", "name": "ambiguous pits left of circular platform", "positive": [[213,277],[215,310],[209,328]], "negative": [[270,290],[193,286],[227,316],[210,354]]},
+    {"id": 14, "label": "ignore", "name": "right groove dark edge and shadow ambiguity", "positive": [[516,87],[557,113],[568,207],[490,305],[582,402],[535,458]], "negative": [[545,90],[584,158],[506,300],[600,375],[523,438]]},
+    {"id": 15, "label": "ignore", "name": "left truncated groove dark outer edge", "positive": [[23,46],[1,185],[56,250],[29,282]], "negative": [[18,58],[9,114],[47,247],[72,278]]}
+  ]
+}

@@ -1,0 +1,31 @@
+Command: ['D:\\大创\\3d\\MicroCleaningVision\\experiments\\probe_annotation\\.venv\\Scripts\\python.exe', '-B', '-m', 'unittest', 'probes.tests.test_comparison', 'probes.tests.test_framework', '-v']
+UTC: 2026-11-09T10:32:36.420963+00:00
+test_absent_artifacts_and_historical_files_never_produce_broken_links (probes.tests.test_comparison.ComparisonTests.test_absent_artifacts_and_historical_files_never_produce_broken_links) ... ok
+test_blocked_uses_actual_reason_without_assuming_missing_reference (probes.tests.test_comparison.ComparisonTests.test_blocked_uses_actual_reason_without_assuming_missing_reference) ... ok
+test_cpu_success_does_not_turn_missing_cuda_measurement_into_no_inference (probes.tests.test_comparison.ComparisonTests.test_cpu_success_does_not_turn_missing_cuda_measurement_into_no_inference) ... ok
+test_custom_image_ids_keep_identity_and_sort_values_with_evidence (probes.tests.test_comparison.ComparisonTests.test_custom_image_ids_keep_identity_and_sort_values_with_evidence) ... ok
+test_failed_does_not_present_partial_overlay_as_success_evidence (probes.tests.test_comparison.ComparisonTests.test_failed_does_not_present_partial_overlay_as_success_evidence) ... ok
+test_micro_sam_and_dino_states_are_dynamic_and_findings_not_hardcoded (probes.tests.test_comparison.ComparisonTests.test_micro_sam_and_dino_states_are_dynamic_and_findings_not_hardcoded) ... ok
+test_real_patchcore_success_is_not_labelled_blocked (probes.tests.test_comparison.ComparisonTests.test_real_patchcore_success_is_not_labelled_blocked) ... ok
+test_synthetic_images_have_direct_explicitly_synthetic_links (probes.tests.test_comparison.ComparisonTests.test_synthetic_images_have_direct_explicitly_synthetic_links) ... ok
+test_unconfigured_probe_is_explicit_without_invented_state (probes.tests.test_comparison.ComparisonTests.test_unconfigured_probe_is_explicit_without_invented_state) ... ok
+test_bad_optional_import_becomes_blocked_env_not_batch_abort (probes.tests.test_framework.FrameworkTests.test_bad_optional_import_becomes_blocked_env_not_batch_abort) ... ok
+test_blocked_attempt_does_not_claim_gpu_inference_measurements (probes.tests.test_framework.FrameworkTests.test_blocked_attempt_does_not_claim_gpu_inference_measurements) ... ok
+test_blocked_failed_and_ok_images_continue_and_have_complete_records (probes.tests.test_framework.FrameworkTests.test_blocked_failed_and_ok_images_continue_and_have_complete_records) ... ok
+test_builtin_requires_explicit_device_before_output_creation (probes.tests.test_framework.FrameworkTests.test_builtin_requires_explicit_device_before_output_creation) ... ok
+test_escape_and_duplicate_ids_rejected_before_output_creation (probes.tests.test_framework.FrameworkTests.test_escape_and_duplicate_ids_rejected_before_output_creation) ... ok
+test_existing_outputs_are_preserved (probes.tests.test_framework.FrameworkTests.test_existing_outputs_are_preserved) ... ok
+test_gpu_occupied_preflight_prevents_load_without_importing_torch (probes.tests.test_framework.FrameworkTests.test_gpu_occupied_preflight_prevents_load_without_importing_torch) ... ok
+test_invalid_probe_outputs_are_failure_records (probes.tests.test_framework.FrameworkTests.test_invalid_probe_outputs_are_failure_records) ... ok
+test_load_and_release_failures_do_not_stop_next_probe (probes.tests.test_framework.FrameworkTests.test_load_and_release_failures_do_not_stop_next_probe) ... ok
+test_load_blocked_releases_and_records_all_images_then_continues (probes.tests.test_framework.FrameworkTests.test_load_blocked_releases_and_records_all_images_then_continues) ... ok
+test_missing_input_and_identity_mismatch_fail_before_infer (probes.tests.test_framework.FrameworkTests.test_missing_input_and_identity_mismatch_fail_before_infer) ... ok
+test_per_image_preflight_follows_synchronize_and_cache_release (probes.tests.test_framework.FrameworkTests.test_per_image_preflight_follows_synchronize_and_cache_release) ... ok
+test_registration_lookup_and_duplicate_rejection (probes.tests.test_framework.FrameworkTests.test_registration_lookup_and_duplicate_rejection) ... ok
+test_release_inventory_failure_still_runs_next_probe (probes.tests.test_framework.FrameworkTests.test_release_inventory_failure_still_runs_next_probe) ... ok
+test_unknown_probe_is_failed_but_later_probe_runs (probes.tests.test_framework.FrameworkTests.test_unknown_probe_is_failed_but_later_probe_runs) ... ok
+
+----------------------------------------------------------------------
+Ran 24 tests in 3.084s
+
+OK
