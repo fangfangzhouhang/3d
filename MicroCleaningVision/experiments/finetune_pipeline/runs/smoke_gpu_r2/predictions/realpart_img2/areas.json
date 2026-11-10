@@ -1,0 +1,43 @@
+{
+  "filename": "realpart_img2.jpg",
+  "part_id": "handoff_part_001",
+  "capture_batch": "handoff_batch_unknown_001",
+  "device": "unknown",
+  "width": 640,
+  "height": 480,
+  "split": "train",
+  "split_role": "placeholder_demo",
+  "annotation_status": "draft",
+  "human_verified": false,
+  "test_ground_truth_allowed": false,
+  "image_path": "D:\\大创\\3d\\MicroCleaningVision\\experiments\\probe_annotation\\inputs\\realpart_img2.jpg",
+  "instances_path": "D:\\大创\\3d\\MicroCleaningVision\\experiments\\probe_annotation\\dataset\\seed_v0\\realpart_img2\\instances.json",
+  "instance_counts": {
+    "structure": 3,
+    "residue": 2,
+    "substrate": 0,
+    "ignore": 5
+  },
+  "draft_unverified": true,
+  "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。",
+  "checkpoint": "best.pt",
+  "epoch": 6,
+  "measurement": "model_prediction_not_manual_annotation",
+  "area_unit": "pixels",
+  "total_pixels": 307200,
+  "classes": {
+    "structure": {
+      "index": 0,
+      "area_px": 307180
+    },
+    "residue": {
+      "index": 1,
+      "area_px": 20
+    },
+    "substrate": {
+      "index": 2,
+      "area_px": 0
+    }
+  },
+  "note": "预测覆盖整幅输入图；未知标注区域不因此成为人工真值，像素面积不是物理面积。"
+}

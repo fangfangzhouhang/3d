@@ -1,0 +1,67 @@
+{
+  "splits": {
+    "train": {
+      "image_count": 2,
+      "status": "有样本"
+    },
+    "val": {
+      "image_count": 0,
+      "status": "无样本"
+    },
+    "test": {
+      "image_count": 0,
+      "status": "无样本"
+    }
+  },
+  "images": [
+    {
+      "filename": "realpart_img1.jpg",
+      "split": "train",
+      "draft_unverified": true,
+      "instance_counts": {
+        "structure": 5,
+        "residue": 0,
+        "substrate": 0,
+        "ignore": 6
+      },
+      "class_pixels": {
+        "structure": 20144,
+        "residue": 0,
+        "substrate": 0,
+        "ignore": 287056
+      }
+    },
+    {
+      "filename": "realpart_img2.jpg",
+      "split": "train",
+      "draft_unverified": true,
+      "instance_counts": {
+        "structure": 3,
+        "residue": 2,
+        "substrate": 0,
+        "ignore": 5
+      },
+      "class_pixels": {
+        "structure": 25751,
+        "residue": 851,
+        "substrate": 0,
+        "ignore": 280598
+      }
+    }
+  ],
+  "instance_counts": {
+    "structure": 8,
+    "residue": 2,
+    "substrate": 0,
+    "ignore": 11
+  },
+  "class_status": {
+    "structure": "有样本",
+    "residue": "有样本",
+    "substrate": "无样本",
+    "ignore": "有样本"
+  },
+  "draft_unverified": true,
+  "manifest": "D:\\大创\\3d\\MicroCleaningVision\\experiments\\probe_annotation\\dataset\\seed_v0\\manifest.csv",
+  "split_policy": "manifest_unchanged; groups_do_not_cross_splits"
+}

@@ -1,0 +1,11 @@
+{
+  "command": [
+    "nvidia-smi",
+    "--query-compute-apps=pid,process_name,used_memory",
+    "--format=csv,noheader"
+  ],
+  "returncode": 0,
+  "stdout": "",
+  "stderr": "",
+  "external_processes": []
+}

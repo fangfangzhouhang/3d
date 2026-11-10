@@ -82,7 +82,9 @@ def set_seed(seed, threads):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.set_num_threads(threads)
-    torch.use_deterministic_algorithms(True)
+    # warn_only: CUDA cross-entropy backward (nll_loss2d) has no deterministic kernel;
+    # strict mode crashed the first GPU smoke step (runs/smoke_after_gpu_release traceback).
+    torch.use_deterministic_algorithms(True, warn_only=True)
     torch.backends.cudnn.benchmark = False
 
 

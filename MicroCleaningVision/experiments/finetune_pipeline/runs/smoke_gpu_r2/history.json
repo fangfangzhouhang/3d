@@ -1,0 +1,290 @@
+[
+  {
+    "epoch": 1,
+    "train_loss": 2.2537484169006348,
+    "train_iou": {
+      "structure": {
+        "status": "ok",
+        "iou": 0.0
+      },
+      "residue": {
+        "status": "ok",
+        "iou": 0.018204766183202842
+      },
+      "substrate": {
+        "status": "无样本",
+        "iou": null
+      }
+    },
+    "selection_split": "train",
+    "selection_score": 0.009102383091601421,
+    "learning_rate": 0.003,
+    "skipped_all_ignore_batches": 0,
+    "draft_unverified": true,
+    "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。"
+  },
+  {
+    "epoch": 2,
+    "train_loss": 2.2226192951202393,
+    "train_iou": {
+      "structure": {
+        "status": "ok",
+        "iou": 0.0
+      },
+      "residue": {
+        "status": "ok",
+        "iou": 0.018204766183202842
+      },
+      "substrate": {
+        "status": "无样本",
+        "iou": null
+      }
+    },
+    "selection_split": "train",
+    "selection_score": 0.009102383091601421,
+    "learning_rate": 0.003,
+    "skipped_all_ignore_batches": 0,
+    "draft_unverified": true,
+    "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。"
+  },
+  {
+    "epoch": 3,
+    "train_loss": 2.17684006690979,
+    "train_iou": {
+      "structure": {
+        "status": "ok",
+        "iou": 0.0
+      },
+      "residue": {
+        "status": "ok",
+        "iou": 0.018204766183202842
+      },
+      "substrate": {
+        "status": "无样本",
+        "iou": null
+      }
+    },
+    "selection_split": "train",
+    "selection_score": 0.009102383091601421,
+    "learning_rate": 0.003,
+    "skipped_all_ignore_batches": 0,
+    "draft_unverified": true,
+    "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。"
+  },
+  {
+    "epoch": 4,
+    "train_loss": 2.106966972351074,
+    "train_iou": {
+      "structure": {
+        "status": "ok",
+        "iou": 0.0
+      },
+      "residue": {
+        "status": "ok",
+        "iou": 0.018204766183202842
+      },
+      "substrate": {
+        "status": "无样本",
+        "iou": null
+      }
+    },
+    "selection_split": "train",
+    "selection_score": 0.009102383091601421,
+    "learning_rate": 0.003,
+    "skipped_all_ignore_batches": 0,
+    "draft_unverified": true,
+    "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。"
+  },
+  {
+    "epoch": 5,
+    "train_loss": 1.8700675964355469,
+    "train_iou": {
+      "structure": {
+        "status": "ok",
+        "iou": 0.9786077953193856
+      },
+      "residue": {
+        "status": "ok",
+        "iou": 0.0
+      },
+      "substrate": {
+        "status": "无样本",
+        "iou": null
+      }
+    },
+    "selection_split": "train",
+    "selection_score": 0.4893038976596928,
+    "learning_rate": 0.003,
+    "skipped_all_ignore_batches": 0,
+    "draft_unverified": true,
+    "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。"
+  },
+  {
+    "epoch": 6,
+    "train_loss": 1.1657297611236572,
+    "train_iou": {
+      "structure": {
+        "status": "ok",
+        "iou": 0.9817952338167971
+      },
+      "residue": {
+        "status": "ok",
+        "iou": 0.0
+      },
+      "substrate": {
+        "status": "无样本",
+        "iou": null
+      }
+    },
+    "selection_split": "train",
+    "selection_score": 0.49089761690839856,
+    "learning_rate": 0.003,
+    "skipped_all_ignore_batches": 0,
+    "draft_unverified": true,
+    "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。"
+  },
+  {
+    "epoch": 7,
+    "train_loss": 0.6593275666236877,
+    "train_iou": {
+      "structure": {
+        "status": "ok",
+        "iou": 0.9817952338167971
+      },
+      "residue": {
+        "status": "ok",
+        "iou": 0.0
+      },
+      "substrate": {
+        "status": "无样本",
+        "iou": null
+      }
+    },
+    "selection_split": "train",
+    "selection_score": 0.49089761690839856,
+    "learning_rate": 0.003,
+    "skipped_all_ignore_batches": 0,
+    "draft_unverified": true,
+    "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。"
+  },
+  {
+    "epoch": 8,
+    "train_loss": 0.9227150678634644,
+    "train_iou": {
+      "structure": {
+        "status": "ok",
+        "iou": 0.9817952338167971
+      },
+      "residue": {
+        "status": "ok",
+        "iou": 0.0
+      },
+      "substrate": {
+        "status": "无样本",
+        "iou": null
+      }
+    },
+    "selection_split": "train",
+    "selection_score": 0.49089761690839856,
+    "learning_rate": 0.003,
+    "skipped_all_ignore_batches": 0,
+    "draft_unverified": true,
+    "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。"
+  },
+  {
+    "epoch": 9,
+    "train_loss": 1.0541608333587646,
+    "train_iou": {
+      "structure": {
+        "status": "ok",
+        "iou": 0.9817952338167971
+      },
+      "residue": {
+        "status": "ok",
+        "iou": 0.0
+      },
+      "substrate": {
+        "status": "无样本",
+        "iou": null
+      }
+    },
+    "selection_split": "train",
+    "selection_score": 0.49089761690839856,
+    "learning_rate": 0.003,
+    "skipped_all_ignore_batches": 0,
+    "draft_unverified": true,
+    "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。"
+  },
+  {
+    "epoch": 10,
+    "train_loss": 0.9153410792350769,
+    "train_iou": {
+      "structure": {
+        "status": "ok",
+        "iou": 0.9817952338167971
+      },
+      "residue": {
+        "status": "ok",
+        "iou": 0.0
+      },
+      "substrate": {
+        "status": "无样本",
+        "iou": null
+      }
+    },
+    "selection_split": "train",
+    "selection_score": 0.49089761690839856,
+    "learning_rate": 0.003,
+    "skipped_all_ignore_batches": 0,
+    "draft_unverified": true,
+    "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。"
+  },
+  {
+    "epoch": 11,
+    "train_loss": 0.7733088135719299,
+    "train_iou": {
+      "structure": {
+        "status": "ok",
+        "iou": 0.9817952338167971
+      },
+      "residue": {
+        "status": "ok",
+        "iou": 0.0
+      },
+      "substrate": {
+        "status": "无样本",
+        "iou": null
+      }
+    },
+    "selection_split": "train",
+    "selection_score": 0.49089761690839856,
+    "learning_rate": 0.003,
+    "skipped_all_ignore_batches": 0,
+    "draft_unverified": true,
+    "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。"
+  },
+  {
+    "epoch": 12,
+    "train_loss": 0.6295403838157654,
+    "train_iou": {
+      "structure": {
+        "status": "ok",
+        "iou": 0.9817952338167971
+      },
+      "residue": {
+        "status": "ok",
+        "iou": 0.0
+      },
+      "substrate": {
+        "status": "无样本",
+        "iou": null
+      }
+    },
+    "selection_split": "train",
+    "selection_score": 0.49089761690839856,
+    "learning_rate": 0.003,
+    "skipped_all_ignore_batches": 0,
+    "draft_unverified": true,
+    "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。"
+  }
+]

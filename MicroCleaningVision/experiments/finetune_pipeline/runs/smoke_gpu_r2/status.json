@@ -1,0 +1,24 @@
+{
+  "status": "completed",
+  "device": "cuda",
+  "epochs": 12,
+  "seconds": 37.00509900000179,
+  "draft_unverified": true,
+  "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。",
+  "loss_first": 2.2537484169006348,
+  "loss_last": 0.6295403838157654,
+  "peak_allocated_bytes": 138946048,
+  "peak_reserved_bytes": 165675008,
+  "checkpoints": {
+    "best.pt": {
+      "path": "runs\\smoke_gpu_r2\\checkpoints\\best.pt",
+      "bytes": 1509709,
+      "sha256": "b622a186ac0f86cc761c94c0fd9f88733990b0cd5554ae6c8c7c980cd4f5bead"
+    },
+    "latest.pt": {
+      "path": "runs\\smoke_gpu_r2\\checkpoints\\latest.pt",
+      "bytes": 1509709,
+      "sha256": "b135ac89af1c8947cddd86abd667ae574ccd90215ff68e02df3a3f3cf5e06405"
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "augmentation_grid.png": {
+    "bytes": 1815214,
+    "sha256": "33def9f979fe35712eedf727d5edddafea7b79ffcc3d2b38c34267ac1aadd85b"
+  },
+  "checkpoints\\best.pt": {
+    "bytes": 1509709,
+    "sha256": "b622a186ac0f86cc761c94c0fd9f88733990b0cd5554ae6c8c7c980cd4f5bead"
+  },
+  "checkpoints\\latest.pt": {
+    "bytes": 1509709,
+    "sha256": "b135ac89af1c8947cddd86abd667ae574ccd90215ff68e02df3a3f3cf5e06405"
+  },
+  "config.json": {
+    "bytes": 1743,
+    "sha256": "02b0619633792e9afd39f7c1bdb01dd1ecbf0f4240f83f7203e07051dbdf1f13"
+  },
+  "data_audit.json": {
+    "bytes": 1511,
+    "sha256": "7d149c2cf2ad869ec486e9eb7ddf64fd4b8aa12fd3e00352061bbe4a6829ad81"
+  },
+  "environment.json": {
+    "bytes": 2054,
+    "sha256": "c38c614273c858ebe681f4aaffeb3fa37f11c5fdf8c8e75fbcff8a7cb0948de5"
+  },
+  "gpu_before_training.json": {
+    "bytes": 216,
+    "sha256": "d4856f5c383c9f629f50940e0476e881fd0cd4bb06daa4c43587bf0848d7b90e"
+  },
+  "history.json": {
+    "bytes": 8380,
+    "sha256": "18c52364f4b9e1ff03d73e615730106d4d73115a959bd2d6499c8ad7ad32a13b"
+  },
+  "input_hashes.json": {
+    "bytes": 2725,
+    "sha256": "08be19d212be5725df5f695574e0a5356a92c5354ad191741d9a37ffbbb721a9"
+  },
+  "metrics.json": {
+    "bytes": 13867,
+    "sha256": "b7d41b393b22f84e2a662efd1d9d3dcb5cf821fdcd51de774e0b2f72c392a35f"
+  },
+  "predictions\\realpart_img1\\areas.json": {
+    "bytes": 1414,
+    "sha256": "c3586fc4850cee1ad86c84be6883a31c506dedcdc25fbf12306091fc45018611"
+  },
+  "predictions\\realpart_img1\\overlay.png": {
+    "bytes": 485853,
+    "sha256": "4d5f93b0b5362baae8e4836efad77952e1883a0ba0c2faf942705d0c31cf6535"
+  },
+  "predictions\\realpart_img1\\semantic.png": {
+    "bytes": 408,
+    "sha256": "763db72bf76e6baaa877b5d9867c25954cf0d4ba002dd7f299066da2b1595d6e"
+  },
+  "predictions\\realpart_img2\\areas.json": {
+    "bytes": 1414,
+    "sha256": "1520a1c1f85d1ad676139ad3acf59d2d71b235383577c0086d9caf1509671f31"
+  },
+  "predictions\\realpart_img2\\overlay.png": {
+    "bytes": 451331,
+    "sha256": "0d3d5e15147d1b93d941ac1b107e6cc4b032401ab0724f78c1813ed4c881a3d1"
+  },
+  "predictions\\realpart_img2\\semantic.png": {
+    "bytes": 396,
+    "sha256": "67d37c5da6730bfddb9fbe4d9ab674448b6bc1953605885d7f1a77fa82e7b551"
+  },
+  "semantic_labels\\realpart_img1.png": {
+    "bytes": 4554,
+    "sha256": "4d6ed606c14f416386ff3cb203ba11e96a5e12c36fbff9eca388797f04e986ba"
+  },
+  "semantic_labels\\realpart_img2.png": {
+    "bytes": 3843,
+    "sha256": "9a86236f97a209ca0477cfe66dd3483309ce39b8c68a84f6f5de4329b6b8005e"
+  },
+  "status.json": {
+    "bytes": 870,
+    "sha256": "e7134b8916f873fe0439e1511b691c1502dcda6394a2fffca03600ff5fb4e201"
+  }
+}

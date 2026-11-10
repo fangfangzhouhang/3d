@@ -1,0 +1,11 @@
+{
+  "tests": 44,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "seconds": 12.36501579999458,
+  "success": true,
+  "device": "cpu",
+  "inputs": "synthetic fixtures; no GPU smoke claim",
+  "log": "evidence\\muse_verify.log"
+}
