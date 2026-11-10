@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "purpose": "正式训练模板，null 项须由负责人依据已核验数据与实验方案填写",
+  "mode": "formal",
+  "seed": null,
+  "device": "cuda",
+  "num_threads": 2,
+  "classes": "configs/classes.json",
+  "manifest": null,
+  "images_root": null,
+  "model": {"name": null, "params": {}},
+  "loss": {"name": "ce_dice", "params": {}},
+  "optimizer": {"name": null, "params": {"lr": null}},
+  "scheduler": null,
+  "epochs": null,
+  "batch_size": null,
+  "preprocess": {"max_side": null, "pad_multiple": 32, "mean": null, "std": null, "image_fill": [0, 0, 0]},
+  "augmentation": {},
+  "augmentation_preview_count": 3
+}

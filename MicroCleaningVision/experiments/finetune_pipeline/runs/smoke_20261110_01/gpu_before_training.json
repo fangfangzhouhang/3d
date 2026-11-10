@@ -1,0 +1,17 @@
+{
+  "command": [
+    "nvidia-smi",
+    "--query-compute-apps=pid,process_name,used_memory",
+    "--format=csv,noheader"
+  ],
+  "returncode": 0,
+  "stdout": "35492, C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1103.4239.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe, [N/A]\n",
+  "stderr": "",
+  "external_processes": [
+    {
+      "pid": 35492,
+      "process_name": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1103.4239.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+      "used_memory": "[N/A]"
+    }
+  ]
+}

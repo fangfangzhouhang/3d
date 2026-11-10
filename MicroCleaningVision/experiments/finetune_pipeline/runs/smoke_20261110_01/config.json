@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "purpose": "管线连通性验证（过拟合检查）；全部数值为冒烟用，非定版",
+  "mode": "smoke",
+  "seed": 20261110,
+  "device": "cuda",
+  "num_threads": 2,
+  "classes": "configs/classes.json",
+  "manifest": "../probe_annotation/dataset/seed_v0/manifest.csv",
+  "images_root": "../probe_annotation/inputs",
+  "model": {
+    "name": "tiny_unet",
+    "params": {
+      "base_channels": 8
+    }
+  },
+  "loss": {
+    "name": "ce_dice",
+    "params": {}
+  },
+  "optimizer": {
+    "name": "Adam",
+    "params": {
+      "lr": 0.003
+    }
+  },
+  "scheduler": null,
+  "epochs": 12,
+  "batch_size": 2,
+  "preprocess": {
+    "max_side": 320,
+    "pad_multiple": 32,
+    "mean": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "std": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "image_fill": [
+      0,
+      0,
+      0
+    ]
+  },
+  "augmentation": {
+    "hflip_p": 0.5,
+    "vflip_p": 0.5,
+    "rotate90_p": 0.25,
+    "rotate90_choices": [
+      1,
+      2,
+      3
+    ],
+    "rotate_degrees": [
+      -4,
+      4
+    ],
+    "crop_fraction": [
+      0.9,
+      1.0
+    ],
+    "scale_range": [
+      0.9,
+      1.1
+    ],
+    "brightness": [
+      0.95,
+      1.05
+    ],
+    "contrast": [
+      0.95,
+      1.05
+    ],
+    "gamma": [
+      0.95,
+      1.05
+    ],
+    "blur_radius": [
+      0,
+      0.4
+    ],
+    "noise_std": [
+      0,
+      0.006
+    ]
+  },
+  "augmentation_preview_count": 3,
+  "pending": {
+    "final_backbone": null,
+    "formal_hyperparameters": null,
+    "imbalance_strategy": null,
+    "deployment_model": null,
+    "onnx_target": "CPU i3-5005U；待模型与部署规格确认"
+  }
+}

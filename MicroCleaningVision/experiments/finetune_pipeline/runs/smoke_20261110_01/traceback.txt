@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "D:\大创\3d\MicroCleaningVision\experiments\finetune_pipeline\train.py", line 151, in run
+    gpu_guard(output)
+  File "D:\大创\3d\MicroCleaningVision\experiments\finetune_pipeline\runtime.py", line 72, in gpu_guard
+    raise RuntimeError(f"GPU_BLOCKED: external compute processes or query failure: {external or result.stderr}")
+RuntimeError: GPU_BLOCKED: external compute processes or query failure: [{'pid': 35492, 'process_name': 'C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1103.4239.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe', 'used_memory': '[N/A]'}]

@@ -1,0 +1,29 @@
+{
+  "python": "3.12.4 (tags/v3.12.4:8e8a4ba, Jun  6 2024, 19:30:16) [MSC v.1940 64 bit (AMD64)]",
+  "executable": "D:\\大创\\3d\\MicroCleaningVision\\experiments\\probe_annotation\\.venv\\Scripts\\python.exe",
+  "torch": "2.7.1+cu128",
+  "numpy": "2.2.6",
+  "pillow": "11.2.1",
+  "git_head": "18aa016cc4047c7a35117c84b3c8acb8e2a54525",
+  "git_branch": "exp/finetune-pipeline",
+  "source_sha256": {
+    "__init__.py": "b15106c028f4cefc609291a96f3c0cfa987597a457b68ec9a275b7c4b2b762ed",
+    "augment.py": "8c88f90b547cc9aec4785de57794940687f7d5cbdf07814d778a8824e54a8e57",
+    "data.py": "16705f2725a46edccea05f19573d9234fd612f6a49d94243241874b3ae989104",
+    "evaluation.py": "8c91db1f720e20c82f33764291043703d0b3a9fd499df53585cbcbebc0769418",
+    "export.py": "c7853c031f8225b46b4c6faa01e712ba220e7e227d6557e4007f5d3ca0d2ea81",
+    "losses.py": "d38bb63fb5588b2f05b63b0046c33d8ec7b42c1cdcc0fb7ecc4cc4761ac25e7f",
+    "models.py": "f669d1a11d83457d65e14a97334ebcb426dfbbeb357209f22f412a549f2acc3e",
+    "predict.py": "cfab9c05210e81664be1a1c0b44c6f1485707f98aff46cb08d732492727f1022",
+    "preprocess.py": "1e20b256a864d296bb528f85bdd022a41deac7dd475c2d29d286d062e488e0c1",
+    "run_tests.py": "8592432761d80a67ed2944d45e5b0df5fe8762af3cdc41cfab464045bcf8ecfc",
+    "runtime.py": "fe9d0f22b534ae6311f4a4225806125f905b93e367cf6ca0fd48764f3635fed5",
+    "train.py": "d309c8622f6f3f45d9c111c4a9e730945e6ab9989175e9173fae43e671f5976a",
+    "verify_scope.py": "e9fbcc7e9bafe09b3371e2cd29c4d09f06467bb2b97af551a4dcdfb6218cc269",
+    "visuals.py": "61c83c4802e44790b6f24a373597bd089cc5d90bb278e72ebd0da0e07ecf79b7"
+  },
+  "manifest_path": "D:\\大创\\3d\\MicroCleaningVision\\experiments\\probe_annotation\\dataset\\seed_v0\\manifest.csv",
+  "manifest_sha256": "5c471ad53bf2cd625d42dadceb784efb551a6ab67b9683c4c8214003985db7c0",
+  "classes_path": "D:\\大创\\3d\\MicroCleaningVision\\experiments\\finetune_pipeline\\configs\\classes.json",
+  "classes_sha256": "71d1fa7f992b41dd639422a138b91ea7a2ad415baa784d7458888935a84e17d5"
+}

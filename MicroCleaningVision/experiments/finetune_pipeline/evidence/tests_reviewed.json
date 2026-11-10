@@ -1,0 +1,11 @@
+{
+  "tests": 43,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "seconds": 11.02675299999828,
+  "success": true,
+  "device": "cpu",
+  "inputs": "synthetic fixtures; no GPU smoke claim",
+  "log": "evidence\\tests_reviewed.log"
+}

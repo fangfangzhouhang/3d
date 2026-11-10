@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.png -text
+*.pt -text
+# Preserve recorded evidence bytes and their SHA256 across checkouts/platforms.
+evidence/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+runs/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

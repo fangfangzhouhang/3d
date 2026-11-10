@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "definition_status": "当前任务约定；残留材料定义与类别终局待老师确认",
+  "classes": [
+    {"name": "structure", "index": 0, "priority": 2, "color": [50, 180, 255]},
+    {"name": "residue", "index": 1, "priority": 3, "color": [255, 90, 70]},
+    {"name": "substrate", "index": 2, "priority": 1, "color": [80, 210, 120]}
+  ],
+  "ignore": {"name": "ignore", "index": 255, "priority": 4, "color": [150, 150, 150]}
+}

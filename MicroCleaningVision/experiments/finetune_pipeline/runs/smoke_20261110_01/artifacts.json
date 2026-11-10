@@ -1,0 +1,54 @@
+{
+  "augmentation_grid.png": {
+    "bytes": 1815214,
+    "sha256": "33def9f979fe35712eedf727d5edddafea7b79ffcc3d2b38c34267ac1aadd85b"
+  },
+  "config.json": {
+    "bytes": 1743,
+    "sha256": "02b0619633792e9afd39f7c1bdb01dd1ecbf0f4240f83f7203e07051dbdf1f13"
+  },
+  "data_audit.json": {
+    "bytes": 1511,
+    "sha256": "7d149c2cf2ad869ec486e9eb7ddf64fd4b8aa12fd3e00352061bbe4a6829ad81"
+  },
+  "environment.json": {
+    "bytes": 2054,
+    "sha256": "f631a064475b80b258a94a8d1a91ee29c6f12a4d68c70b70e4832a978613633f"
+  },
+  "events.jsonl": {
+    "bytes": 1984,
+    "sha256": "18986175099271010dd7c060f51e009d20c827307e276dd9863ff9aa73da3c37"
+  },
+  "gpu_before_training.json": {
+    "bytes": 520,
+    "sha256": "5a7cab5b245af81e8c73d57840051debd166b2ee17c0cbc1db3a52c0ee32de93"
+  },
+  "input_hashes.json": {
+    "bytes": 2725,
+    "sha256": "08be19d212be5725df5f695574e0a5356a92c5354ad191741d9a37ffbbb721a9"
+  },
+  "metrics.json": {
+    "bytes": 722,
+    "sha256": "cd107d150abb51b13200b32f19fdefd2d27f7005af89a169803a2ada206ee088"
+  },
+  "run.log": {
+    "bytes": 1984,
+    "sha256": "18986175099271010dd7c060f51e009d20c827307e276dd9863ff9aa73da3c37"
+  },
+  "semantic_labels\\realpart_img1.png": {
+    "bytes": 4554,
+    "sha256": "4d6ed606c14f416386ff3cb203ba11e96a5e12c36fbff9eca388797f04e986ba"
+  },
+  "semantic_labels\\realpart_img2.png": {
+    "bytes": 3843,
+    "sha256": "9a86236f97a209ca0477cfe66dd3483309ce39b8c68a84f6f5de4329b6b8005e"
+  },
+  "status.json": {
+    "bytes": 472,
+    "sha256": "e5de53aa13c9af069732a3c3753b148a3b52c4a2cd61d0b8204e681162c64803"
+  },
+  "traceback.txt": {
+    "bytes": 610,
+    "sha256": "07af1f5151883b384179949589c6af3fd94663d8ff456351f764b1f26763721c"
+  }
+}

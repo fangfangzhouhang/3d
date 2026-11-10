@@ -1,0 +1,48 @@
+test_flips_and_quarter_turns_have_exact_landmark_locations (test_augment.AugmentationTests.test_flips_and_quarter_turns_have_exact_landmark_locations) ... ok
+test_full_configuration_is_reproducible_pixel_for_pixel (test_augment.AugmentationTests.test_full_configuration_is_reproducible_pixel_for_pixel) ... ok
+test_invalid_parameters_fail_instead_of_silent_identity (test_augment.AugmentationTests.test_invalid_parameters_fail_instead_of_silent_identity) ... ok
+test_photometry_leaves_mask_unchanged (test_augment.AugmentationTests.test_photometry_leaves_mask_unchanged) ... ok
+test_random_crop_alignment_and_changed_extent (test_augment.AugmentationTests.test_random_crop_alignment_and_changed_extent) ... ok
+test_scale_alignment_and_nearest_class_values (test_augment.AugmentationTests.test_scale_alignment_and_nearest_class_values) ... ok
+test_small_rotation_alignment_expected_point_and_unknown_fill (test_augment.AugmentationTests.test_small_rotation_alignment_expected_point_and_unknown_fill) ... ok
+test_normalization_must_be_explicit (test_augment.PreprocessTests.test_normalization_must_be_explicit) ... ok
+test_odd_size_padding_is_ignore_and_restored_shape_exact (test_augment.PreprocessTests.test_odd_size_padding_is_ignore_and_restored_shape_exact) ... ok
+test_resize_padding_normalization_and_inverse_coordinates (test_augment.PreprocessTests.test_resize_padding_normalization_and_inverse_coordinates) ... ok
+test_conflicting_schema_is_rejected (test_data.CompositionTests.test_conflicting_schema_is_rejected) ... ok
+test_overlap_priority_is_independent_of_instance_order (test_data.CompositionTests.test_overlap_priority_is_independent_of_instance_order) ... ok
+test_uncovered_is_ignore_even_if_lowest_priority_class_exists (test_data.CompositionTests.test_uncovered_is_ignore_even_if_lowest_priority_class_exists) ... ok
+test_unknown_label_and_bad_shape_are_rejected (test_data.CompositionTests.test_unknown_label_and_bad_shape_are_rejected) ... ok
+test_mask_hash_mismatch_is_rejected (test_data.DatasetTests.test_mask_hash_mismatch_is_rejected) ... ok
+test_mask_path_cannot_escape_annotation_directory (test_data.DatasetTests.test_mask_path_cannot_escape_annotation_directory) ... ok
+test_missing_class_empty_split_and_audit (test_data.DatasetTests.test_missing_class_empty_split_and_audit) ... ok
+test_same_epoch_is_reproducible_and_does_not_mutate_inputs (test_data.DatasetTests.test_same_epoch_is_reproducible_and_does_not_mutate_inputs) ... ok
+test_distinct_groups_and_same_split_linked_groups_are_accepted (test_data.SplitTests.test_distinct_groups_and_same_split_linked_groups_are_accepted) ... ok
+test_either_part_batch_or_explicit_group_cannot_cross_split (test_data.SplitTests.test_either_part_batch_or_explicit_group_cannot_cross_split) ... ok
+test_missing_group_is_rejected (test_data.SplitTests.test_missing_group_is_rejected) ... ok
+test_absent_class_is_no_samples_and_false_positives_remain (test_model_eval.MainlineEvaluationTests.test_absent_class_is_no_samples_and_false_positives_remain) ... ok
+test_bad_shape_and_unknown_labels_fail (test_model_eval.MainlineEvaluationTests.test_bad_shape_and_unknown_labels_fail) ... ok
+test_empty_split_and_all_ignore_are_no_samples (test_model_eval.MainlineEvaluationTests.test_empty_split_and_all_ignore_are_no_samples) ... ok
+test_import_is_original_source_and_does_not_install_global_cv2 (test_model_eval.MainlineEvaluationTests.test_import_is_original_source_and_does_not_install_global_cv2) ... ok
+test_known_values_and_ignore_pixels_excluded (test_model_eval.MainlineEvaluationTests.test_known_values_and_ignore_pixels_excluded) ... ok
+test_micro_aggregation_includes_false_positive_from_absent_image (test_model_eval.MainlineEvaluationTests.test_micro_aggregation_includes_false_positive_from_absent_image) ... ok
+test_all_ignore_is_finite_zero_with_valid_backward (test_model_eval.ModelLossTests.test_all_ignore_is_finite_zero_with_valid_backward) ... ok
+test_decoder_upsamples_by_exact_nearest_replication (test_model_eval.ModelLossTests.test_decoder_upsamples_by_exact_nearest_replication) ... ok
+test_default_loss_is_requested_unweighted_sum (test_model_eval.ModelLossTests.test_default_loss_is_requested_unweighted_sum) ... ok
+test_export_is_only_a_pending_interface (test_model_eval.ModelLossTests.test_export_is_only_a_pending_interface) ... ok
+test_ignore_logits_do_not_change_loss_or_receive_gradient (test_model_eval.ModelLossTests.test_ignore_logits_do_not_change_loss_or_receive_gradient) ... ok
+test_invalid_class_target_is_rejected (test_model_eval.ModelLossTests.test_invalid_class_target_is_rejected) ... ok
+test_loss_registry_is_replaceable (test_model_eval.ModelLossTests.test_loss_registry_is_replaceable) ... ok
+test_model_registry_allows_new_factory_without_training_branch (test_model_eval.ModelLossTests.test_model_registry_allows_new_factory_without_training_branch) ... ok
+test_pending_backbone_is_explicit_and_no_model_loaded (test_model_eval.ModelLossTests.test_pending_backbone_is_explicit_and_no_model_loaded) ... ok
+test_unet_shape_and_real_backward_on_odd_size (test_model_eval.ModelLossTests.test_unet_shape_and_real_backward_on_odd_size) ... ok
+test_formal_refuses_unreviewed_and_placeholder (test_pipeline.PipelineTests.test_formal_refuses_unreviewed_and_placeholder) ... ok
+test_formal_template_fails_pending_values (test_pipeline.PipelineTests.test_formal_template_fails_pending_values) ... ok
+test_gpu_external_process_including_gui_is_blocked (test_pipeline.PipelineTests.test_gpu_external_process_including_gui_is_blocked) ... ok
+test_output_cannot_escape_or_overwrite (test_pipeline.PipelineTests.test_output_cannot_escape_or_overwrite) ... ok
+test_synthetic_cpu_complete_chain_and_standalone_predict (test_pipeline.PipelineTests.test_synthetic_cpu_complete_chain_and_standalone_predict) ... ok
+test_variable_shape_batch_pads_only_ignore_targets (test_pipeline.PipelineTests.test_variable_shape_batch_pads_only_ignore_targets) ... ok
+
+----------------------------------------------------------------------
+Ran 43 tests in 8.155s
+
+OK

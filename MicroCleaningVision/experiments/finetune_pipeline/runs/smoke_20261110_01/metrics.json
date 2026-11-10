@@ -1,0 +1,12 @@
+{
+  "status": "blocked",
+  "error": "GPU_BLOCKED: external compute processes or query failure: [{'pid': 35492, 'process_name': 'C:\\\\Program Files\\\\WindowsApps\\\\OpenAI.Codex_26.1103.4239.0_x64__2p2nqsd0c76g0\\\\app\\\\ChatGPT.exe', 'used_memory': '[N/A]'}]",
+  "draft_unverified": true,
+  "disclaimer": "这是管线连通性验证（过拟合检查）——训练与评测同图是刻意的，产出的指标只证明管线能转，不代表模型效果。",
+  "completed_epochs": 0,
+  "training": "NOT_PERFORMED",
+  "evaluation": "NOT_PERFORMED",
+  "predictions": "NOT_PERFORMED",
+  "metrics": null,
+  "record_note": "Recorded from the preserved GPU guard failure; no training or evaluation was run."
+}
