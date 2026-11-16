@@ -40,7 +40,7 @@
 /* Z 方向电平翻转开关：0 = 逻辑 UP 时 DIR- 拉低（与 XY 的 FWD 同电平习惯）。
  * DIR- 电平与滑台升/降的真实对应未经实测：首次点动若方向反了，
  * 只改这里为 1，不要动接线和调用方。限位判断用逻辑方向，不受此宏影响。 */
-#define SM_Z_DIR_INVERT    0u
+#define SM_Z_DIR_INVERT    1u
 
 /* 定时器计数时钟 = HSI 8MHz / (PSC+1) = 1MHz */
 #define SM_TIM_PSC         7u

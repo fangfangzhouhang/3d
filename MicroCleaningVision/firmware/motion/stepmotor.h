@@ -74,17 +74,7 @@ typedef enum {
   SM_Z_DOWN = 1
 } sm_z_dir_t;
 
-/* Z 标定参数：导程 5mm，行程 50mm。
- * SM_Z_PULSE_PER_REV 必须与 HBS57 拨码 SW1-SW4 的实际档位一致：
- * 当前 3200 Pulse/rev → 640 脉冲/mm；拨码改 5000 时同步改这里为 5000
- * （→ 1000 脉冲/mm，步长恰 1μm）。 */
-#define SM_Z_PULSE_PER_REV   3200u
-#define SM_Z_LEAD_MM         5u
-#define SM_Z_STEPS_PER_MM    (SM_Z_PULSE_PER_REV / SM_Z_LEAD_MM)   /* 640 */
-#define SM_Z_TRAVEL_MM       50u
-#define SM_Z_MAX_STEPS       (SM_Z_STEPS_PER_MM * SM_Z_TRAVEL_MM)  /* 32000 */
-
-/* Z 轴：走 steps 个脉冲，dir 为逻辑方向。启动前会先停三轴（与 XY 同口径）。 */
+/* Z 轴：走 steps 个原始脉冲。标定和单位换算见 z_axis_config.h。 */
 void sm_z_start(uint32_t steps, sm_z_dir_t dir);
 
 /* Z 状态查询。 */

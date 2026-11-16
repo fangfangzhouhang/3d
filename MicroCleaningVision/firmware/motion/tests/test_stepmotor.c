@@ -49,7 +49,7 @@ int main(void) {
   /* Z 轴：计数、方向电平与限位自停（TIM4，上限位 PB15）。 */
   sm_z_start(2u, SM_Z_UP);
   assert(sm_z_is_busy() && TIM4->enabled);
-  assert((GPIOB->output & GPIO_Pin_14) == 0u); /* UP 默认 DIR- 拉低（SM_Z_DIR_INVERT=0） */
+  assert((GPIOB->output & GPIO_Pin_14) != 0u); /* 实机方向校正后，UP 释放开漏 DIR-。 */
   fake_timer_ticks(TIM4, 4u);
   assert(sm_z_step_count() == 2u && !sm_z_is_busy());
   GPIOB->input |= GPIO_Pin_15; /* 模拟上限位触发 */
@@ -58,6 +58,7 @@ int main(void) {
   fake_timer_ticks(TIM4, 3u);
   assert(sm_z_step_count() == 0u && !sm_z_is_busy()); /* 朝限位方向不再发脉冲 */
   sm_z_start(1u, SM_Z_DOWN); /* 反方向不受上限位阻挡 */
+  assert((GPIOB->output & GPIO_Pin_14) == 0u);
   fake_timer_ticks(TIM4, 2u);
   assert(sm_z_step_count() == 1u && !sm_z_is_busy());
   GPIOB->input &= (uint16_t)~GPIO_Pin_15;

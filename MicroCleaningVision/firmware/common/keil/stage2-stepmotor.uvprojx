@@ -404,6 +404,16 @@
               <FilePath>..\..\motion\stepmotor.c</FilePath>
             </File>
             <File>
+              <FileName>z_axis_config.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\motion\z_axis_config.c</FilePath>
+            </File>
+            <File>
+              <FileName>limit_input.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\motion\limit_input.c</FilePath>
+            </File>
+            <File>
               <FileName>pump.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\pump\pump.c</FilePath>
