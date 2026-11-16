@@ -53,6 +53,7 @@ New-Item -ItemType Directory -Path $buildRoot -Force | Out-Null
 $supportRoot = Join-Path $commonRoot 'tests\support'
 $sources = @(
   (Join-Path $firmwareRoot 'pump\pump.c'), (Join-Path $firmwareRoot 'motion\stepmotor.c'),
+  (Join-Path $firmwareRoot 'motion\z_axis_config.c'), (Join-Path $firmwareRoot 'motion\limit_input.c'),
   (Join-Path $commonRoot 'board\stm32f10x_it.c'), (Join-Path $supportRoot 'fake_board.c'),
   (Join-Path $commonRoot 'safety\control_core.c'),
   (Join-Path $commonRoot 'serial\mcv1_protocol.c')
@@ -67,6 +68,7 @@ try {
   $env:ZIG_GLOBAL_CACHE_DIR = Join-Path $commonRoot '.tools\zig-global-cache'
   $env:ZIG_LOCAL_CACHE_DIR = Join-Path $buildRoot 'zig-cache'
   $tests = @('pump\tests\test_pump.c', 'motion\tests\test_stepmotor.c',
+    'motion\tests\test_z_axis_config.c', 'motion\tests\test_limit_input.c',
     'common\tests\test_command_flow.c', 'common\tests\test_interlocks.c')
   foreach ($relative in $tests) {
     $testSource = Join-Path $firmwareRoot $relative
@@ -114,5 +116,6 @@ try {
   $env:ZIG_GLOBAL_CACHE_DIR = $previousZigGlobalCache
   $env:ZIG_LOCAL_CACHE_DIR = $previousZigLocalCache
 }
-Write-Output 'Main firmware: 5/5 C executables passed. No camera, COM port, flash, motor or pump used.'
+$testCount = $tests.Count + 1 # Includes the separate ARM-required build.
+Write-Output "Main firmware: $testCount/$testCount C executables passed. No camera, COM port, flash, motor or pump used."
 Write-Output "Generated executables (Git ignored): $buildRoot"

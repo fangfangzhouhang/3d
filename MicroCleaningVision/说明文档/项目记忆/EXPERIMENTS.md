@@ -2,6 +2,12 @@
 
 > ⚠️ 口径注记（2026-11-07）：本文件是带日期的历史实验记录，按 DECISIONS 的 D-017 保留原文、不追改。文中「清洗 / 污染 / 去除率」均是实验当时（多为代理场景）的用法；课题任务定义已更正为微纳 3D 打印聚焦显影，引用本文件数字时须注明其代理场景属性，不得表述为显影效果证据。
 
+## EXP-Z-CONFIG-20261116
+
+基线 z轴实验 baafb69，本地首轮改动。GCC 14.2 下原 5 项和新增 2 项 C 测试通过，覆盖 Z 比值换算、双极性限位消抖和无效采样。Python 串口 59 项通过。ARMCC 5.06u7 的 Stage 2 目标重编为 0 错误、0 警告。证据为同批次主机与 Keil 日志。测试使用替身，尚无现场电压、限停、实物位移或回零数据。
+
+同日实机复测 Z 方向。STM32 串口为 COM5、115200 8N1，SPEED 100 获确认。校正前 PULSEZ 2000 UP 回 STEPZ_START N=2000 UP，最终 READZ 回 Z UP=0 DOWN=0 SENT=2000 BUSY=0，操作者观察到载物台向下。SM_Z_DIR_INVERT 由 0 改为 1 后，Keil 重编 0 错误、0 警告，操作者报告重烧完成。PULSEZ 1000 UP 回 STEPZ_START N=1000 UP，最终 READZ 回 Z UP=0 DOWN=0 SENT=1000 BUSY=0，操作者观察到载物台向上。实机证据为上行方向观察；5 mm 位移、DOWN 复测、HBS57 编码器监视及 X 限位仍待验证。
+
 ## EXP-MERGE-456-MAIN-20261101
 
 基线456@cb7f7b713d2cf5c0af28d8b8b4b4da68e8a10245，main@f3b8cf112a2aa712a388f17f3bf5a81260adfc69，共同基线56a32cf9395c67535bc9ca1692fb3e0b42d647a3。merge-tree预演与实际merge均只有test/test_coverage_panel.py冲突；审阅后选main包含播放/导出按钮映射与初始高度等待的原版本，尺寸/可见性断言未弱化。合并前创建backup/456-before-main-sync-20261101_121918。

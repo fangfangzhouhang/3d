@@ -5,7 +5,7 @@
 #include <string.h>
 
 GPIO_TypeDef fake_gpio_a, fake_gpio_b;
-TIM_TypeDef fake_tim2, fake_tim3;
+TIM_TypeDef fake_tim2, fake_tim3, fake_tim4;
 uint32_t fake_apb1_clocks, fake_apb2_clocks;
 static uint32_t fake_ms;
 static char uart_output[8192];
@@ -17,6 +17,7 @@ void fake_board_reset(void) {
   fake_gpio_b.input = GPIO_Pin_3; /* 测试夹具：急停常闭接地，ARM 按钮未按。 */
   memset(&fake_tim2, 0, sizeof(fake_tim2));
   memset(&fake_tim3, 0, sizeof(fake_tim3));
+  memset(&fake_tim4, 0, sizeof(fake_tim4));
   fake_apb1_clocks = 0u;
   fake_apb2_clocks = 0u;
   fake_ms = 0u;
@@ -82,7 +83,7 @@ void TIM_SetAutoreload(TIM_TypeDef *tim, uint16_t period) { tim->period = period
 void TIM_SetCounter(TIM_TypeDef *tim, uint16_t value) { tim->counter = value; }
 ITStatus TIM_GetITStatus(TIM_TypeDef *tim, uint16_t flag) { (void)flag; return tim->pending && tim->interrupt_enabled ? SET : RESET; }
 void TIM_ClearITPendingBit(TIM_TypeDef *tim, uint16_t flag) { (void)flag; tim->pending = false; }
-void NVIC_Init(NVIC_InitTypeDef *config) { assert(config->NVIC_IRQChannel == TIM2_IRQn || config->NVIC_IRQChannel == TIM3_IRQn); }
+void NVIC_Init(NVIC_InitTypeDef *config) { assert(config->NVIC_IRQChannel == TIM2_IRQn || config->NVIC_IRQChannel == TIM3_IRQn || config->NVIC_IRQChannel == TIM4_IRQn); }
 
 void fake_timer_ticks(TIM_TypeDef *tim, unsigned int count) {
   unsigned int i;
@@ -90,7 +91,8 @@ void fake_timer_ticks(TIM_TypeDef *tim, unsigned int count) {
     if (!tim->enabled || !tim->interrupt_enabled) break;
     tim->pending = true;
     if (tim == TIM2) TIM2_IRQHandler();
-    else { assert(tim == TIM3); TIM3_IRQHandler(); }
+    else if (tim == TIM3) TIM3_IRQHandler();
+    else { assert(tim == TIM4); TIM4_IRQHandler(); }
     assert(!tim->pending);
   }
 }

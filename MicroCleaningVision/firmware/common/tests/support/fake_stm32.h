@@ -11,7 +11,7 @@ typedef enum { RESET = 0, SET = 1 } FlagStatus;
 typedef FlagStatus ITStatus;
 #define Bit_RESET 0u
 #define Bit_SET 1u
-typedef enum { GPIO_Mode_Out_PP = 1, GPIO_Mode_IN_FLOATING, GPIO_Mode_IPU } GPIOMode_TypeDef;
+typedef enum { GPIO_Mode_Out_PP = 1, GPIO_Mode_IN_FLOATING, GPIO_Mode_IPU, GPIO_Mode_Out_OD, GPIO_Mode_IPD } GPIOMode_TypeDef;
 typedef enum { GPIO_Speed_2MHz = 2, GPIO_Speed_50MHz = 50 } GPIOSpeed_TypeDef;
 typedef struct {
   uint16_t output;
@@ -49,12 +49,13 @@ typedef struct {
 } NVIC_InitTypeDef;
 
 extern GPIO_TypeDef fake_gpio_a, fake_gpio_b;
-extern TIM_TypeDef fake_tim2, fake_tim3;
+extern TIM_TypeDef fake_tim2, fake_tim3, fake_tim4;
 extern uint32_t fake_apb1_clocks, fake_apb2_clocks;
 #define GPIOA (&fake_gpio_a)
 #define GPIOB (&fake_gpio_b)
 #define TIM2 (&fake_tim2)
 #define TIM3 (&fake_tim3)
+#define TIM4 (&fake_tim4)
 #define GPIO_Pin_0 ((uint16_t)0x0001)
 #define GPIO_Pin_1 ((uint16_t)0x0002)
 #define GPIO_Pin_2 ((uint16_t)0x0004)
@@ -62,15 +63,21 @@ extern uint32_t fake_apb1_clocks, fake_apb2_clocks;
 #define GPIO_Pin_5 ((uint16_t)0x0020)
 #define GPIO_Pin_6 ((uint16_t)0x0040)
 #define GPIO_Pin_7 ((uint16_t)0x0080)
+#define GPIO_Pin_8 ((uint16_t)0x0100)
 #define GPIO_Pin_12 ((uint16_t)0x1000)
+#define GPIO_Pin_13 ((uint16_t)0x2000)
+#define GPIO_Pin_14 ((uint16_t)0x4000)
+#define GPIO_Pin_15 ((uint16_t)0x8000)
 #define RCC_APB2Periph_GPIOA 1u
 #define RCC_APB2Periph_GPIOB 2u
 #define RCC_APB2Periph_AFIO 16u
 #define GPIO_Remap_SWJ_JTAGDisable 1u
 #define RCC_APB1Periph_TIM2 4u
 #define RCC_APB1Periph_TIM3 8u
+#define RCC_APB1Periph_TIM4 32u
 #define TIM2_IRQn 28u
 #define TIM3_IRQn 29u
+#define TIM4_IRQn 30u
 #define TIM_CounterMode_Up 0u
 #define TIM_CKD_DIV1 0u
 #define TIM_FLAG_Update 1u
@@ -99,6 +106,7 @@ void fake_uart_clear(void);
 const char *fake_uart_output(void);
 void TIM2_IRQHandler(void);
 void TIM3_IRQHandler(void);
+void TIM4_IRQHandler(void);
 void SysTick_Handler(void);
 
 #endif

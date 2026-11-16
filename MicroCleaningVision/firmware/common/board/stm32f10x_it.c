@@ -24,3 +24,7 @@ void TIM2_IRQHandler(void) {
 void TIM3_IRQHandler(void) {
   sm_tim3_irq();
 }
+
+void TIM4_IRQHandler(void) {
+  sm_tim4_irq();
+}

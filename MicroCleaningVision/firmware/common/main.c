@@ -11,6 +11,8 @@
  *   STOP                                    → 两轴立即停止，泵关闭
  *   READ                                    → X 状态 STEP_SENT=xx BUSY=0|1
  *   READXY                                  → 两轴状态 STEP2 X=.. BX=.. Y=.. BY=..
+ *   PULSEZ <N> [UP|DOWN]                    → Z 轴发 N 个脉冲（默认 UP，撞限位自停）
+ *   READZ                                   → Z 状态 Z UP=.. DOWN=.. SENT=.. BUSY=..
  *   PUMP ON                                 → 兼容开泵，固件 300ms 到时关闭
  *   PUMP OFF                                → 关闭水泵（PB0 拉高）
  *   TO_NEEDLE                               → Y 轴正走名义 7680 步，偏移未标定
@@ -18,12 +20,14 @@
  *   MCV1|PING / STATUS / PUMP|id|ms / STOP    → 原泵协议与安全状态机
  *   CLEAR                                   → 急停输入恢复后解除锁存，不恢复动作
  *
- * 接线（共阳极，两台 DM542）：
+ * 接线（共阳极）：
  *   每台 PUL+、DIR+ 接在一起，接到 STM32 的 3.3V，不要接 5V
- *   X：PA6 → X PUL-，PA7 → X DIR-
- *   Y：PA0 → Y PUL-，PA1 → Y DIR-
- *   STM32 GND 与两台 DM542 GND、24V 地共地；ENA 不接
- *   24V+ → DM542 +V
+ *   X（DM542）：PA6 → X PUL-，PA7 → X DIR-
+ *   Y（DM542）：PA0 → Y PUL-，PA1 → Y DIR-
+ *   Z（HBS57）：PB13 → Z PUL-，PB14 → Z DIR-（开漏输出）
+ *   Z 上限位：SN04-N2 → 光耦板 → PB15；Z 下限位 PB8 暂无传感器、已接 GND
+ *   STM32 GND 与驱动器 GND、24V 地共地；ENA 不接
+ *   24V+ → DM542 +V / HBS57 +VDC
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -212,6 +216,19 @@ static void parse_and_exec(const char *line) {
     return;
   }
 
+  /* READZ —— Z 轴限位与状态（急停时也可查，便于诊断） */
+  if (strcmp(line, "READZ") == 0) {
+    char buf[64];
+    (void)snprintf(buf, sizeof(buf),
+                   "Z UP=%lu DOWN=%lu SENT=%lu BUSY=%lu",
+                   (unsigned long)(sm_z_limit_up() ? 1u : 0u),
+                   (unsigned long)(sm_z_limit_down() ? 1u : 0u),
+                   (unsigned long)sm_z_step_count(),
+                   (unsigned long)(sm_z_is_busy() ? 1u : 0u));
+    tx_response(buf);
+    return;
+  }
+
   /* READ */
   if (strcmp(line, "READ") == 0) {
     char buf[64];
@@ -341,6 +358,42 @@ static void parse_and_exec(const char *line) {
     return;
   }
 
+  /* PULSEZ <N> [UP|DOWN] —— Z 轴点动，默认 UP；本方向限位已触发时拒绝启动，
+   * 运动中触发由 stepmotor 的 TIM4 中断逐脉冲检查、自停。 */
+  if (strcmp(args[0], "PULSEZ") == 0 && (argc == 2u || argc == 3u)) {
+    sm_z_dir_t zdir = SM_Z_UP;
+    if (!parse_unsigned(args[1], &n) ||
+        (argc == 3u && strcmp(args[2], "UP") != 0 && strcmp(args[2], "DOWN") != 0)) {
+      tx_response("ERR: BAD_PULSEZ");
+      return;
+    }
+    if (argc == 3u && strcmp(args[2], "DOWN") == 0) zdir = SM_Z_DOWN;
+    if (n == 0u) {
+      tx_response("ERR: N=0");
+      return;
+    }
+    if (n > SM_MAX_PULSE_STEPS) {
+      tx_response("ERR: N>20000");
+      return;
+    }
+    if (sm_is_busy() || sm_y_is_busy() || sm_z_is_busy()) {
+      tx_response("ERR: BUSY");
+      return;
+    }
+    if ((zdir == SM_Z_UP && sm_z_limit_up()) ||
+        (zdir == SM_Z_DOWN && sm_z_limit_down())) {
+      tx_response("ERR: Z_LIMIT");
+      return;
+    }
+    sm_z_start(n, zdir);
+    char buf[64];
+    (void)snprintf(buf, sizeof(buf),
+                   "STEPZ_START N=%lu %s",
+                   (unsigned long)n, zdir == SM_Z_UP ? "UP" : "DOWN");
+    tx_response(buf);
+    return;
+  }
+
   /* MOVEXY <Nx> <FWD|REV> <Ny> <FWD|REV> —— 双轴同时运动 */
   if (strcmp(args[0], "MOVEXY") == 0) {
     uint32_t nx = 0u;
@@ -433,10 +486,11 @@ int main(void) {
   service_safety();
 
   /* 启动 Banner —— 等 Python probe 脚本或串口助手 */
-  hal_uart_send_str("\r\n=== STAGE2 STEPMOTOR XY TEST ===\r\n");
-  hal_uart_send_str("2x DM542 + 2x 57-56, X+Y axes\r\n");
+  hal_uart_send_str("\r\n=== STAGE2 STEPMOTOR XYZ TEST ===\r\n");
+  hal_uart_send_str("2x DM542 + HBS57, X+Y+Z axes\r\n");
   hal_uart_send_str("HELLO / PULSE N / MOVEXY Nx d Ny d / MOVE N / "
-                    "SPEED Hz / STOP / READ / READXY / PUMP ON / PUMP OFF / "
+                    "SPEED Hz / STOP / READ / READXY / PULSEZ N [UP|DOWN] / READZ / "
+                    "PUMP ON / PUMP OFF / "
                     "TO_NEEDLE / TO_SCOPE\r\n");
   hal_uart_send_str("Waiting...\r\n");
 
