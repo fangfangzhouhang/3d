@@ -7,12 +7,12 @@
 | 文件 / 目录 | 做什么 | 主责 |
 |---|---|---|
 | ../pump/pump.c、pump.h、tests/ | PB0 泵输出、低层单元测试 | H1 |
-| ../motion/stepmotor.c、stepmotor.h、tests/ | 双轴脉冲、偏移、低层单元测试 | H2 |
+| ../motion/stepmotor.c、stepmotor.h、tests/ | XY 脉冲和偏移、Z 轴点动、低层单元测试 | H2 |
 | main.c | 唯一当前串口入口、命令分发、计时和按钮轮询 | 共享，一次一位主改 |
 | board/ | 芯片初始化、串口、毫秒时钟、实际中断转发 | 共享 |
 | safety/ | 旧工程已有的纯 C 安全状态机，内容未重写 | 共享 |
 | serial/mcv1_protocol.c、mcv1_protocol.h | 旧、新工程复用同一份喷水协议 | 共享 |
-| keil/stage2-stepmotor.uvprojx | 当前 XY + 泵联动构建 | 共享 |
+| keil/stage2-stepmotor.uvprojx | 当前 XYZ + 泵联动构建 | 共享 |
 | keil/f103-stage1.uvprojx | 保留的旧喷水构建 | 共享 |
 | compat/stage1/ | 旧板级入口、旧解析器和回归测试 | H1 维护兼容，H2 复核相关接口 |
 | scripts/、tests/ | 本机编译与真实主入口的故障测试 | 共享 |
@@ -24,10 +24,11 @@
 ~~~text
 串口 MOVEXY → main.c → motion/sm_start_xy → TIM2/TIM3 → 已发脉冲和忙闲
 串口 TO_NEEDLE / TO_SCOPE → main.c → sm_start_scope_offset → 同一个 sm_start_xy
+串口 MOVEZ / READZ → main.c → motion/sm_z_* → STEP / DIR 和上下限位
 串口 PUMP 或 MCV1 → main.c → 已有 protocol / control_core
-                           ↑ 时间、PB2 急停、PB3 ARM
+                           ↑ 时间、PB12 急停、PB3 ARM
                            ↓ apply_safe_outputs → pump_on/off → PB0
-STOP / MCV1|STOP / 急停 / FAULT → 泵关闭 + 两轴停止
+STOP / MCV1|STOP / 急停 / FAULT → 泵关闭 + 三轴停止
 ~~~
 
 针头偏移不是另一套运动驱动。继承的参数是 24 mm × 名义 320 步/mm = 7680 个 Y 脉冲；TO_NEEDLE 用 FWD，TO_SCOPE 用 REV。它是相对运动，不是回零、绝对定位或标定。
@@ -42,12 +43,31 @@ STOP / MCV1|STOP / 急停 / FAULT → 泵关闭 + 两轴停止
 
 1. 旧 PUMP ON 仍回 PUMP_ON，但现在走已有状态机，只申请一次 300 ms 脉冲。到时自行关闭；重复 ON 不延长这一轮。
 2. MCV1 的 PING / STATUS / 限时 PUMP / STOP 接入当前主入口；ACK 是接受申请，DONE 是输出定时结束，不是水量或清洗成功证据。固件继承范围 100–2000 ms；电脑既有编码器仍限制 100–500 ms，不能混为一个范围。
-3. PB2 从浮空改为上拉。当前假设常闭触点接 PB2–GND：闭合低电平正常，按下或断线高电平锁存急停。没有连接触点时会阻止动作。这是需要现场核对的新接线要求，不是已经确认的实物事实。
+3. 当前急停为 PB12 上拉。固件假设常闭触点接 PB12–GND：闭合低电平正常，按下或断线高电平锁存急停。没有连接触点时会阻止动作。
 4. PB3 上拉并关闭 JTAG 保留 SWD，释放 PB3 给 ARM 输入。默认 FW_REQUIRE_ARM_BUTTON=0 与旧配置一致，不宣称默认强制按 ARM。设为 1 的旧按钮防抖和原始 ARM/PUMP ON 流程已离线测试；MCV1 的额外按钮握手仍有旧限制。
 5. CLEAR 只清除已解除的急停，不自动继续动作。STOP 中止喷水时保留中止回执，不伪造 DONE。
 6. 运动忙时拒绝覆盖命令；非法数字/方向/尾部垃圾被拒绝；过长串口行整行丢弃。停止后挂起的中断不再多发脉冲。
 
 主循环轮询联锁，仍可能受串口发送等影响产生延迟；它不等于独立硬件断电急停，不提供位置或流量传感器反馈。现场运行前必须核对接线和人工授权。
+
+### Z 轴点动
+
+| STM32 引脚 | 功能 |
+|---|---|
+| `PB13` | STEP，开漏直连 HBS57 `PUL−`，空闲释放，拉低发脉冲 |
+| `PB14` | DIR，开漏直连 HBS57 `DIR−`，默认 `UP` 拉低，实机方向由 `Z_DIR_INVERT` 调整 |
+| `PB15` | 上限位，接 3.3 V 侧隔离输出 |
+| `PB8` | 下限位，接 3.3 V 侧隔离输出 |
+
+按现场定版，`PUL+`、`DIR+` 共接 STM32 `3.3V`，`ENA`、`ALM` 留空。现场 24 V 抱闸随驱动器电源通断。用仪器核对 STEP 空闲、HBS57 的有效计步沿及其对 3.3 V 信号的响应，再进行实物点动。
+
+核对限位输入在常态为低，触发或断线为高。现场 `PB8` 暂接地，`DOWN=0`，下行目前没有物理限位保护。装好下限位后，将 `PB8` 接对应的 3.3 V 隔离输出。硬件急停和抱闸独立验收。
+
+- `MOVEZ 20 UP` 或 `MOVEZ 20 DOWN` 请求一次点动，协议上限沿用 XY 的 20000 个脉冲，标称 100 脉冲/秒。现场点动使用短步数。对应限位触发时停止该方向，反向可离开限位。Z 点动与 XY 运动、喷水互锁。
+- `READZ` 回复例如 `STEPZ N=20 STATE=DONE UP=0 DOWN=0`。`N` 为本次点动发出的 STEP 有效沿数，`UP`、`DOWN` 为限位输入状态，`1` 表示触发或断线。
+- `STOP` 和 `MCV1|STOP` 中止正在执行的点动。急停解除后用 `CLEAR` 清锁，下一次点动需要重新发命令。
+- 当前版本只有相对点动，尚无 Z 轴回零命令或回零方向设定。
+- 导程 5 mm、行程 50 mm，按交接文档记录的 3200 脉冲/圈编译，得到 640 脉冲/mm、全程 32000 脉冲。拨码改到 5000 时同步改 `SM_Z_PULSES_PER_REV`。固件按本次启动以来已发脉冲限制相对位置的最大跨度，超出回复 `ERR: Z_TRAVEL`。未知开机位置时，这个限制无法确定到机械端点的剩余距离。
 
 ## 4. 离线测试：不插相机、不插板、不打开 COM
 

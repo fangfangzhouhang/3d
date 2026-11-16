@@ -213,3 +213,106 @@ uint32_t sm_step_count(void)   { return x_axis.sent; }
 bool     sm_is_busy(void)      { return x_axis.busy; }
 uint32_t sm_y_step_count(void) { return y_axis.sent; }
 bool     sm_y_is_busy(void)    { return y_axis.busy; }
+
+/* HBS57 3.3 V 共阳直连：开漏输出拉低时光耦导通。 */
+#define SM_Z_STEP_PIN        GPIO_Pin_13
+#define SM_Z_DIR_PIN         GPIO_Pin_14
+#define SM_Z_UP_LIMIT_PIN    GPIO_Pin_15
+#define SM_Z_DOWN_LIMIT_PIN  GPIO_Pin_8
+/* 默认 UP 拉低 DIR−。实机方向相反时只翻转这个常量。 */
+#define Z_DIR_INVERT         0u
+#define SM_Z_ACTIVE_MS       2u
+#define SM_Z_IDLE_MS         8u
+
+static sm_z_state_t z_state;
+static sm_z_dir_t z_dir;
+static uint32_t z_target, z_sent, z_transition_ms;
+static bool z_step_active;
+/* Relative commanded position since boot. No physical zero is known. */
+static int32_t z_position, z_minimum, z_maximum;
+
+void sm_z_init(void) {
+  GPIO_InitTypeDef gpio;
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+  /* 先将输出锁存置 1，再使能开漏，避免初始化时拉低 STEP。 */
+  GPIO_SetBits(GPIOB, SM_Z_STEP_PIN | SM_Z_DIR_PIN);
+  gpio.GPIO_Pin = SM_Z_STEP_PIN | SM_Z_DIR_PIN;
+  gpio.GPIO_Mode = GPIO_Mode_Out_OD;
+  gpio.GPIO_Speed = GPIO_Speed_2MHz;
+  GPIO_Init(GPIOB, &gpio);
+
+  /* 常态下拉、触发或断线读高。隔离板要按这个逻辑接入。 */
+  gpio.GPIO_Pin = SM_Z_UP_LIMIT_PIN | SM_Z_DOWN_LIMIT_PIN;
+  gpio.GPIO_Mode = GPIO_Mode_IPU;
+  GPIO_Init(GPIOB, &gpio);
+  z_state = SM_Z_IDLE;
+  z_sent = 0u;
+  z_step_active = false;
+  z_position = z_minimum = z_maximum = 0;
+}
+
+bool sm_z_limit_active(sm_z_dir_t dir) {
+  uint16_t pin = dir == SM_Z_UP ? SM_Z_UP_LIMIT_PIN : SM_Z_DOWN_LIMIT_PIN;
+  return GPIO_ReadInputDataBit(GPIOB, pin) != Bit_RESET;
+}
+
+bool sm_z_travel_allows(uint32_t steps, sm_z_dir_t dir) {
+  if (steps > SM_Z_MAX_PULSE_STEPS) return false;
+  if (dir == SM_Z_UP)
+    return z_position - z_minimum + (int32_t)steps <= (int32_t)SM_Z_TRAVEL_PULSES;
+  if (dir == SM_Z_DOWN)
+    return z_maximum - z_position + (int32_t)steps <= (int32_t)SM_Z_TRAVEL_PULSES;
+  return false;
+}
+
+bool sm_z_start(uint32_t steps, sm_z_dir_t dir, uint32_t now_ms) {
+  if (z_state == SM_Z_MOVING || steps == 0u || steps > SM_Z_MAX_PULSE_STEPS ||
+      (dir != SM_Z_UP && dir != SM_Z_DOWN)) return false;
+  if (sm_z_limit_active(dir)) {
+    z_state = SM_Z_LIMIT;
+    return false;
+  }
+  if (!sm_z_travel_allows(steps, dir)) return false;
+  if ((dir == SM_Z_UP) != (Z_DIR_INVERT != 0u)) GPIO_ResetBits(GPIOB, SM_Z_DIR_PIN);
+  else GPIO_SetBits(GPIOB, SM_Z_DIR_PIN);
+  z_dir = dir;
+  z_target = steps;
+  z_sent = 0u;
+  z_transition_ms = now_ms;
+  z_state = SM_Z_MOVING;
+  return true;
+}
+
+static void sm_z_finish(sm_z_state_t result) {
+  GPIO_SetBits(GPIOB, SM_Z_STEP_PIN);
+  z_step_active = false;
+  z_state = result;
+}
+
+void sm_z_service(uint32_t now_ms) {
+  uint32_t elapsed = now_ms - z_transition_ms;
+  if (z_state != SM_Z_MOVING) return;
+  if (sm_z_limit_active(z_dir)) {
+    sm_z_finish(SM_Z_LIMIT);
+  } else if (z_step_active && elapsed >= SM_Z_ACTIVE_MS) {
+    GPIO_SetBits(GPIOB, SM_Z_STEP_PIN);
+    z_step_active = false;
+    z_transition_ms = now_ms;
+    if (z_sent == z_target) z_state = SM_Z_DONE;
+  } else if (!z_step_active && elapsed >= SM_Z_IDLE_MS) {
+    GPIO_ResetBits(GPIOB, SM_Z_STEP_PIN);
+    z_step_active = true;
+    z_transition_ms = now_ms;
+    ++z_sent;
+    z_position += z_dir == SM_Z_UP ? 1 : -1;
+    if (z_position < z_minimum) z_minimum = z_position;
+    if (z_position > z_maximum) z_maximum = z_position;
+  }
+}
+
+void sm_z_stop(void) {
+  if (z_state == SM_Z_MOVING) sm_z_finish(SM_Z_STOPPED);
+}
+
+sm_z_state_t sm_z_state(void) { return z_state; }
+uint32_t sm_z_step_count(void) { return z_sent; }

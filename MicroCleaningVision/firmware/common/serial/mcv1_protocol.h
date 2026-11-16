@@ -23,6 +23,7 @@ typedef struct {
   unsigned int response_head;
   unsigned int response_count;
   bool action_active;
+  bool pump_inhibited; /* Board interlock for new pump requests. */
 } mcv1_controller_t;
 
 void mcv1_init(mcv1_controller_t *controller, const fw_config_t *config);

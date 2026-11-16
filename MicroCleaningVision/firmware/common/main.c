@@ -8,7 +8,9 @@
  *   MOVEXY <Nx> <FWD|REV> <Ny> <FWD|REV>    → X/Y 同频同时启动，短轴先停
  *   MOVE <N>                                → 等价 PULSE N
  *   SPEED <Hz>                              → 两轴同设频率 10-20000Hz
- *   STOP                                    → 两轴立即停止，泵关闭
+ *   MOVEZ <N> <UP|DOWN>                     → Z 轴点动 1–20000 个脉冲
+ *   READZ                                   → Z 轴脉冲数、状态及限位
+ *   STOP                                    → XYZ 停止，泵关闭
  *   READ                                    → X 状态 STEP_SENT=xx BUSY=0|1
  *   READXY                                  → 两轴状态 STEP2 X=.. BX=.. Y=.. BY=..
  *   PUMP ON                                 → 兼容开泵，固件 300ms 到时关闭
@@ -45,7 +47,7 @@ static uint8_t line_idx;
 static bool line_discarding;
 static mcv1_controller_t pump_controller;
 
-/* 公共辅助引脚；PB2/PB3 由 read_inputs() 送入已有安全状态机。 */
+/* 公共辅助引脚；PB12/PB3 由 read_inputs() 送入已有安全状态机。 */
 static void board_aux_gpio_init(void) {
   GPIO_InitTypeDef gpio;
 
@@ -79,6 +81,7 @@ static void board_init(void) {
   board_aux_gpio_init();
   hal_uart2_init();
   sm_init();
+  sm_z_init();
   mcv1_init(&pump_controller, &config);
   line_idx = 0u;
   line_discarding = false;
@@ -97,6 +100,15 @@ static fw_inputs_t read_inputs(void) {
   return inputs;
 }
 
+static void stop_motion(void) {
+  sm_stop();
+  sm_z_stop();
+}
+
+static bool motion_busy(void) {
+  return sm_is_busy() || sm_y_is_busy() || sm_z_state() == SM_Z_MOVING;
+}
+
 static void apply_safe_outputs(void) {
   fw_outputs_t outputs = fw_core_outputs(&pump_controller.core, hal_now_ms());
   fw_status_t status = fw_core_status(&pump_controller.core);
@@ -106,11 +118,12 @@ static void apply_safe_outputs(void) {
   else GPIO_ResetBits(GPIOA, GPIO_Pin_5);
   if (outputs.buzzer_on) GPIO_SetBits(GPIOB, GPIO_Pin_1);
   else GPIO_ResetBits(GPIOB, GPIO_Pin_1);
-  if (status.state == FW_STATE_E_STOP || status.state == FW_STATE_FAULT) sm_stop();
+  if (status.state == FW_STATE_E_STOP || status.state == FW_STATE_FAULT) stop_motion();
 }
 
 static void service_safety(void) {
-  mcv1_step(&pump_controller, read_inputs());
+  fw_inputs_t inputs = read_inputs();
+  mcv1_step(&pump_controller, inputs);
   apply_safe_outputs(); /* 先关闭输出，再发送回执，避免 UART 等待延迟停泵。 */
 }
 
@@ -123,7 +136,7 @@ static void flush_pump_responses(void) {
 
 static void stop_all(void) {
   const fw_command_t stop = {FW_CMD_STOP, 0u};
-  sm_stop();
+  stop_motion();
   if (pump_controller.action_active) {
     mcv1_process_line(&pump_controller, read_inputs(), "MCV1|STOP");
   } else {
@@ -164,7 +177,8 @@ static void parse_and_exec(const char *line) {
 
   service_safety();
   if (strncmp(line, "MCV1|", 5) == 0) {
-    if (strcmp(line, "MCV1|STOP") == 0) sm_stop();
+    if (strcmp(line, "MCV1|STOP") == 0) stop_motion();
+    pump_controller.pump_inhibited = sm_z_state() == SM_Z_MOVING;
     mcv1_process_line(&pump_controller, read_inputs(), line);
     apply_safe_outputs();
     flush_pump_responses();
@@ -224,6 +238,17 @@ static void parse_and_exec(const char *line) {
     return;
   }
 
+  if (strcmp(line, "READZ") == 0) {
+    static const char *const states[] = {"IDLE", "MOVING", "DONE", "LIMIT", "STOPPED"};
+    char buf[64];
+    (void)snprintf(buf, sizeof(buf), "STEPZ N=%lu STATE=%s UP=%u DOWN=%u",
+                   (unsigned long)sm_z_step_count(), states[sm_z_state()],
+                   sm_z_limit_active(SM_Z_UP) ? 1u : 0u,
+                   sm_z_limit_active(SM_Z_DOWN) ? 1u : 0u);
+    tx_response(buf);
+    return;
+  }
+
   if (strcmp(line, "CLEAR") == 0) {
     const fw_command_t clear = {FW_CMD_CLEAR, 0u};
     fw_result_t result = fw_core_command(&pump_controller.core, read_inputs(), &clear);
@@ -242,7 +267,7 @@ static void parse_and_exec(const char *line) {
   if (strcmp(line, "PUMP ON") == 0) {
     const fw_command_t arm = {FW_CMD_ARM, 0u};
     const fw_command_t pump = {FW_CMD_PUMP, LEGACY_PUMP_DURATION_MS};
-    if (pump_controller.action_active) {
+    if (pump_controller.action_active || sm_z_state() == SM_Z_MOVING) {
       tx_response("ERR: BUSY");
       return;
     }
@@ -276,7 +301,7 @@ static void parse_and_exec(const char *line) {
   if (strcmp(line, "TO_NEEDLE") == 0 || strcmp(line, "TO_SCOPE") == 0) {
     char buf[64];
     bool returning = strcmp(line, "TO_SCOPE") == 0;
-    if (sm_is_busy() || sm_y_is_busy()) {
+    if (motion_busy()) {
       tx_response("ERR: BUSY");
       return;
     }
@@ -295,6 +320,33 @@ static void parse_and_exec(const char *line) {
   }
   if (argc == 0u || token != NULL) {
     tx_response("ERR: BAD_CMD");
+    return;
+  }
+
+  if (strcmp(args[0], "MOVEZ") == 0) {
+    sm_z_dir_t dir;
+    char buf[40];
+    if (argc != 3u || !parse_unsigned(args[1], &n) || n == 0u ||
+        n > SM_Z_MAX_PULSE_STEPS ||
+        (strcmp(args[2], "UP") != 0 && strcmp(args[2], "DOWN") != 0)) {
+      tx_response("ERR: BAD_MOVEZ");
+      return;
+    }
+    if (motion_busy() || status.state == FW_STATE_PUMPING) {
+      tx_response("ERR: BUSY");
+      return;
+    }
+    dir = strcmp(args[2], "UP") == 0 ? SM_Z_UP : SM_Z_DOWN;
+    if (!sm_z_limit_active(dir) && !sm_z_travel_allows(n, dir)) {
+      tx_response("ERR: Z_TRAVEL");
+      return;
+    }
+    if (!sm_z_start(n, dir, hal_now_ms())) {
+      tx_response("ERR: Z_LIMIT");
+      return;
+    }
+    (void)snprintf(buf, sizeof(buf), "STEPZ_START N=%lu %s", (unsigned long)n, args[2]);
+    tx_response(buf);
     return;
   }
 
@@ -328,7 +380,7 @@ static void parse_and_exec(const char *line) {
       tx_response("ERR: N>20000");
       return;
     }
-    if (sm_is_busy() || sm_y_is_busy()) {
+    if (motion_busy()) {
       tx_response("ERR: BUSY");
       return;
     }
@@ -359,7 +411,7 @@ static void parse_and_exec(const char *line) {
       tx_response("ERR: N>20000");
       return;
     }
-    if (sm_is_busy() || sm_y_is_busy()) {
+    if (motion_busy()) {
       tx_response("ERR: BUSY");
       return;
     }
@@ -386,7 +438,7 @@ static void parse_and_exec(const char *line) {
       tx_response("ERR: N>20000");
       return;
     }
-    if (sm_is_busy() || sm_y_is_busy()) {
+    if (motion_busy()) {
       tx_response("ERR: BUSY");
       return;
     }
@@ -433,11 +485,10 @@ int main(void) {
   service_safety();
 
   /* 启动 Banner —— 等 Python probe 脚本或串口助手 */
-  hal_uart_send_str("\r\n=== STAGE2 STEPMOTOR XY TEST ===\r\n");
-  hal_uart_send_str("2x DM542 + 2x 57-56, X+Y axes\r\n");
+  hal_uart_send_str("\r\n=== STAGE2 STEPMOTOR XYZ TEST ===\r\n");
   hal_uart_send_str("HELLO / PULSE N / MOVEXY Nx d Ny d / MOVE N / "
                     "SPEED Hz / STOP / READ / READXY / PUMP ON / PUMP OFF / "
-                    "TO_NEEDLE / TO_SCOPE\r\n");
+                    "TO_NEEDLE / TO_SCOPE / MOVEZ N UP|DOWN / READZ\r\n");
   hal_uart_send_str("Waiting...\r\n");
 
   while (1) {
@@ -449,6 +500,8 @@ int main(void) {
       feed_byte((char)byte);
       service_safety();
     }
+    service_safety();
+    sm_z_service(hal_now_ms());
     /* 安全状态机每轮服务；TIM2/TIM3 只负责脉冲，不管理泵。 */
   }
 }

@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F10X_MD,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\board;..;..\..\pump;C:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\Include;C:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\inc;C:\Keil_v5\ARM\PACK\ARM\CMSIS\5.0.1\CMSIS\Include;..\safety;..\compat\stage1\system_b;..\serial</IncludePath>
+              <IncludePath>..\board;..;..\..\pump;..\..\motion;C:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\Include;C:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\inc;C:\Keil_v5\ARM\PACK\ARM\CMSIS\5.0.1\CMSIS\Include;..\safety;..\compat\stage1\system_b;..\serial</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>

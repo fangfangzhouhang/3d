@@ -11,7 +11,7 @@ typedef enum { RESET = 0, SET = 1 } FlagStatus;
 typedef FlagStatus ITStatus;
 #define Bit_RESET 0u
 #define Bit_SET 1u
-typedef enum { GPIO_Mode_Out_PP = 1, GPIO_Mode_IN_FLOATING, GPIO_Mode_IPU } GPIOMode_TypeDef;
+typedef enum { GPIO_Mode_Out_PP = 1, GPIO_Mode_IN_FLOATING, GPIO_Mode_IPU, GPIO_Mode_Out_OD } GPIOMode_TypeDef;
 typedef enum { GPIO_Speed_2MHz = 2, GPIO_Speed_50MHz = 50 } GPIOSpeed_TypeDef;
 typedef struct {
   uint16_t output;
@@ -62,7 +62,11 @@ extern uint32_t fake_apb1_clocks, fake_apb2_clocks;
 #define GPIO_Pin_5 ((uint16_t)0x0020)
 #define GPIO_Pin_6 ((uint16_t)0x0040)
 #define GPIO_Pin_7 ((uint16_t)0x0080)
+#define GPIO_Pin_8 ((uint16_t)0x0100)
 #define GPIO_Pin_12 ((uint16_t)0x1000)
+#define GPIO_Pin_13 ((uint16_t)0x2000)
+#define GPIO_Pin_14 ((uint16_t)0x4000)
+#define GPIO_Pin_15 ((uint16_t)0x8000)
 #define RCC_APB2Periph_GPIOA 1u
 #define RCC_APB2Periph_GPIOB 2u
 #define RCC_APB2Periph_AFIO 16u

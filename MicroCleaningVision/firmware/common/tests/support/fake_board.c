@@ -14,7 +14,8 @@ static size_t uart_length;
 void fake_board_reset(void) {
   memset(&fake_gpio_a, 0, sizeof(fake_gpio_a));
   memset(&fake_gpio_b, 0, sizeof(fake_gpio_b));
-  fake_gpio_b.input = GPIO_Pin_3; /* 测试夹具：急停常闭接地，ARM 按钮未按。 */
+  /* 急停常闭接地，ARM 未按，Z 限位断开时由上拉读高。 */
+  fake_gpio_b.input = GPIO_Pin_3 | GPIO_Pin_8 | GPIO_Pin_15;
   memset(&fake_tim2, 0, sizeof(fake_tim2));
   memset(&fake_tim3, 0, sizeof(fake_tim3));
   fake_apb1_clocks = 0u;

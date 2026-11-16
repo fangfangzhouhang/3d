@@ -63,4 +63,23 @@ bool     sm_y_is_busy(void);     /* Y 是否运动中 */
 void sm_tim2_irq(void);          /* Y 轴 */
 void sm_tim3_irq(void);          /* X 轴 */
 
+#define SM_Z_MAX_PULSE_STEPS SM_MAX_PULSE_STEPS
+#define SM_Z_PULSES_PER_REV 3200u
+#define SM_Z_LEAD_MM 5u
+#define SM_Z_TRAVEL_MM 50u
+#define SM_Z_PULSES_PER_MM (SM_Z_PULSES_PER_REV / SM_Z_LEAD_MM)
+#define SM_Z_TRAVEL_PULSES (SM_Z_PULSES_PER_MM * SM_Z_TRAVEL_MM)
+typedef enum { SM_Z_UP, SM_Z_DOWN } sm_z_dir_t;
+typedef enum { SM_Z_IDLE, SM_Z_MOVING, SM_Z_DONE, SM_Z_LIMIT, SM_Z_STOPPED } sm_z_state_t;
+
+/* PB13 → PUL−、PB14 → DIR−（3.3 V 共阳，开漏）；PB15 上限位、PB8 下限位。 */
+void sm_z_init(void);
+bool sm_z_limit_active(sm_z_dir_t dir);
+bool sm_z_travel_allows(uint32_t steps, sm_z_dir_t dir);
+bool sm_z_start(uint32_t steps, sm_z_dir_t dir, uint32_t now_ms);
+void sm_z_service(uint32_t now_ms);
+void sm_z_stop(void);
+sm_z_state_t sm_z_state(void);
+uint32_t sm_z_step_count(void);
+
 #endif /* STEPMOTOR_H */

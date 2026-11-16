@@ -21,7 +21,99 @@ static void elapsed(unsigned int ms) {
   unsigned int i;
   for (i = 0u; i < ms; ++i) SysTick_Handler();
   service_safety();
+  sm_z_service(hal_now_ms());
   flush_pump_responses();
+}
+
+static void test_z_jog(void) {
+  command("READZ", "STEPZ N=0 STATE=IDLE UP=1 DOWN=1\r\n");
+  command("MOVEZ 1 UP", "ERR: Z_LIMIT\r\n");
+  command("MOVEZ 1 DOWN", "ERR: Z_LIMIT\r\n");
+  assert(GPIOB->modes[13] == GPIO_Mode_Out_OD && GPIOB->modes[14] == GPIO_Mode_Out_OD);
+  assert((GPIOB->output_at_init[13] & GPIO_Pin_13) != 0u);
+  assert((GPIOB->output_at_init[14] & GPIO_Pin_14) != 0u);
+  assert(GPIOB->modes[8] == GPIO_Mode_IPU && GPIOB->modes[15] == GPIO_Mode_IPU);
+  GPIOB->input &= (uint16_t)~(GPIO_Pin_8 | GPIO_Pin_15);
+  command("MOVEZ 0 DOWN", "ERR: BAD_MOVEZ\r\n");
+  command("MOVEZ 20001 UP", "ERR: BAD_MOVEZ\r\n");
+  command("MOVEZ 1 FWD", "ERR: BAD_MOVEZ\r\n");
+  command("MOVEZ 2 UP", "STEPZ_START N=2 UP\r\n");
+  assert((GPIOB->output & GPIO_Pin_14) == 0u);
+  command("PULSE 1", "ERR: BUSY\r\n");
+  command("PUMP ON", "ERR: BUSY\r\n");
+  command("MCV1|PUMP|z_busy|300", "MCV1|ERR|z_busy|BUSY\r\n");
+  elapsed(7u);
+  assert(sm_z_step_count() == 0u);
+  elapsed(1u);
+  assert(sm_z_step_count() == 1u && (GPIOB->output & GPIO_Pin_13) == 0u);
+  elapsed(2u);
+  assert((GPIOB->output & GPIO_Pin_13) != 0u);
+  elapsed(8u);
+  elapsed(2u);
+  command("READZ", "STEPZ N=2 STATE=DONE UP=0 DOWN=0\r\n");
+  elapsed(20u);
+  assert(sm_z_step_count() == 2u && (GPIOB->output & GPIO_Pin_13) != 0u);
+
+  command("MOVEZ 5 UP", "STEPZ_START N=5 UP\r\n");
+  elapsed(8u);
+  GPIOB->input |= GPIO_Pin_15;
+  elapsed(1u);
+  assert((GPIOB->output & GPIO_Pin_13) != 0u);
+  command("READZ", "STEPZ N=1 STATE=LIMIT UP=1 DOWN=0\r\n");
+  command("MOVEZ 20000 DOWN", "STEPZ_START N=20000 DOWN\r\n");
+  assert((GPIOB->output & GPIO_Pin_14) != 0u);
+  elapsed(8u);
+  command("MCV1|STOP", "MCV1|ACK|STOP\r\nMCV1|DONE|STOP\r\n");
+  elapsed(20u);
+  command("READZ", "STEPZ N=1 STATE=STOPPED UP=1 DOWN=0\r\n");
+
+  command("MOVEZ 5 DOWN", "STEPZ_START N=5 DOWN\r\n");
+  elapsed(8u);
+  command("STOP", "STEP_STOPPED\r\n");
+  assert((GPIOB->output & GPIO_Pin_13) != 0u);
+  command("MOVEZ 5 DOWN", "STEPZ_START N=5 DOWN\r\n");
+  elapsed(8u);
+  GPIOB->input |= GPIO_Pin_12;
+  elapsed(1u);
+  assert((GPIOB->output & GPIO_Pin_13) != 0u);
+  GPIOB->input &= (uint16_t)~GPIO_Pin_12;
+  command("MOVEZ 1 DOWN", "ERR: ESTOP\r\n");
+  command("CLEAR", "CLEARED\r\n");
+  elapsed(20u);
+  command("READZ", "STEPZ N=1 STATE=STOPPED UP=1 DOWN=0\r\n");
+
+  command("MOVEZ 2 DOWN", "STEPZ_START N=2 DOWN\r\n");
+  elapsed(8u);
+  GPIOB->input |= GPIO_Pin_8;
+  elapsed(1u);
+  assert((GPIOB->output & GPIO_Pin_13) != 0u);
+  command("READZ", "STEPZ N=1 STATE=LIMIT UP=1 DOWN=1\r\n");
+  command("MOVEZ 1 DOWN", "ERR: Z_LIMIT\r\n");
+  GPIOB->input &= (uint16_t)~GPIO_Pin_15;
+  command("MOVEZ 1 UP", "STEPZ_START N=1 UP\r\n");
+  elapsed(8u);
+  elapsed(2u);
+  command("READZ", "STEPZ N=1 STATE=DONE UP=0 DOWN=1\r\n");
+}
+
+static void test_z_travel(void) {
+  uint32_t now = 0u;
+  board_init();
+  GPIOB->input &= (uint16_t)~(GPIO_Pin_8 | GPIO_Pin_15);
+  for (uint32_t remaining = SM_Z_TRAVEL_PULSES; remaining > 0u;) {
+    uint32_t pulses = remaining > SM_Z_MAX_PULSE_STEPS ? SM_Z_MAX_PULSE_STEPS : remaining;
+    assert(sm_z_start(pulses, SM_Z_UP, now));
+    for (uint32_t pulse = 0u; pulse < pulses; ++pulse) {
+      sm_z_service(now += 8u);
+      sm_z_service(now += 2u);
+    }
+    assert(sm_z_state() == SM_Z_DONE);
+    remaining -= pulses;
+  }
+  command("MOVEZ 1 UP", "ERR: Z_TRAVEL\r\n");
+  command("MOVEZ 1 DOWN", "STEPZ_START N=1 DOWN\r\n");
+  command("STOP", "STEP_STOPPED\r\n");
+  command("MOVEZ 1 UP", "ERR: Z_TRAVEL\r\n"); /* A cancelled command spent no pulses. */
 }
 
 int main(void) {
@@ -30,6 +122,8 @@ int main(void) {
   board_init();
   service_safety();
   assert((GPIOB->output & GPIO_Pin_0) != 0u);
+
+  test_z_jog();
 
   command("PUMP ON", "PUMP_ON\r\n");
   elapsed(250u);
@@ -104,6 +198,7 @@ int main(void) {
   service_safety();
   assert((GPIOB->output & GPIO_Pin_0) != 0u);
   command("PUMP ON", "ERR: FAULT\r\n");
+  test_z_travel();
   puts("test_interlocks: PASS (real main + shared core: timeout, replay, ESTOP, STOP, overflow, BUSY, invalid directions)");
   return 0;
 }

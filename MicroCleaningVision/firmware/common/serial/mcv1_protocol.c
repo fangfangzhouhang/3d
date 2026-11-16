@@ -235,6 +235,8 @@ void mcv1_process_line(
       }
     } else if (is_completed(controller, fields[2])) {
       queue_response(controller, "MCV1|DONE|%s\r\n", fields[2]);
+    } else if (controller->pump_inhibited) {
+      queue_pump_response(controller, fields[2], "BUSY");
     } else if (fw_core_command(&controller->core, inputs, &arm) != FW_RESULT_OK ||
                fw_core_command(&controller->core, inputs, &pump) != FW_RESULT_OK) {
       queue_pump_response(controller, fields[2], "INTERNAL");
